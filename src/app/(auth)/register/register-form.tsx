@@ -1,0 +1,405 @@
+"use client";
+
+import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { AnimatePresence, motion } from "motion/react";
+import { ArrowLeft, ArrowRight, Briefcase, Check, Eye, EyeOff, Loader2, Plus, Search, Sparkles, X } from "lucide-react";
+import { registerAction, type FormState } from "@/app/actions";
+import { CATEGORIES, SKILL_LEVELS } from "@/lib/categories";
+import { CategoryIcon } from "@/components/category-icon";
+import { FieldError, Input, Label, btn, cn } from "@/components/ui";
+
+const SUGGESTIONS: Record<string, string[]> = {
+  design: ["Logo Design", "UI Design", "Illustration", "Figma", "Branding"],
+  development: ["React", "Website Development", "Node.js", "Python", "WordPress"],
+  writing: ["Copywriting", "Proofreading", "Translation", "Blog Writing", "CV Writing"],
+  marketing: ["Social Media Marketing", "SEO", "Google Ads", "Email Marketing"],
+  home: ["Plumbing", "Electrical Wiring", "Cleaning", "Painting", "Carpentry"],
+  repairs: ["Laptop Repair", "Phone Screen Replacement", "Network Setup", "AC Repair"],
+  tutoring: ["Mathematics", "English", "Physics", "Coding for Kids", "Exam Preparation"],
+  photo: ["Photography", "Video Editing", "Drone Footage", "Photo Editing"],
+  music: ["Mixing", "Guitar Lessons", "Beat Production", "Voice Over"],
+  business: ["Bookkeeping", "Tax Filing", "Business Plans", "Excel"],
+  wellness: ["Personal Training", "Yoga", "Nutrition Coaching", "Massage"],
+  events: ["Makeup", "Event Planning", "DJ", "Catering", "Hair Styling"],
+};
+
+type Role = "client" | "provider";
+type Skill = { name: string; level: string };
+
+const EASE = [0.22, 1, 0.36, 1] as const;
+
+export function RegisterForm() {
+  const params = useSearchParams();
+  const next = params.get("next") ?? "";
+  const [state, formAction, pending] = useActionState<FormState, FormData>(registerAction, {});
+  const [, startTransition] = useTransition();
+
+  const [role, setRole] = useState<Role | null>(params.get("role") === "provider" ? "provider" : null);
+  const [step, setStep] = useState(params.get("role") === "provider" ? 1 : 0);
+  const [dir, setDir] = useState(1);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [headline, setHeadline] = useState("");
+  const [category, setCategory] = useState("");
+  const [location, setLocation] = useState("");
+  const [rate, setRate] = useState("");
+  const [skills, setSkills] = useState<Skill[]>([]);
+  const [skillInput, setSkillInput] = useState("");
+  const [skillLevel, setSkillLevel] = useState("Intermediate");
+
+  const steps = role === "provider" ? ["Role", "Account", "Profile", "Skills"] : ["Role", "Account"];
+  const last = steps.length - 1;
+
+  // Server-side field errors: show them and jump back to the step that owns the field.
+  useEffect(() => {
+    if (!state.fieldErrors) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setErrors(state.fieldErrors);
+    const f = Object.keys(state.fieldErrors);
+    if (f.some((k) => ["name", "email", "password"].includes(k))) setStep(1);
+    else if (f.some((k) => ["headline", "category"].includes(k))) setStep(2);
+    else if (f.includes("skills")) setStep(3);
+  }, [state]);
+
+  const strength = useMemo(() => {
+    let s = 0;
+    if (password.length >= 8) s++;
+    if (password.length >= 12) s++;
+    if (/[A-Z]/.test(password) && /[a-z]/.test(password)) s++;
+    if (/\d/.test(password) || /[^a-zA-Z0-9]/.test(password)) s++;
+    return s;
+  }, [password]);
+
+  function validate(s: number) {
+    const e: Record<string, string> = {};
+    if (s === 0 && !role) e.role = "Choose how you'll use findIn.";
+    if (s === 1) {
+      if (name.trim().length < 2) e.name = "Please enter your full name.";
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) e.email = "Enter a valid email address.";
+      if (password.length < 8) e.password = "Use at least 8 characters.";
+    }
+    if (s === 2) {
+      if (headline.trim().length < 6) e.headline = "Tell people what you do in a few words.";
+      if (!category) e.category = "Pick the category that fits you best.";
+    }
+    if (s === 3 && skills.length === 0) e.skills = "Add at least one skill.";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
+
+  function go(to: number) {
+    if (to > step && !validate(step)) return;
+    setErrors({});
+    setDir(to > step ? 1 : -1);
+    setStep(to);
+  }
+
+  function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (step < last) return go(step + 1);
+    if (!validate(step)) return;
+    const fd = new FormData();
+    Object.entries({ name, email, password, role: role ?? "client", headline, category, location, rate, next }).forEach(([k, v]) => fd.set(k, v));
+    fd.set("skills", JSON.stringify(skills));
+    startTransition(() => formAction(fd));
+  }
+
+  function addSkill(n = skillInput) {
+    const v = n.trim();
+    if (!v || skills.some((s) => s.name.toLowerCase() === v.toLowerCase())) return;
+    setSkills((s) => [...s, { name: v, level: skillLevel }]);
+    setSkillInput("");
+    setErrors((e) => ({ ...e, skills: "" }));
+  }
+
+  const pwColors = ["bg-red-400", "bg-orange-400", "bg-amber-400", "bg-emerald-500"];
+  const pwLabels = ["Too weak", "Okay", "Good", "Strong"];
+
+  return (
+    <div>
+      <div className="mb-8">
+        <div className="flex items-center justify-between text-xs font-semibold text-muted">
+          <span>
+            Step {step + 1} of {steps.length}
+          </span>
+          <span className="text-brand-700">{steps[step]}</span>
+        </div>
+        <div className="mt-2.5 flex gap-1.5">
+          {steps.map((s, i) => (
+            <div key={s} className="h-1.5 flex-1 overflow-hidden rounded-full bg-line">
+              <motion.div className="h-full rounded-full bg-brand-gradient" initial={false} animate={{ width: i <= step ? "100%" : "0%" }} transition={{ duration: 0.5, ease: EASE }} />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <form onSubmit={submit} noValidate>
+        <div className="relative">
+          <AnimatePresence mode="wait" custom={dir} initial={false}>
+            <motion.div
+              key={step}
+              custom={dir}
+              initial={{ opacity: 0, x: dir * 40 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: dir * -40 }}
+              transition={{ duration: 0.35, ease: EASE }}
+            >
+              {step === 0 && (
+                <div>
+                  <h1 className="font-display text-4xl font-extrabold tracking-tight">Join findIn</h1>
+                  <p className="mt-3 text-ink-soft">How would you like to get started? You can always do both later.</p>
+                  <div className="mt-8 grid gap-4">
+                    {([
+                      { v: "client", icon: Search, t: "I want to hire", d: "Find skilled people and get things done." },
+                      { v: "provider", icon: Briefcase, t: "I want to offer my skills", d: "Create a profile, list services and get hired." },
+                    ] as const).map(({ v, icon: Icon, t, d }) => {
+                      const active = role === v;
+                      return (
+                        <button
+                          type="button"
+                          key={v}
+                          onClick={() => {
+                            setRole(v);
+                            setErrors({});
+                          }}
+                          className={cn(
+                            "group relative flex items-center gap-4 rounded-2xl border-2 bg-white p-5 text-left transition-all duration-200",
+                            active ? "border-brand-500 shadow-lift" : "border-line hover:border-brand-200 hover:shadow-soft"
+                          )}
+                        >
+                          <span className={cn("grid size-13 shrink-0 place-items-center rounded-2xl transition-colors", active ? "bg-brand-gradient text-white" : "bg-brand-50 text-brand-600")}>
+                            <Icon className="size-6" />
+                          </span>
+                          <span className="flex-1">
+                            <span className="block text-lg font-bold">{t}</span>
+                            <span className="block text-sm text-muted">{d}</span>
+                          </span>
+                          <span className={cn("grid size-6 place-items-center rounded-full border-2 transition-all", active ? "border-brand-600 bg-brand-600" : "border-line")}>
+                            <AnimatePresence>
+                              {active && (
+                                <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
+                                  <Check className="size-3.5 text-white" strokeWidth={3} />
+                                </motion.span>
+                              )}
+                            </AnimatePresence>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <FieldError msg={errors.role} />
+                </div>
+              )}
+
+              {step === 1 && (
+                <div>
+                  <h1 className="font-display text-4xl font-extrabold tracking-tight">Create your account</h1>
+                  <p className="mt-3 text-ink-soft">It takes less than a minute.</p>
+                  <div className="mt-8 space-y-5">
+                    <div>
+                      <Label htmlFor="name">Full name</Label>
+                      <Input id="name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" placeholder="e.g. Amara Okafor" aria-invalid={!!errors.name} autoFocus />
+                      <FieldError msg={errors.name} />
+                    </div>
+                    <div>
+                      <Label htmlFor="email">Email</Label>
+                      <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="you@example.com" aria-invalid={!!errors.email} />
+                      <FieldError msg={errors.email} />
+                    </div>
+                    <div>
+                      <Label htmlFor="password" hint="8+ characters">Password</Label>
+                      <div className="relative">
+                        <Input id="password" type={showPw ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" placeholder="Create a password" aria-invalid={!!errors.password} className="pr-12" />
+                        <button type="button" onClick={() => setShowPw((s) => !s)} className="absolute right-2 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-lg text-muted hover:bg-brand-50 hover:text-brand-700" aria-label={showPw ? "Hide password" : "Show password"}>
+                          {showPw ? <EyeOff className="size-4.5" /> : <Eye className="size-4.5" />}
+                        </button>
+                      </div>
+                      {password && (
+                        <div className="mt-2.5 flex items-center gap-3">
+                          <div className="flex flex-1 gap-1">
+                            {[0, 1, 2, 3].map((i) => (
+                              <div key={i} className="h-1 flex-1 overflow-hidden rounded-full bg-line">
+                                <motion.div className={cn("h-full", pwColors[Math.max(0, strength - 1)])} initial={false} animate={{ width: i < strength ? "100%" : "0%" }} transition={{ duration: 0.3 }} />
+                              </div>
+                            ))}
+                          </div>
+                          <span className="w-16 text-right text-xs font-semibold text-muted">{pwLabels[Math.max(0, strength - 1)]}</span>
+                        </div>
+                      )}
+                      <FieldError msg={errors.password} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {step === 2 && (
+                <div>
+                  <h1 className="font-display text-4xl font-extrabold tracking-tight">Your professional profile</h1>
+                  <p className="mt-3 text-ink-soft">This is what people see when they search.</p>
+                  <div className="mt-8 space-y-5">
+                    <div>
+                      <Label htmlFor="headline" hint={`${headline.length}/120`}>Headline</Label>
+                      <Input id="headline" value={headline} maxLength={120} onChange={(e) => setHeadline(e.target.value)} placeholder="e.g. Certified electrician for homes & offices" aria-invalid={!!errors.headline} autoFocus />
+                      <FieldError msg={errors.headline} />
+                    </div>
+                    <div>
+                      <Label>Main category</Label>
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        {CATEGORIES.map((c) => (
+                          <button
+                            type="button"
+                            key={c.slug}
+                            onClick={() => setCategory(c.slug)}
+                            className={cn(
+                              "flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-[13px] font-semibold transition-all",
+                              category === c.slug ? "border-brand-500 bg-brand-50 text-brand-800 ring-2 ring-brand-200" : "border-line bg-white text-ink-soft hover:border-brand-200"
+                            )}
+                          >
+                            <CategoryIcon slug={c.slug} className="size-4 shrink-0" />
+                            <span className="leading-tight">{c.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                      <FieldError msg={errors.category} />
+                    </div>
+                    <div className="grid gap-5 sm:grid-cols-2">
+                      <div>
+                        <Label htmlFor="location">Location</Label>
+                        <Input id="location" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="City, Country" />
+                      </div>
+                      <div>
+                        <Label htmlFor="rate" hint="optional">Hourly rate (USD)</Label>
+                        <div className="relative">
+                          <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-semibold text-muted">$</span>
+                          <Input id="rate" type="number" min={0} value={rate} onChange={(e) => setRate(e.target.value)} placeholder="30" className="pl-8" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {step === 3 && (
+                <div>
+                  <h1 className="font-display text-4xl font-extrabold tracking-tight">What are you good at?</h1>
+                  <p className="mt-3 text-ink-soft">Add the skills people should find you for. Be specific — it helps search.</p>
+                  <div className="mt-8">
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Input
+                        value={skillInput}
+                        onChange={(e) => setSkillInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === ",") {
+                            e.preventDefault();
+                            addSkill();
+                          }
+                        }}
+                        placeholder="Type a skill and press Enter"
+                        aria-invalid={!!errors.skills}
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <div className="flex rounded-xl border border-line bg-white p-1">
+                          {SKILL_LEVELS.map((l) => (
+                            <button
+                              type="button"
+                              key={l}
+                              onClick={() => setSkillLevel(l)}
+                              className={cn("relative rounded-lg px-2.5 py-2 text-xs font-semibold transition-colors", skillLevel === l ? "text-white" : "text-muted hover:text-ink")}
+                            >
+                              {skillLevel === l && <motion.span layoutId="lvl" className="absolute inset-0 rounded-lg bg-ink" transition={{ type: "spring", stiffness: 400, damping: 30 }} />}
+                              <span className="relative">{l}</span>
+                            </button>
+                          ))}
+                        </div>
+                        <button type="button" onClick={() => addSkill()} className={btn("dark", "md", "size-12 shrink-0 rounded-xl px-0")} aria-label="Add skill">
+                          <Plus className="size-5" />
+                        </button>
+                      </div>
+                    </div>
+                    <FieldError msg={errors.skills} />
+
+                    <div className="mt-5 flex min-h-12 flex-wrap gap-2">
+                      <AnimatePresence>
+                        {skills.map((s) => (
+                          <motion.span
+                            key={s.name}
+                            layout
+                            initial={{ opacity: 0, scale: 0.6 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.6 }}
+                            className="inline-flex items-center gap-2 rounded-full bg-brand-600 py-1.5 pl-3.5 pr-1.5 text-sm font-semibold text-white"
+                          >
+                            {s.name}
+                            <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] uppercase tracking-wide">{s.level}</span>
+                            <button type="button" onClick={() => setSkills((k) => k.filter((x) => x.name !== s.name))} className="grid size-6 place-items-center rounded-full hover:bg-white/20" aria-label={`Remove ${s.name}`}>
+                              <X className="size-3.5" />
+                            </button>
+                          </motion.span>
+                        ))}
+                      </AnimatePresence>
+                      {skills.length === 0 && <p className="self-center text-sm text-muted">No skills yet — add a few or pick from suggestions.</p>}
+                    </div>
+
+                    {category && (
+                      <div className="mt-6 rounded-2xl border border-dashed border-brand-200 bg-brand-50/50 p-4">
+                        <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-brand-700">
+                          <Sparkles className="size-3.5" /> Suggested for you
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {(SUGGESTIONS[category] ?? [])
+                            .filter((s) => !skills.some((k) => k.name === s))
+                            .map((s) => (
+                              <button type="button" key={s} onClick={() => addSkill(s)} className="inline-flex items-center gap-1 rounded-full border border-brand-200 bg-white px-3 py-1.5 text-sm font-medium text-brand-700 transition hover:-translate-y-0.5 hover:border-brand-400">
+                                <Plus className="size-3.5" /> {s}
+                              </button>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        {state.error && <p className="mt-4 text-sm font-medium text-red-600">{state.error}</p>}
+
+        <div className="mt-10 flex items-center gap-3">
+          {step > 0 && (
+            <button type="button" onClick={() => go(step - 1)} className={btn("outline", "lg", "size-13 px-0")} aria-label="Back">
+              <ArrowLeft className="size-5" />
+            </button>
+          )}
+          <button type="submit" disabled={pending} className={btn("primary", "lg", "group flex-1")}>
+            {pending ? (
+              <Loader2 className="size-5 animate-spin" />
+            ) : step === last ? (
+              <>
+                Create my account <Check className="size-5" />
+              </>
+            ) : (
+              <>
+                Continue <ArrowRight className="size-4.5 transition-transform group-hover:translate-x-0.5" />
+              </>
+            )}
+          </button>
+        </div>
+      </form>
+
+      <p className="mt-8 text-center text-sm text-muted">
+        Already have an account?{" "}
+        <Link href={`/login${next ? `?next=${encodeURIComponent(next)}` : ""}`} className="font-semibold text-brand-700 hover:underline">
+          Sign in
+        </Link>
+      </p>
+    </div>
+  );
+}
