@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { sendEmailVerification, signInWithEmailAndPassword } from "firebase/auth";
-import { authErrorMessage, clientAuth } from "@/lib/firebase-client";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { authErrorMessage, clientAuth, sendConfirmationEmail } from "@/lib/firebase-client";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
@@ -129,7 +129,8 @@ export function RegisterForm() {
       try {
         const cred = await signInWithEmailAndPassword(clientAuth(), email.trim().toLowerCase(), password);
         // Firebase emails a confirmation link (free). Requests need a confirmed email.
-        await sendEmailVerification(cred.user, { url: `${window.location.origin}/dashboard?verified=1` }).catch(() => {});
+        const mailError = await sendConfirmationEmail(cred.user);
+        if (mailError) console.warn("[findMe] confirmation email not sent:", mailError);
         const session = await startSessionAction(await cred.user.getIdToken(), next || "/dashboard?welcome=1");
         if (session?.error) setState({ error: session.error });
       } catch (err) {

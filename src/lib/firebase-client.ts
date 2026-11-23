@@ -1,7 +1,7 @@
 "use client";
 
 import { getApps, initializeApp } from "firebase/app";
-import { browserLocalPersistence, getAuth, initializeAuth, type Auth, type User } from "firebase/auth";
+import { browserLocalPersistence, getAuth, initializeAuth, sendEmailVerification, type Auth, type User } from "firebase/auth";
 
 // Public web config — safe to ship to the browser. Access is controlled by Firebase Auth,
 // Firestore security rules (deny-all for clients) and the server.
@@ -32,6 +32,27 @@ export async function clientUser(): Promise<User | null> {
   const a = clientAuth();
   await a.authStateReady();
   return a.currentUser;
+}
+
+/**
+ * Sends Firebase's "confirm your email" message. Tries with a link back to findMe first; if this
+ * site's address isn't on the project's allowed list, sends the plain version instead of failing.
+ * Returns null on success, or a Firebase error code.
+ */
+export async function sendConfirmationEmail(user: User): Promise<string | null> {
+  try {
+    await sendEmailVerification(user, { url: `${window.location.origin}/dashboard?verified=1` });
+    return null;
+  } catch (e) {
+    const code = (e as { code?: string }).code ?? "unknown";
+    if (!/continue-uri|unauthorized-domain/.test(code)) return code;
+  }
+  try {
+    await sendEmailVerification(user);
+    return null;
+  } catch (e) {
+    return (e as { code?: string }).code ?? "unknown";
+  }
 }
 
 /** Friendly messages for the Firebase Auth errors people actually hit. */
