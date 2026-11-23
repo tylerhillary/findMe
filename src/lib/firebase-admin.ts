@@ -1,6 +1,6 @@
 import "server-only";
 import fs from "node:fs";
-import { getVercelOidcToken } from "@vercel/functions/oidc";
+import { getVercelOidcToken, getVercelOidcTokenSync } from "@vercel/functions/oidc";
 import { ExternalAccountClient } from "google-auth-library";
 import { applicationDefault, cert, getApps, initializeApp, type App, type Credential } from "firebase-admin/app";
 import { getAuth, type Auth } from "firebase-admin/auth";
@@ -14,6 +14,26 @@ const PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
  * Enabled when these are set in Vercel → Settings → Environment Variables:
  *   GCP_PROJECT_NUMBER, GCP_WORKLOAD_IDENTITY_POOL_ID, GCP_WORKLOAD_IDENTITY_PROVIDER_ID, GCP_SERVICE_ACCOUNT_EMAIL
  */
+// Vercel attaches its identity token to each incoming request. Google libraries ask for it later,
+// from inside their own connection code where that request is no longer visible, so we keep the
+// latest token we saw while a request was active (tokens last about an hour).
+let lastVercelToken: string | null = null;
+function rememberVercelToken() {
+  try {
+    lastVercelToken = getVercelOidcTokenSync();
+  } catch {
+    // not inside a Vercel request (e.g. at build time or on your computer)
+  }
+}
+async function vercelToken() {
+  try {
+    return (lastVercelToken = await getVercelOidcToken());
+  } catch (e) {
+    if (lastVercelToken) return lastVercelToken;
+    throw e;
+  }
+}
+
 function vercelFederation() {
   const { GCP_PROJECT_NUMBER: num, GCP_WORKLOAD_IDENTITY_POOL_ID: pool, GCP_WORKLOAD_IDENTITY_PROVIDER_ID: provider, GCP_SERVICE_ACCOUNT_EMAIL: email } = process.env;
   if (!num || !pool || !provider || !email) return null;
@@ -23,7 +43,7 @@ function vercelFederation() {
     subject_token_type: "urn:ietf:params:oauth:token-type:jwt",
     token_url: "https://sts.googleapis.com/v1/token",
     service_account_impersonation_url: `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${email}:generateAccessToken`,
-    subject_token_supplier: { getSubjectToken: () => getVercelOidcToken() },
+    subject_token_supplier: { getSubjectToken: vercelToken },
   });
   if (!client) throw new Error("Couldn't set up Google Cloud access from Vercel.");
 
@@ -71,6 +91,12 @@ function admin() {
 }
 
 /** Firestore (Admin SDK — bypasses security rules; server only). */
-export const db = () => admin().db;
+export const db = () => {
+  rememberVercelToken();
+  return admin().db;
+};
 /** Firebase Auth admin (verifies tokens, manages session cookies). */
-export const adminAuth = () => admin().auth;
+export const adminAuth = () => {
+  rememberVercelToken();
+  return admin().auth;
+};
