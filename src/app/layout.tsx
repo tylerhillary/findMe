@@ -9,18 +9,25 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: { default: "findIn — Find the right person for any job", template: "%s · findIn" },
+  title: { default: "findMe — Find the right person for any job", template: "%s · findMe" },
   description:
-    "findIn connects you with skilled people near you and around the world. Search a skill, compare profiles, and hire through findIn.",
+    "findMe connects you with trusted, skilled people across Nigeria — from Lagos to Abuja, Kano to Port Harcourt. Search a skill, compare profiles, and hire through findMe.",
 };
 
 export const viewport: Viewport = {
   themeColor: "#6230f0",
 };
 
+// Some form-filling browser extensions (e.g. Edge/Bing autofill) stamp `fdprocessedid` on every
+// input and button before React hydrates, causing noisy hydration warnings. Strip it as it appears.
+const STRIP_EXTENSION_ATTRS = `(function(){var a="fdprocessedid";function s(e){e&&e.removeAttribute&&e.hasAttribute(a)&&e.removeAttribute(a)}document.querySelectorAll("["+a+"]").forEach(s);new MutationObserver(function(m){for(var i=0;i<m.length;i++)s(m[i].target)}).observe(document.documentElement,{subtree:true,attributes:true,attributeFilter:[a]})})();`;
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${jakarta.variable} h-full antialiased`}>
+    <html lang="en-NG" className={`${jakarta.variable} h-full antialiased`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: STRIP_EXTENSION_ATTRS }} />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

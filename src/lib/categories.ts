@@ -11,6 +11,12 @@ export const CATEGORIES = [
   { slug: "business", name: "Business & Finance", icon: "Briefcase", hue: "from-lime-500 to-green-600" },
   { slug: "wellness", name: "Health & Wellness", icon: "HeartPulse", hue: "from-pink-500 to-rose-500" },
   { slug: "events", name: "Events & Beauty", icon: "PartyPopper", hue: "from-orange-500 to-amber-500" },
+  { slug: "fashion", name: "Fashion & Tailoring", icon: "Scissors", hue: "from-fuchsia-600 to-purple-600" },
+  { slug: "auto", name: "Auto & Mechanics", icon: "Car", hue: "from-blue-600 to-cyan-500" },
+  { slug: "power", name: "Solar & Generators", icon: "Zap", hue: "from-yellow-500 to-amber-600" },
+  { slug: "logistics", name: "Delivery & Logistics", icon: "Truck", hue: "from-teal-500 to-emerald-600" },
+  { slug: "food", name: "Food & Catering", icon: "ChefHat", hue: "from-red-500 to-orange-500" },
+  { slug: "cleaning", name: "Cleaning & Laundry", icon: "SprayCan", hue: "from-sky-400 to-cyan-500" },
 ] as const;
 
 export type CategorySlug = (typeof CATEGORIES)[number]["slug"];

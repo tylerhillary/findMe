@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
-import { LayoutDashboard, LogOut, Menu, MessageSquareText, Search, UserRound, X } from "lucide-react";
-import { logoutAction } from "@/app/actions";
+import { LayoutDashboard, LogOut, Menu, MessageSquareText, Search, Settings, UserRound, X } from "lucide-react";
+import { SignOutForm } from "@/components/sign-out-form";
 import { Avatar, Logo, btn, cn } from "./ui";
 
 const LINKS = [
@@ -35,7 +35,7 @@ export function HeaderShell({ auth, transparent }: { auth: ReactNode; transparen
           solid ? "border-b border-line/70 bg-white/80 shadow-[0_1px_0_rgb(0_0_0/0.02)] backdrop-blur-xl" : "border-b border-transparent bg-transparent"
         )}
       >
-        <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+        <nav className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-3 px-4 sm:h-16 sm:px-6 lg:px-8">
           <div className="flex items-center gap-8">
             <Logo />
             <ul className="hidden items-center gap-1 lg:flex">
@@ -51,14 +51,14 @@ export function HeaderShell({ auth, transparent }: { auth: ReactNode; transparen
               ))}
             </ul>
           </div>
-          <div className="flex items-center gap-2">
-            <Link href="/search" aria-label="Search" className={btn("ghost", "sm", "size-10 px-0 lg:hidden")}>
-              <Search className="size-5" />
+          <div className="flex items-center gap-1 sm:gap-2">
+            <Link href="/search" aria-label="Search" className={btn("ghost", "sm", "size-9 px-0 lg:hidden")}>
+              <Search className="size-[18px]" />
             </Link>
             {auth}
             <button
               onClick={() => setOpen((o) => !o)}
-              className={btn("ghost", "sm", "size-10 px-0 lg:hidden")}
+              className={btn("ghost", "sm", "size-9 px-0 lg:hidden")}
               aria-label={open ? "Close menu" : "Open menu"}
               aria-expanded={open}
             >
@@ -75,12 +75,12 @@ export function HeaderShell({ auth, transparent }: { auth: ReactNode; transparen
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
             transition={{ duration: 0.22, ease: "easeOut" }}
-            className="absolute inset-x-0 top-16 border-b border-line bg-white/95 px-4 pb-6 pt-2 shadow-lift backdrop-blur-xl lg:hidden"
+            className="absolute inset-x-0 top-14 border-b border-line bg-white/95 px-3 pb-4 pt-2 shadow-lift backdrop-blur-xl sm:top-16 lg:hidden"
           >
             <ul className="space-y-1">
               {LINKS.map((l, i) => (
                 <motion.li key={l.href} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.04 * i }}>
-                  <Link href={l.href} onClick={() => setOpen(false)} className="block rounded-xl px-4 py-3 text-base font-semibold text-ink hover:bg-brand-50">
+                  <Link href={l.href} onClick={() => setOpen(false)} className="block rounded-xl px-3 py-2.5 text-[15px] font-semibold text-ink hover:bg-brand-50">
                     {l.label}
                   </Link>
                 </motion.li>
@@ -114,17 +114,18 @@ export function UserMenu({ user }: { user: { name: string; email: string; avatar
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/dashboard/requests", label: "Requests & messages", icon: MessageSquareText },
     { href: "/dashboard/profile", label: "Edit profile", icon: UserRound },
+    { href: "/dashboard/settings", label: "Account settings", icon: Settings },
   ];
 
   return (
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 rounded-full border border-line bg-white p-1 pr-1 transition hover:border-brand-200 hover:shadow-soft sm:pr-3"
+        className="flex items-center gap-2 rounded-full border border-line bg-white p-0.5 transition hover:border-brand-200 hover:shadow-soft sm:p-1 sm:pr-3"
         aria-expanded={open}
         aria-haspopup="menu"
       >
-        <Avatar name={user.name} src={user.avatar} size={32} />
+        <Avatar name={user.name} src={user.avatar} size={30} />
         <span className="hidden max-w-28 truncate text-sm font-semibold sm:block">{user.name.split(" ")[0]}</span>
       </button>
       <AnimatePresence>
@@ -135,7 +136,7 @@ export function UserMenu({ user }: { user: { name: string; email: string; avatar
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -6 }}
             transition={{ duration: 0.16 }}
-            className="absolute right-0 mt-2 w-64 origin-top-right overflow-hidden rounded-2xl border border-line bg-white p-1.5 shadow-lift"
+            className="absolute right-0 mt-2 w-60 max-w-[calc(100vw-2rem)] origin-top-right overflow-hidden rounded-2xl border border-line bg-white p-1.5 shadow-lift"
           >
             <div className="px-3 py-2.5">
               <p className="truncate font-semibold">{user.name}</p>
@@ -153,11 +154,11 @@ export function UserMenu({ user }: { user: { name: string; email: string; avatar
               </Link>
             ))}
             <div className="my-1 h-px bg-line" />
-            <form action={logoutAction}>
+            <SignOutForm>
               <button className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50">
                 <LogOut className="size-4" /> Sign out
               </button>
-            </form>
+            </SignOutForm>
           </motion.div>
         )}
       </AnimatePresence>

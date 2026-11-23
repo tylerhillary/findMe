@@ -1,0 +1,124 @@
+// Firestore document shapes. Timestamps are epoch milliseconds.
+import type { RequestStatus } from "./categories";
+
+export type Skill = { id: string; name: string; level: string };
+
+/** users/{uid} — uid is the Firebase Auth uid. Contains PII (email, phone): server access only. */
+export type UserDoc = {
+  name: string;
+  email: string;
+  role: "client" | "provider";
+  headline?: string;
+  bio?: string;
+  location?: string;
+  category?: string;
+  hourlyRate?: number;
+  available?: boolean;
+  avatar?: string | null; // small JPEG data URL
+  phone?: string; // E.164 (+234…)
+  whatsapp?: boolean;
+  showPhone?: boolean;
+  /** True once the current phone number was confirmed with a code (reset when the number changes). */
+  phoneVerified?: boolean;
+  skills?: Skill[];
+  // Denormalised counters, kept up to date by server actions.
+  ratingSum?: number;
+  reviewCount?: number;
+  jobsDone?: number;
+  startingPrice?: number | null;
+  /** Number of different people who have reported this user. */
+  reportCount?: number;
+  /** Hidden from search after repeated reports, until an admin reviews it. */
+  flagged?: boolean;
+  createdAt: number;
+};
+
+/** reports/{reporterId}__{reportedId} — one report per pair, so nobody can pile on alone. */
+export type ReportDoc = {
+  reporterId: string;
+  reportedId: string;
+  requestId: string | null;
+  reason: string;
+  details: string;
+  status: "open" | "reviewed" | "dismissed";
+  createdAt: number;
+};
+
+/** blocks/{blockerId}__{blockedId} — blocker no longer hears from blocked, and vice versa. */
+export type BlockDoc = { blockerId: string; blockedId: string; createdAt: number };
+
+/** services/{id} */
+export type ServiceDoc = {
+  userId: string;
+  title: string;
+  description: string;
+  category: string;
+  price: number;
+  priceUnit: "hour" | "project";
+  deliveryDays: number;
+  createdAt: number;
+};
+
+/** requests/{id} — messages live in requests/{id}/messages */
+export type RequestDoc = {
+  clientId: string;
+  providerId: string;
+  participants: string[];
+  serviceId: string | null;
+  title: string;
+  budget: number;
+  status: RequestStatus;
+  lastMessage?: string;
+  messageCount?: number;
+  /** True once the client has left a review (false until then). */
+  reviewed?: boolean;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type MessageDoc = { senderId: string; body: string; createdAt: number };
+
+/** reviews/{requestId} — one review per completed request */
+export type ReviewDoc = {
+  requestId: string;
+  providerId: string;
+  clientId: string;
+  rating: number;
+  comment: string;
+  createdAt: number;
+};
+
+export type NotificationKind = "request" | "message" | "status" | "review";
+
+/** notifications/{id} — what a user sees under the bell (and may also get by email). */
+export type NotificationDoc = {
+  userId: string;
+  kind: NotificationKind;
+  title: string;
+  body: string;
+  href: string;
+  requestId: string | null;
+  read: boolean;
+  createdAt: number;
+};
+
+/** support/{id} — messages sent through the contact form. */
+export type SupportDoc = {
+  name: string;
+  email: string;
+  topic: string;
+  message: string;
+  userId: string | null;
+  status: "open" | "closed";
+  createdAt: number;
+};
+
+/** phone_codes/{uid} — the pending verification code (hashed), with limits against abuse. */
+export type PhoneCodeDoc = {
+  phone: string;
+  codeHash: string;
+  expiresAt: number;
+  attempts: number;
+  /** Times codes were sent in the last hour, for rate limiting. */
+  sentAt: number[];
+};

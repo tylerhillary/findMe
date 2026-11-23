@@ -8,11 +8,12 @@ import { cn } from "./ui";
 
 const PROMPTS = [
   "a logo for my bakery",
-  "someone to fix a leaking sink",
-  "a maths tutor for my son",
-  "a wedding photographer",
-  "a website for my business",
-  "help with my taxes",
+  "someone to fix my generator",
+  "a JAMB tutor for my son",
+  "a tailor for aso-ebi",
+  "a website with Paystack",
+  "a plumber in Lekki",
+  "small chops for my party",
 ];
 
 export function SearchBar({
@@ -51,12 +52,12 @@ export function SearchBar({
       role="search"
       className={cn(
         "relative flex w-full items-center rounded-full border bg-white transition-all duration-300",
-        lg ? "h-16 p-1.5 pl-6 sm:h-[72px] sm:pl-7" : "h-13 p-1 pl-5",
-        focused ? "border-brand-300 shadow-lift ring-8 ring-brand-100/60" : "border-line shadow-soft hover:border-brand-200"
+        lg ? "h-13 p-1 pl-4 sm:h-[72px] sm:p-1.5 sm:pl-7" : "h-12 p-1 pl-4 sm:h-13 sm:pl-5",
+        focused ? "border-brand-300 shadow-lift ring-4 ring-brand-100/60 sm:ring-8" : "border-line shadow-soft hover:border-brand-200"
       )}
     >
-      <Search className={cn("shrink-0 text-brand-500", lg ? "size-5 sm:size-6" : "size-5")} />
-      <div className="relative ml-3 h-full flex-1">
+      <Search className={cn("shrink-0 text-brand-500", lg ? "size-[18px] sm:size-6" : "size-[18px] sm:size-5")} />
+      <div className="relative ml-2.5 h-full min-w-0 flex-1 sm:ml-3">
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -64,10 +65,10 @@ export function SearchBar({
           onBlur={() => setFocused(false)}
           autoFocus={autoFocus}
           aria-label="What do you need help with?"
-          className={cn("peer h-full w-full bg-transparent font-medium text-ink outline-none", lg ? "text-base sm:text-lg" : "text-[15px]")}
+          className={cn("peer h-full w-full bg-transparent font-medium text-ink outline-none", lg ? "text-base sm:text-lg" : "text-base sm:text-[15px]")}
         />
         {!q && (
-          <div className={cn("pointer-events-none absolute inset-0 flex items-center overflow-hidden text-muted", lg ? "text-base sm:text-lg" : "text-[15px]")}>
+          <div className={cn("pointer-events-none absolute inset-0 flex items-center overflow-hidden text-muted", lg ? "text-[15px] sm:text-lg" : "text-[15px]")}>
             <span className="hidden shrink-0 sm:inline">I need&nbsp;</span>
             <AnimatePresence mode="wait">
               <motion.span
@@ -88,11 +89,11 @@ export function SearchBar({
         type="submit"
         className={cn(
           "group inline-flex h-full shrink-0 items-center gap-2 rounded-full bg-brand-600 font-semibold text-white shadow-glow transition-all hover:bg-brand-700 active:scale-95",
-          lg ? "px-5 sm:px-7" : "px-5"
+          lg ? "aspect-square justify-center px-0 sm:aspect-auto sm:px-7" : "aspect-square justify-center px-0 sm:aspect-auto sm:px-5"
         )}
       >
         <span className="hidden sm:inline">Search</span>
-        <ArrowRight className="size-5 transition-transform group-hover:translate-x-0.5" />
+        <ArrowRight className="size-[18px] transition-transform group-hover:translate-x-0.5 sm:size-5" />
       </button>
     </form>
   );

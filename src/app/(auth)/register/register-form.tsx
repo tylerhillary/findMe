@@ -1,28 +1,38 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { sendEmailVerification, signInWithEmailAndPassword } from "firebase/auth";
+import { authErrorMessage, clientAuth } from "@/lib/firebase-client";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowLeft, ArrowRight, Briefcase, Check, Eye, EyeOff, Loader2, Plus, Search, Sparkles, X } from "lucide-react";
-import { registerAction, type FormState } from "@/app/actions";
+import { registerAction, startSessionAction, type FormState } from "@/app/actions";
 import { CATEGORIES, SKILL_LEVELS } from "@/lib/categories";
+import { normalizeNgPhone } from "@/lib/phone";
+import { PhoneInput } from "@/components/phone-input";
 import { CategoryIcon } from "@/components/category-icon";
-import { FieldError, Input, Label, btn, cn } from "@/components/ui";
+import { FieldError, Input, Label, LocationInput, btn, cn } from "@/components/ui";
 
 const SUGGESTIONS: Record<string, string[]> = {
   design: ["Logo Design", "UI Design", "Illustration", "Figma", "Branding"],
   development: ["React", "Website Development", "Node.js", "Python", "WordPress"],
   writing: ["Copywriting", "Proofreading", "Translation", "Blog Writing", "CV Writing"],
   marketing: ["Social Media Marketing", "SEO", "Google Ads", "Email Marketing"],
-  home: ["Plumbing", "Electrical Wiring", "Cleaning", "Painting", "Carpentry"],
+  home: ["Plumbing", "Electrical Wiring", "Cleaning", "Painting", "POP Ceiling", "Tiling"],
   repairs: ["Laptop Repair", "Phone Screen Replacement", "Network Setup", "AC Repair"],
-  tutoring: ["Mathematics", "English", "Physics", "Coding for Kids", "Exam Preparation"],
+  tutoring: ["Mathematics", "English", "JAMB Preparation", "WAEC Preparation", "Coding for Kids"],
   photo: ["Photography", "Video Editing", "Drone Footage", "Photo Editing"],
   music: ["Mixing", "Guitar Lessons", "Beat Production", "Voice Over"],
   business: ["Bookkeeping", "Tax Filing", "Business Plans", "Excel"],
   wellness: ["Personal Training", "Yoga", "Nutrition Coaching", "Massage"],
-  events: ["Makeup", "Event Planning", "DJ", "Catering", "Hair Styling"],
+  events: ["Makeup", "Gele Tying", "Event Planning", "DJ", "MC", "Event Decoration"],
+  fashion: ["Tailoring", "Ankara Styles", "Aso-ebi", "Agbada", "Hair Braiding"],
+  auto: ["Car Diagnostics", "Car Servicing", "Panel Beating", "Car AC Repair", "Vulcanizing"],
+  power: ["Solar Installation", "Inverter Installation", "Generator Repair", "Changeover Installation"],
+  logistics: ["Dispatch Delivery", "Same-day Delivery", "Moving & Haulage", "Interstate Delivery"],
+  food: ["Private Chef", "Event Catering", "Small Chops", "Cake Baking", "Nigerian Soups", "Meal Prep"],
+  cleaning: ["House Cleaning", "Deep Cleaning", "Fumigation", "Laundry", "Dry Cleaning"],
 };
 
 type Role = "client" | "provider";
@@ -33,8 +43,8 @@ const EASE = [0.22, 1, 0.36, 1] as const;
 export function RegisterForm() {
   const params = useSearchParams();
   const next = params.get("next") ?? "";
-  const [state, formAction, pending] = useActionState<FormState, FormData>(registerAction, {});
-  const [, startTransition] = useTransition();
+  const [state, setState] = useState<FormState>({});
+  const [pending, startTransition] = useTransition();
 
   const [role, setRole] = useState<Role | null>(params.get("role") === "provider" ? "provider" : null);
   const [step, setStep] = useState(params.get("role") === "provider" ? 1 : 0);
@@ -44,6 +54,8 @@ export function RegisterForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
+  const [whatsapp, setWhatsapp] = useState(true);
   const [showPw, setShowPw] = useState(false);
   const [headline, setHeadline] = useState("");
   const [category, setCategory] = useState("");
@@ -62,7 +74,7 @@ export function RegisterForm() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setErrors(state.fieldErrors);
     const f = Object.keys(state.fieldErrors);
-    if (f.some((k) => ["name", "email", "password"].includes(k))) setStep(1);
+    if (f.some((k) => ["name", "email", "password", "phone"].includes(k))) setStep(1);
     else if (f.some((k) => ["headline", "category"].includes(k))) setStep(2);
     else if (f.includes("skills")) setStep(3);
   }, [state]);
@@ -78,11 +90,13 @@ export function RegisterForm() {
 
   function validate(s: number) {
     const e: Record<string, string> = {};
-    if (s === 0 && !role) e.role = "Choose how you'll use findIn.";
+    if (s === 0 && !role) e.role = "Choose how you'll use findMe.";
     if (s === 1) {
       if (name.trim().length < 2) e.name = "Please enter your full name.";
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) e.email = "Enter a valid email address.";
       if (password.length < 8) e.password = "Use at least 8 characters.";
+      if (phone.trim() && !normalizeNgPhone(phone)) e.phone = "Enter a valid Nigerian number, e.g. 0803 123 4567.";
+      else if (role === "provider" && !phone.trim()) e.phone = "Add a number clients can reach you on.";
     }
     if (s === 2) {
       if (headline.trim().length < 6) e.headline = "Tell people what you do in a few words.";
@@ -105,9 +119,25 @@ export function RegisterForm() {
     if (step < last) return go(step + 1);
     if (!validate(step)) return;
     const fd = new FormData();
-    Object.entries({ name, email, password, role: role ?? "client", headline, category, location, rate, next }).forEach(([k, v]) => fd.set(k, v));
+    Object.entries({ name, email, password, phone, whatsapp: whatsapp ? "1" : "0", role: role ?? "client", headline, category, location, rate, next }).forEach(([k, v]) => fd.set(k, v));
     fd.set("skills", JSON.stringify(skills));
-    startTransition(() => formAction(fd));
+    startTransition(async () => {
+      // 1) Server validates and creates the Firebase account + profile.
+      const res = await registerAction({}, fd);
+      if (!res.ok) return setState(res);
+      // 2) Sign in with the new account and start the server session.
+      try {
+        const cred = await signInWithEmailAndPassword(clientAuth(), email.trim().toLowerCase(), password);
+        // Firebase emails a confirmation link (free). Requests need a confirmed email.
+        await sendEmailVerification(cred.user, { url: `${window.location.origin}/dashboard?verified=1` }).catch(() => {});
+        const session = await startSessionAction(await cred.user.getIdToken(), next || "/dashboard?welcome=1");
+        if (session?.error) setState({ error: session.error });
+      } catch (err) {
+        // A successful sign-in ends in a redirect, which arrives here as a special error — not a failure.
+        if (String((err as { digest?: string }).digest ?? "").startsWith("NEXT_REDIRECT")) return;
+        setState({ error: `Your account was created, but signing in failed: ${authErrorMessage((err as { code?: string }).code)} Try signing in.` });
+      }
+    });
   }
 
   function addSkill(n = skillInput) {
@@ -152,9 +182,9 @@ export function RegisterForm() {
             >
               {step === 0 && (
                 <div>
-                  <h1 className="font-display text-4xl font-extrabold tracking-tight">Join findIn</h1>
-                  <p className="mt-3 text-ink-soft">How would you like to get started? You can always do both later.</p>
-                  <div className="mt-8 grid gap-4">
+                  <h1 className="font-display text-[1.75rem] font-extrabold leading-tight tracking-tight sm:text-4xl">Join findMe</h1>
+                  <p className="mt-2 text-[15px] text-ink-soft sm:mt-3 sm:text-base">How would you like to get started? You can always do both later.</p>
+                  <div className="mt-6 grid gap-3 sm:mt-8 sm:gap-4">
                     {([
                       { v: "client", icon: Search, t: "I want to hire", d: "Find skilled people and get things done." },
                       { v: "provider", icon: Briefcase, t: "I want to offer my skills", d: "Create a profile, list services and get hired." },
@@ -169,16 +199,16 @@ export function RegisterForm() {
                             setErrors({});
                           }}
                           className={cn(
-                            "group relative flex items-center gap-4 rounded-2xl border-2 bg-white p-5 text-left transition-all duration-200",
+                            "group relative flex items-center gap-3 rounded-2xl border-2 bg-white p-4 text-left transition-all duration-200 sm:gap-4 sm:p-5",
                             active ? "border-brand-500 shadow-lift" : "border-line hover:border-brand-200 hover:shadow-soft"
                           )}
                         >
-                          <span className={cn("grid size-13 shrink-0 place-items-center rounded-2xl transition-colors", active ? "bg-brand-gradient text-white" : "bg-brand-50 text-brand-600")}>
-                            <Icon className="size-6" />
+                          <span className={cn("grid size-11 shrink-0 place-items-center rounded-xl transition-colors sm:size-13 sm:rounded-2xl", active ? "bg-brand-gradient text-white" : "bg-brand-50 text-brand-600")}>
+                            <Icon className="size-5 sm:size-6" />
                           </span>
                           <span className="flex-1">
-                            <span className="block text-lg font-bold">{t}</span>
-                            <span className="block text-sm text-muted">{d}</span>
+                            <span className="block text-[15px] font-bold sm:text-lg">{t}</span>
+                            <span className="block text-[13px] text-muted sm:text-sm">{d}</span>
                           </span>
                           <span className={cn("grid size-6 place-items-center rounded-full border-2 transition-all", active ? "border-brand-600 bg-brand-600" : "border-line")}>
                             <AnimatePresence>
@@ -199,9 +229,9 @@ export function RegisterForm() {
 
               {step === 1 && (
                 <div>
-                  <h1 className="font-display text-4xl font-extrabold tracking-tight">Create your account</h1>
-                  <p className="mt-3 text-ink-soft">It takes less than a minute.</p>
-                  <div className="mt-8 space-y-5">
+                  <h1 className="font-display text-[1.75rem] font-extrabold leading-tight tracking-tight sm:text-4xl">Create your account</h1>
+                  <p className="mt-2 text-[15px] text-ink-soft sm:mt-3 sm:text-base">It takes less than a minute.</p>
+                  <div className="mt-6 space-y-4 sm:mt-8 sm:space-y-5">
                     <div>
                       <Label htmlFor="name">Full name</Label>
                       <Input id="name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" placeholder="e.g. Amara Okafor" aria-invalid={!!errors.name} autoFocus />
@@ -211,6 +241,16 @@ export function RegisterForm() {
                       <Label htmlFor="email">Email</Label>
                       <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="you@example.com" aria-invalid={!!errors.email} />
                       <FieldError msg={errors.email} />
+                    </div>
+                    <div>
+                      <Label htmlFor="phone" hint={role === "provider" ? "Mobile or business line" : "Optional"}>Phone number</Label>
+                      <PhoneInput id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} aria-invalid={!!errors.phone} />
+                      <FieldError msg={errors.phone} />
+                      <label className="mt-2.5 flex cursor-pointer items-center gap-2 text-sm text-ink-soft">
+                        <input type="checkbox" checked={whatsapp} onChange={(e) => setWhatsapp(e.target.checked)} className="size-4 accent-brand-600" />
+                        This number is on WhatsApp
+                      </label>
+                      <p className="mt-1 text-xs text-muted">Only shared with people whose request you accept (or who accept yours).</p>
                     </div>
                     <div>
                       <Label htmlFor="password" hint="8+ characters">Password</Label>
@@ -240,9 +280,9 @@ export function RegisterForm() {
 
               {step === 2 && (
                 <div>
-                  <h1 className="font-display text-4xl font-extrabold tracking-tight">Your professional profile</h1>
-                  <p className="mt-3 text-ink-soft">This is what people see when they search.</p>
-                  <div className="mt-8 space-y-5">
+                  <h1 className="font-display text-[1.75rem] font-extrabold leading-tight tracking-tight sm:text-4xl">Your professional profile</h1>
+                  <p className="mt-2 text-[15px] text-ink-soft sm:mt-3 sm:text-base">This is what people see when they search.</p>
+                  <div className="mt-6 space-y-4 sm:mt-8 sm:space-y-5">
                     <div>
                       <Label htmlFor="headline" hint={`${headline.length}/120`}>Headline</Label>
                       <Input id="headline" value={headline} maxLength={120} onChange={(e) => setHeadline(e.target.value)} placeholder="e.g. Certified electrician for homes & offices" aria-invalid={!!errors.headline} autoFocus />
@@ -270,14 +310,14 @@ export function RegisterForm() {
                     </div>
                     <div className="grid gap-5 sm:grid-cols-2">
                       <div>
-                        <Label htmlFor="location">Location</Label>
-                        <Input id="location" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="City, Country" />
+                        <Label htmlFor="location" hint="Area, State">Location</Label>
+                        <LocationInput id="location" value={location} onChange={(e) => setLocation(e.target.value)} />
                       </div>
                       <div>
-                        <Label htmlFor="rate" hint="optional">Hourly rate (USD)</Label>
+                        <Label htmlFor="rate" hint="optional">Hourly rate (₦)</Label>
                         <div className="relative">
-                          <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-semibold text-muted">$</span>
-                          <Input id="rate" type="number" min={0} value={rate} onChange={(e) => setRate(e.target.value)} placeholder="30" className="pl-8" />
+                          <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-semibold text-muted">₦</span>
+                          <Input id="rate" type="number" min={0} value={rate} onChange={(e) => setRate(e.target.value)} placeholder="10000" className="pl-8" />
                         </div>
                       </div>
                     </div>
@@ -287,9 +327,9 @@ export function RegisterForm() {
 
               {step === 3 && (
                 <div>
-                  <h1 className="font-display text-4xl font-extrabold tracking-tight">What are you good at?</h1>
-                  <p className="mt-3 text-ink-soft">Add the skills people should find you for. Be specific — it helps search.</p>
-                  <div className="mt-8">
+                  <h1 className="font-display text-[1.75rem] font-extrabold leading-tight tracking-tight sm:text-4xl">What are you good at?</h1>
+                  <p className="mt-2 text-[15px] text-ink-soft sm:mt-3 sm:text-base">Add the skills people should find you for. Be specific — it helps search.</p>
+                  <div className="mt-6 sm:mt-8">
                     <div className="flex flex-col gap-2 sm:flex-row">
                       <Input
                         value={skillInput}
@@ -372,7 +412,7 @@ export function RegisterForm() {
 
         {state.error && <p className="mt-4 text-sm font-medium text-red-600">{state.error}</p>}
 
-        <div className="mt-10 flex items-center gap-3">
+        <div className="mt-7 flex items-center gap-3 sm:mt-10">
           {step > 0 && (
             <button type="button" onClick={() => go(step - 1)} className={btn("outline", "lg", "size-13 px-0")} aria-label="Back">
               <ArrowLeft className="size-5" />
@@ -394,7 +434,13 @@ export function RegisterForm() {
         </div>
       </form>
 
-      <p className="mt-8 text-center text-sm text-muted">
+      <p className="mt-5 text-center text-xs leading-relaxed text-muted">
+        By creating an account you agree to our{" "}
+        <Link href="/terms" className="font-semibold text-ink-soft underline-offset-2 hover:underline">Terms of Service</Link> and{" "}
+        <Link href="/privacy" className="font-semibold text-ink-soft underline-offset-2 hover:underline">Privacy Policy</Link>.
+      </p>
+
+      <p className="mt-4 text-center text-sm text-muted sm:mt-6">
         Already have an account?{" "}
         <Link href={`/login${next ? `?next=${encodeURIComponent(next)}` : ""}`} className="font-semibold text-brand-700 hover:underline">
           Sign in

@@ -44,7 +44,7 @@ export function WelcomeBanner({ name, isPro }: { name: string; isPro: boolean })
               <PartyPopper className="size-7" />
             </span>
             <div className="flex-1">
-              <h2 className="text-xl font-extrabold">Welcome to findIn, {name}! 🎉</h2>
+              <h2 className="text-xl font-extrabold">Welcome to findMe, {name}! 🎉</h2>
               <p className="mt-1 text-white/70">
                 {isPro ? "Your profile is live. Publish a service so clients know exactly what to hire you for." : "You're all set. Search for any skill and send your first request."}
               </p>

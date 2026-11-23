@@ -1,27 +1,87 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { refresh } from "next/cache";
-import { getDb, tx } from "@/lib/db";
-import { hashPassword, newId, verifyPassword } from "@/lib/crypto";
-import { createSession, destroySession, getCurrentUser, requireUser } from "@/lib/auth";
+import { refresh, updateTag } from "next/cache";
+import { FieldValue } from "firebase-admin/firestore";
+import { adminAuth, db } from "@/lib/firebase-admin";
+import { createSession, destroySession, getCurrentUser, getSessionUid, requireUser } from "@/lib/auth";
+import { markNotificationsRead, notify } from "@/lib/notify";
+import { sendTermii, type Channel } from "@/lib/termii";
+import { createHash, randomInt } from "node:crypto";
 import { isCategory, SKILL_LEVELS, type RequestStatus } from "@/lib/categories";
+import { normalizeNgPhone } from "@/lib/phone";
+import { CATALOG_TAG } from "@/lib/queries";
+import type { BlockDoc, MessageDoc, NotificationDoc, PhoneCodeDoc, ReportDoc, RequestDoc, ReviewDoc, ServiceDoc, Skill, SupportDoc, UserDoc } from "@/lib/schema";
+import { AUTO_HIDE_AFTER, REPORT_REASONS } from "@/lib/safety";
+
+const PHONE_ERROR = "Enter a valid Nigerian number, e.g. 0803 123 4567.";
 
 export type FormState = { error?: string; fieldErrors?: Record<string, string>; ok?: boolean; message?: string };
 
 const str = (fd: FormData, k: string, max = 2000) => String(fd.get(k) ?? "").trim().slice(0, max);
 const int = (fd: FormData, k: string) => {
   const n = Math.round(Number(fd.get(k)));
-  return Number.isFinite(n) && n >= 0 ? Math.min(n, 1_000_000) : 0;
+  return Number.isFinite(n) && n >= 0 ? Math.min(n, 100_000_000) : 0;
 };
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const newId = () => crypto.randomUUID();
+
+const users = () => db().collection("users");
+const services = () => db().collection("services");
+const requests = () => db().collection("requests");
+const reviews = () => db().collection("reviews");
+const reports = () => db().collection("reports");
+const blocks = () => db().collection("blocks");
+
+/** True when either person has blocked the other. */
+async function isBlockedBetween(a: string, b: string) {
+  const [ab, ba] = await db().getAll(blocks().doc(`${a}__${b}`), blocks().doc(`${b}__${a}`));
+  return ab.exists || ba.exists;
+}
 
 function safeNext(next: string) {
   return next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
 }
 
+/** Recompute a provider's cheapest service (shown on cards and used for price filters). */
+async function refreshStartingPrice(userId: string) {
+  const snap = await services().where("userId", "==", userId).select("price").get();
+  const prices = snap.docs.map((d) => (d.data() as { price: number }).price).filter((p) => p > 0);
+  await users().doc(userId).update({ startingPrice: prices.length ? Math.min(...prices) : null });
+}
+
 // ---------------- Auth ----------------
 
+/** Called from the browser right after a Firebase sign-in: swaps the ID token for a session cookie. */
+export async function startSessionAction(idToken: string, next: string): Promise<FormState> {
+  try {
+    const uid = await createSession(idToken);
+    // Accounts created outside the app (e.g. in the Firebase console) still need a profile.
+    const ref = users().doc(uid);
+    const existing = await ref.get();
+    if (existing.exists) {
+      // If they changed their email (confirmed by link), keep the profile in step.
+      const authUser = await adminAuth().getUser(uid);
+      if (authUser.email && authUser.email !== (existing.data() as UserDoc).email) await ref.update({ email: authUser.email });
+    } else {
+      const authUser = await adminAuth().getUser(uid);
+      await ref.set({
+        name: authUser.displayName || authUser.email?.split("@")[0] || "findMe user",
+        email: authUser.email ?? "",
+        role: "client",
+        createdAt: Date.now(),
+      } satisfies UserDoc);
+    }
+  } catch {
+    return { error: "Your sign-in couldn't be confirmed. Please try again." };
+  }
+  redirect(safeNext(next));
+}
+
+/**
+ * Validates everything and creates the Firebase Auth account + profile on the server.
+ * The browser then signs in with the same email/password and calls startSessionAction.
+ */
 export async function registerAction(_: FormState, fd: FormData): Promise<FormState> {
   const name = str(fd, "name", 80);
   const email = str(fd, "email", 120).toLowerCase();
@@ -37,10 +97,17 @@ export async function registerAction(_: FormState, fd: FormData): Promise<FormSt
   const location = str(fd, "location", 80);
   const category = str(fd, "category", 40);
   const rate = int(fd, "rate");
-  let skills: { name: string; level: string }[] = [];
+  const phoneRaw = str(fd, "phone", 30);
+  const phone = normalizeNgPhone(phoneRaw);
+  const whatsapp = fd.get("whatsapp") !== "0";
+  let skills: Skill[] = [];
   try {
     skills = (JSON.parse(String(fd.get("skills") ?? "[]")) as { name: string; level: string }[])
-      .map((s) => ({ name: String(s.name).trim().slice(0, 40), level: SKILL_LEVELS.includes(s.level as never) ? s.level : "Intermediate" }))
+      .map((s) => ({
+        id: newId(),
+        name: String(s.name).trim().slice(0, 40),
+        level: SKILL_LEVELS.includes(s.level as never) ? s.level : "Intermediate",
+      }))
       .filter((s) => s.name)
       .slice(0, 20);
   } catch {
@@ -51,39 +118,42 @@ export async function registerAction(_: FormState, fd: FormData): Promise<FormSt
     if (headline.length < 6) fieldErrors.headline = "Tell people what you do in a few words.";
     if (!isCategory(category)) fieldErrors.category = "Pick the category that fits you best.";
     if (skills.length === 0) fieldErrors.skills = "Add at least one skill.";
+    if (!phone) fieldErrors.phone = phoneRaw ? PHONE_ERROR : "Add a number clients can reach you on.";
+  } else if (phoneRaw && !phone) {
+    fieldErrors.phone = PHONE_ERROR;
   }
   if (Object.keys(fieldErrors).length) return { fieldErrors };
 
-  const db = getDb();
-  if (db.prepare("SELECT 1 FROM users WHERE email = ?").get(email)) {
-    return { fieldErrors: { email: "An account with this email already exists. Try signing in." } };
+  let uid: string;
+  try {
+    uid = (await adminAuth().createUser({ email, password, displayName: name })).uid;
+  } catch (e) {
+    const code = (e as { code?: string }).code;
+    if (code === "auth/email-already-exists") {
+      return { fieldErrors: { email: "An account with this email already exists. Try signing in." } };
+    }
+    if (code === "auth/invalid-password") return { fieldErrors: { password: "Use at least 8 characters." } };
+    if (code === "auth/invalid-email") return { fieldErrors: { email: "Enter a valid email address." } };
+    console.error("[register] createUser failed:", e);
+    return { error: "We couldn't create your account right now. Please try again." };
   }
 
-  const id = newId();
-  tx((db) => {
-    db.prepare(
-      `INSERT INTO users (id, name, email, password_hash, role, headline, location, category, hourly_rate, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(id, name, email, hashPassword(password), role, headline, location, isCategory(category) ? category : "", rate, Date.now());
-    const ins = db.prepare("INSERT INTO skills (id, user_id, name, level) VALUES (?, ?, ?, ?)");
-    for (const s of skills) ins.run(newId(), id, s.name, s.level);
-  });
-  await createSession(id);
-  const next = str(fd, "next", 300);
-  redirect(next ? safeNext(next) : "/dashboard?welcome=1");
-}
-
-export async function loginAction(_: FormState, fd: FormData): Promise<FormState> {
-  const email = str(fd, "email", 120).toLowerCase();
-  const password = String(fd.get("password") ?? "");
-  const user = getDb().prepare("SELECT id, password_hash FROM users WHERE email = ?").get(email) as
-    | { id: string; password_hash: string }
-    | undefined;
-  if (!user || !verifyPassword(password, user.password_hash)) {
-    return { error: "That email and password don't match. Please try again." };
+  try {
+    await users().doc(uid).set({
+      name, email, role, headline, location,
+      category: isCategory(category) ? category : "",
+      hourlyRate: rate, available: true, avatar: null,
+      phone: phone ?? "", whatsapp, showPhone: false,
+      skills, ratingSum: 0, reviewCount: 0, jobsDone: 0, startingPrice: null,
+      createdAt: Date.now(),
+    } satisfies UserDoc);
+  } catch {
+    // Don't leave a login without a profile behind.
+    await adminAuth().deleteUser(uid).catch(() => {});
+    return { error: "We couldn't create your account right now. Please try again." };
   }
-  await createSession(user.id);
-  redirect(safeNext(str(fd, "next", 300)));
+  if (role === "provider") updateTag(CATALOG_TAG);
+  return { ok: true };
 }
 
 export async function logoutAction() {
@@ -106,18 +176,32 @@ export async function updateProfileAction(_: FormState, fd: FormData): Promise<F
   if (role === "provider" && !isCategory(category)) {
     return { fieldErrors: { category: "Pick a category so people can find you." } };
   }
+  const phoneRaw = str(fd, "phone", 30);
+  const phone = normalizeNgPhone(phoneRaw);
+  if (phoneRaw && !phone) return { fieldErrors: { phone: PHONE_ERROR } };
+  if (role === "provider" && !phone) return { fieldErrors: { phone: "Add a number clients can reach you on." } };
 
-  getDb()
-    .prepare(
-      `UPDATE users SET name = ?, headline = ?, bio = ?, location = ?, category = ?, hourly_rate = ?,
-         available = ?, role = ?, avatar = COALESCE(NULLIF(?, ''), avatar) WHERE id = ?`
-    )
-    .run(
-      name, str(fd, "headline", 120), str(fd, "bio", 1500), str(fd, "location", 80),
-      isCategory(category) ? category : "", int(fd, "rate"), fd.get("available") === "on" ? 1 : 0,
-      role, avatar, user.id
-    );
-  if (fd.get("removeAvatar") === "1") getDb().prepare("UPDATE users SET avatar = NULL WHERE id = ?").run(user.id);
+  const update: Partial<UserDoc> = {
+    name,
+    headline: str(fd, "headline", 120),
+    bio: str(fd, "bio", 1500),
+    location: str(fd, "location", 80),
+    category: isCategory(category) ? category : "",
+    hourlyRate: int(fd, "rate"),
+    available: fd.get("available") === "on",
+    role,
+    phone: phone ?? "",
+    whatsapp: fd.get("whatsapp") === "on",
+    showPhone: fd.get("showPhone") === "on",
+  };
+  if (avatar) update.avatar = avatar;
+  if (fd.get("removeAvatar") === "1") update.avatar = null;
+  const before = (await users().doc(user.id).get()).data() as UserDoc | undefined;
+  if ((before?.phone ?? "") !== (phone ?? "")) update.phoneVerified = false;
+
+  await users().doc(user.id).update(update);
+  await adminAuth().updateUser(user.id, { displayName: name }).catch(() => {});
+  updateTag(CATALOG_TAG);
   refresh();
   return { ok: true, message: "Profile saved" };
 }
@@ -127,20 +211,28 @@ export async function addSkillAction(_: FormState, fd: FormData): Promise<FormSt
   const name = str(fd, "name", 40);
   const level = str(fd, "level", 20);
   if (!name) return { error: "Type a skill first." };
-  const db = getDb();
-  if (db.prepare("SELECT 1 FROM skills WHERE user_id = ? AND lower(name) = lower(?)").get(user.id, name)) {
-    return { error: "You already listed that skill." };
-  }
-  db.prepare("INSERT INTO skills (id, user_id, name, level) VALUES (?, ?, ?, ?)").run(
-    newId(), user.id, name, SKILL_LEVELS.includes(level as never) ? level : "Intermediate"
-  );
+  const ref = users().doc(user.id);
+  const error = await db().runTransaction(async (t) => {
+    const skills = ((await t.get(ref)).data() as UserDoc).skills ?? [];
+    if (skills.some((s) => s.name.toLowerCase() === name.toLowerCase())) return "You already listed that skill.";
+    if (skills.length >= 30) return "You can list up to 30 skills.";
+    t.update(ref, { skills: [...skills, { id: newId(), name, level: SKILL_LEVELS.includes(level as never) ? level : "Intermediate" }] });
+    return null;
+  });
+  if (error) return { error };
+  updateTag(CATALOG_TAG);
   refresh();
   return { ok: true };
 }
 
 export async function removeSkillAction(skillId: string) {
   const user = await requireUser();
-  getDb().prepare("DELETE FROM skills WHERE id = ? AND user_id = ?").run(skillId, user.id);
+  const ref = users().doc(user.id);
+  await db().runTransaction(async (t) => {
+    const skills = ((await t.get(ref)).data() as UserDoc).skills ?? [];
+    t.update(ref, { skills: skills.filter((s) => s.id !== skillId) });
+  });
+  updateTag(CATALOG_TAG);
   refresh();
 }
 
@@ -150,43 +242,54 @@ export async function saveServiceAction(_: FormState, fd: FormData): Promise<For
   const user = await requireUser();
   const id = str(fd, "id", 60);
   const title = str(fd, "title", 100);
-  const description = str(fd, "description", 1200);
   const category = str(fd, "category", 40);
-  const priceUnit = fd.get("priceUnit") === "hour" ? "hour" : "project";
   const fieldErrors: Record<string, string> = {};
   if (title.length < 4) fieldErrors.title = "Give your service a clear title.";
   if (!isCategory(category)) fieldErrors.category = "Choose a category.";
   if (int(fd, "price") <= 0) fieldErrors.price = "Set a price.";
   if (Object.keys(fieldErrors).length) return { fieldErrors };
 
-  const db = getDb();
+  const data = {
+    title,
+    description: str(fd, "description", 1200),
+    category,
+    price: int(fd, "price"),
+    priceUnit: fd.get("priceUnit") === "hour" ? ("hour" as const) : ("project" as const),
+    deliveryDays: Math.max(1, int(fd, "deliveryDays")),
+  };
+
   if (id) {
-    db.prepare(
-      `UPDATE services SET title = ?, description = ?, category = ?, price = ?, price_unit = ?, delivery_days = ?
-       WHERE id = ? AND user_id = ?`
-    ).run(title, description, category, int(fd, "price"), priceUnit, Math.max(1, int(fd, "deliveryDays")), id, user.id);
+    const ref = services().doc(id);
+    const existing = (await ref.get()).data() as ServiceDoc | undefined;
+    if (!existing || existing.userId !== user.id) return { error: "Service not found." };
+    await ref.update(data);
   } else {
-    db.prepare(
-      `INSERT INTO services (id, user_id, title, description, category, price, price_unit, delivery_days, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(newId(), user.id, title, description, category, int(fd, "price"), priceUnit, Math.max(1, int(fd, "deliveryDays")), Date.now());
+    await services().add({ ...data, userId: user.id, createdAt: Date.now() } satisfies ServiceDoc);
     // Publishing a service lists you as a provider.
-    db.prepare("UPDATE users SET role = 'provider', category = COALESCE(NULLIF(category, ''), ?) WHERE id = ?").run(category, user.id);
+    const me = (await users().doc(user.id).get()).data() as UserDoc;
+    await users().doc(user.id).update({ role: "provider", category: me.category || category });
   }
+  await refreshStartingPrice(user.id);
+  updateTag(CATALOG_TAG);
   refresh();
   return { ok: true, message: id ? "Service updated" : "Service published" };
 }
 
 export async function deleteServiceAction(serviceId: string) {
   const user = await requireUser();
-  getDb().prepare("DELETE FROM services WHERE id = ? AND user_id = ?").run(serviceId, user.id);
+  const ref = services().doc(serviceId);
+  const s = (await ref.get()).data() as ServiceDoc | undefined;
+  if (!s || s.userId !== user.id) return;
+  await ref.delete();
+  await refreshStartingPrice(user.id);
+  updateTag(CATALOG_TAG);
   refresh();
 }
 
 // ---------------- Requests & messages ----------------
 
 export async function sendRequestAction(_: FormState, fd: FormData): Promise<FormState> {
-  const providerId = str(fd, "providerId", 60);
+  const providerId = str(fd, "providerId", 128);
   const user = await getCurrentUser();
   if (!user) redirect(`/login?next=${encodeURIComponent(`/pro/${providerId}`)}`);
   if (user.id === providerId) return { error: "You can't send a request to yourself." };
@@ -196,45 +299,123 @@ export async function sendRequestAction(_: FormState, fd: FormData): Promise<For
   const fieldErrors: Record<string, string> = {};
   if (title.length < 4) fieldErrors.title = "Summarise the job in a few words.";
   if (message.length < 15) fieldErrors.message = "Describe what you need (at least 15 characters).";
+  // Clients without a number on file can add one here; it is only shared if the pro accepts.
+  const phoneRaw = str(fd, "phone", 30);
+  const phone = normalizeNgPhone(phoneRaw);
+  if (phoneRaw && !phone) fieldErrors.phone = PHONE_ERROR;
   if (Object.keys(fieldErrors).length) return { fieldErrors };
 
-  const db = getDb();
-  if (!db.prepare("SELECT 1 FROM users WHERE id = ? AND role = 'provider'").get(providerId)) {
-    return { error: "This professional is no longer available." };
+  const provider = (await users().doc(providerId).get()).data() as UserDoc | undefined;
+  if (!provider || provider.role !== "provider") return { error: "This professional is no longer available." };
+  if (await isBlockedBetween(user.id, providerId)) return { error: "You can't send requests to this person." };
+  const authUser = await adminAuth().getUser(user.id);
+  if (!authUser.emailVerified) {
+    return { error: `Please confirm your email first — we sent a link to ${authUser.email}. You can resend it from your dashboard.` };
   }
-  const serviceId = str(fd, "serviceId", 60);
-  const validService = serviceId && db.prepare("SELECT 1 FROM services WHERE id = ? AND user_id = ?").get(serviceId, providerId);
+  const serviceId = str(fd, "serviceId", 128);
+  const service = serviceId ? ((await services().doc(serviceId).get()).data() as ServiceDoc | undefined) : undefined;
 
-  const id = newId();
   const now = Date.now();
-  tx((db) => {
-    db.prepare(
-      `INSERT INTO requests (id, client_id, provider_id, service_id, title, budget, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)`
-    ).run(id, user.id, providerId, validService ? serviceId : null, title, int(fd, "budget"), now, now);
-    db.prepare("INSERT INTO messages (id, request_id, sender_id, body, created_at) VALUES (?, ?, ?, ?, ?)").run(
-      newId(), id, user.id, message, now
-    );
+  const reqRef = requests().doc();
+  const batch = db().batch();
+  if (phone) {
+    const me = (await users().doc(user.id).get()).data() as UserDoc;
+    if (!me.phone) batch.update(users().doc(user.id), { phone });
+  }
+  batch.set(reqRef, {
+    clientId: user.id,
+    providerId,
+    participants: [user.id, providerId],
+    serviceId: service && service.userId === providerId ? serviceId : null,
+    title,
+    budget: int(fd, "budget"),
+    status: "pending",
+    lastMessage: message,
+    messageCount: 1,
+    reviewed: false,
+    createdAt: now,
+    updatedAt: now,
+  } satisfies RequestDoc);
+  batch.set(reqRef.collection("messages").doc(), { senderId: user.id, body: message, createdAt: now } satisfies MessageDoc);
+  await batch.commit();
+  const budget = int(fd, "budget");
+  await notify({
+    userId: providerId,
+    kind: "request",
+    requestId: reqRef.id,
+    title: `New request from ${user.name}`,
+    body: `“${title}”${budget > 0 ? ` · budget ${new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", currencyDisplay: "narrowSymbol", maximumFractionDigits: 0 }).format(budget)}` : ""}. Reply quickly — fast responses win more jobs.`,
+    href: `/dashboard/requests/${reqRef.id}`,
+    cta: "View request",
   });
-  redirect(`/dashboard/requests/${id}?sent=1`);
+  redirect(`/dashboard/requests/${reqRef.id}?sent=1`);
 }
 
-export async function sendMessageAction(_: FormState, fd: FormData): Promise<FormState> {
-  const user = await requireUser();
-  const requestId = str(fd, "requestId", 60);
-  const body = str(fd, "body", 3000);
+export type ChatMessage = { id: string; body: string; at: number; senderId: string };
+
+/** Sends a chat message and returns it, so the page can show it without re-reading the conversation. */
+export async function sendMessageAction(requestId: string, rawBody: string): Promise<{ message?: ChatMessage; error?: string }> {
+  const uid = await getSessionUid();
+  if (!uid) return { error: "Your session expired. Please sign in again." };
+  const body = String(rawBody ?? "").trim().slice(0, 3000);
   if (!body) return { error: "Write a message first." };
-  const db = getDb();
-  const req = db.prepare("SELECT status FROM requests WHERE id = ? AND (client_id = ? OR provider_id = ?)").get(
-    requestId, user.id, user.id
-  ) as { status: RequestStatus } | undefined;
-  if (!req) return { error: "Conversation not found." };
-  if (req.status === "declined" || req.status === "cancelled") return { error: "This request is closed." };
+  const ref = requests().doc(String(requestId ?? "").slice(0, 128));
+  const r = (await ref.get()).data() as RequestDoc | undefined;
+  if (!r || !r.participants.includes(uid)) return { error: "Conversation not found." };
+  if (r.status === "declined" || r.status === "cancelled") return { error: "This request is closed." };
+  const otherId = r.clientId === uid ? r.providerId : r.clientId;
+  if (await isBlockedBetween(uid, otherId)) return { error: "Messaging is turned off because one of you blocked the other." };
   const now = Date.now();
-  db.prepare("INSERT INTO messages (id, request_id, sender_id, body, created_at) VALUES (?, ?, ?, ?, ?)").run(newId(), requestId, user.id, body, now);
-  db.prepare("UPDATE requests SET updated_at = ? WHERE id = ?").run(now, requestId);
-  refresh();
-  return { ok: true };
+  const msgRef = ref.collection("messages").doc();
+  const batch = db().batch();
+  batch.set(msgRef, { senderId: uid, body, createdAt: now } satisfies MessageDoc);
+  batch.update(ref, { lastMessage: body, messageCount: FieldValue.increment(1), updatedAt: now });
+  await batch.commit();
+  const sender = (await users().doc(uid).get()).data() as UserDoc | undefined;
+  await notify({
+    userId: otherId,
+    kind: "message",
+    requestId: ref.id,
+    title: `${sender?.name ?? "Someone"} sent you a message`,
+    body: `About “${r.title}”: ${body.length > 140 ? body.slice(0, 140) + "…" : body}`,
+    href: `/dashboard/requests/${ref.id}`,
+    cta: "Reply",
+  });
+  return { message: { id: msgRef.id, body, at: now, senderId: uid } };
+}
+
+/**
+ * Cheap check for new activity in an open conversation.
+ * Costs 1 Firestore read when nothing changed; otherwise also reads only the messages newer than `since`.
+ * A status change (accepted, completed…) is reported so the page can fully refresh once.
+ */
+export async function pollThreadAction(
+  requestId: string,
+  knownCount: number,
+  knownStatus: RequestStatus,
+  since: number
+): Promise<{ count: number; status: RequestStatus; messages: ChatMessage[] } | null> {
+  const uid = await getSessionUid();
+  if (!uid) return null;
+  const ref = requests().doc(String(requestId ?? "").slice(0, 128));
+  const r = (await ref.get()).data() as RequestDoc | undefined;
+  if (!r || !r.participants.includes(uid)) return null;
+  const count = r.messageCount ?? 0;
+  if (count === knownCount || r.status !== knownStatus) return { count, status: r.status, messages: [] };
+  const snap = await ref
+    .collection("messages")
+    .where("createdAt", ">=", Number(since) || 0)
+    .orderBy("createdAt")
+    .limit(100)
+    .get();
+  return {
+    count,
+    status: r.status,
+    messages: snap.docs.map((d) => {
+      const m = d.data() as MessageDoc;
+      return { id: d.id, body: m.body, at: m.createdAt, senderId: m.senderId };
+    }),
+  };
 }
 
 const TRANSITIONS: Record<"provider" | "client", Partial<Record<RequestStatus, RequestStatus[]>>> = {
@@ -242,43 +423,283 @@ const TRANSITIONS: Record<"provider" | "client", Partial<Record<RequestStatus, R
   client: { pending: ["cancelled"], accepted: ["cancelled"] },
 };
 
+const STATUS_NOTE: Record<RequestStatus, string> = {
+  accepted: "accepted the request · phone numbers are now shared",
+  declined: "declined the request",
+  completed: "marked the job as completed",
+  cancelled: "cancelled the request",
+  pending: "",
+};
+
 export async function updateRequestStatusAction(requestId: string, status: RequestStatus) {
   const user = await requireUser();
-  const db = getDb();
-  const req = db.prepare("SELECT client_id, provider_id, status FROM requests WHERE id = ?").get(requestId) as
-    | { client_id: string; provider_id: string; status: RequestStatus }
-    | undefined;
-  if (!req) return;
-  const side = req.provider_id === user.id ? "provider" : req.client_id === user.id ? "client" : null;
-  if (!side || !TRANSITIONS[side][req.status]?.includes(status)) return;
-  const now = Date.now();
-  db.prepare("UPDATE requests SET status = ?, updated_at = ? WHERE id = ?").run(status, now, requestId);
-  const note = {
-    accepted: "accepted the request",
-    declined: "declined the request",
-    completed: "marked the job as completed",
-    cancelled: "cancelled the request",
-    pending: "",
-  }[status];
-  db.prepare("INSERT INTO messages (id, request_id, sender_id, body, created_at) VALUES (?, ?, ?, ?, ?)").run(
-    newId(), requestId, user.id, `__status__:${note}`, now
-  );
+  const ref = requests().doc(requestId);
+  const changed = await db().runTransaction(async (t) => {
+    const r = (await t.get(ref)).data() as RequestDoc | undefined;
+    if (!r) return null;
+    const side = r.providerId === user.id ? "provider" : r.clientId === user.id ? "client" : null;
+    if (!side || !TRANSITIONS[side][r.status]?.includes(status)) return null;
+    const now = Date.now();
+    const note = `__status__:${STATUS_NOTE[status]}`;
+    t.update(ref, { status, updatedAt: now, lastMessage: note, messageCount: FieldValue.increment(1) });
+    t.set(ref.collection("messages").doc(), { senderId: user.id, body: note, createdAt: now } satisfies MessageDoc);
+    if (status === "completed") t.update(users().doc(r.providerId), { jobsDone: FieldValue.increment(1) });
+    return r;
+  });
+  if (changed && status === "completed") updateTag(CATALOG_TAG);
+  if (changed) {
+    const first = user.name.split(" ")[0];
+    const toClient = changed.providerId === user.id;
+    const text: Partial<Record<RequestStatus, { title: string; body: string; cta: string }>> = {
+      accepted: { title: `${first} accepted your request`, body: `“${changed.title}” is on. Phone numbers are now shared, so you can call or WhatsApp each other.`, cta: "Open conversation" },
+      declined: { title: `${first} can't take your request`, body: `“${changed.title}” was declined. There are other great pros on findMe — try another.`, cta: "Find someone else" },
+      completed: { title: `${first} marked your job as done`, body: `How did “${changed.title}” go? A quick rating helps other clients choose well.`, cta: "Rate the job" },
+      cancelled: { title: `${first} cancelled a request`, body: `“${changed.title}” was cancelled by the client.`, cta: "View request" },
+    };
+    const t = text[status];
+    if (t) {
+      await notify({
+        userId: toClient ? changed.clientId : changed.providerId,
+        kind: "status",
+        requestId: requestId,
+        title: t.title,
+        body: t.body,
+        href: status === "declined" ? "/search" : status === "completed" ? `/dashboard/requests/${requestId}#review` : `/dashboard/requests/${requestId}`,
+        cta: t.cta,
+      });
+    }
+  }
   refresh();
 }
 
 export async function leaveReviewAction(_: FormState, fd: FormData): Promise<FormState> {
   const user = await requireUser();
-  const requestId = str(fd, "requestId", 60);
+  const requestId = str(fd, "requestId", 128);
   const rating = Math.min(5, Math.max(1, int(fd, "rating")));
-  const db = getDb();
-  const req = db.prepare("SELECT provider_id FROM requests WHERE id = ? AND client_id = ? AND status = 'completed'").get(
-    requestId, user.id
-  ) as { provider_id: string } | undefined;
-  if (!req) return { error: "You can review a job once it's completed." };
-  if (db.prepare("SELECT 1 FROM reviews WHERE request_id = ?").get(requestId)) return { error: "You already reviewed this job." };
-  db.prepare(
-    "INSERT INTO reviews (id, request_id, provider_id, client_id, rating, comment, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
-  ).run(newId(), requestId, req.provider_id, user.id, rating, str(fd, "comment", 1000), Date.now());
+  const reqRef = requests().doc(requestId);
+  const reviewRef = reviews().doc(requestId);
+
+  const error = await db().runTransaction(async (t) => {
+    const [reqSnap, reviewSnap] = await Promise.all([t.get(reqRef), t.get(reviewRef)]);
+    const r = reqSnap.data() as RequestDoc | undefined;
+    if (!r || r.clientId !== user.id || r.status !== "completed") return "You can review a job once it's completed.";
+    if (reviewSnap.exists) return "You already reviewed this job.";
+    t.create(reviewRef, {
+      requestId, providerId: r.providerId, clientId: user.id, rating, comment: str(fd, "comment", 1000), createdAt: Date.now(),
+    } satisfies ReviewDoc);
+    t.update(users().doc(r.providerId), { ratingSum: FieldValue.increment(rating), reviewCount: FieldValue.increment(1) });
+    t.update(reqRef, { reviewed: true });
+    return null;
+  });
+  if (error) return { error };
+  const reviewed = (await reqRef.get()).data() as RequestDoc | undefined;
+  if (reviewed) {
+    await notify({
+      userId: reviewed.providerId,
+      kind: "review",
+      requestId,
+      title: `${user.name.split(" ")[0]} left you a ${rating}★ review`,
+      body: `For “${reviewed.title}”. Great reviews move you up in search.`,
+      href: `/pro/${reviewed.providerId}`,
+      cta: "See your profile",
+    });
+  }
+  updateTag(CATALOG_TAG);
   refresh();
   return { ok: true, message: "Thanks for your review!" };
+}
+
+/* ───────────────────────── safety: report & block ───────────────────────── */
+
+/**
+ * Report a user. One report per reporter/reported pair (re-reporting updates the details).
+ * A pro reported by AUTO_HIDE_AFTER different people is hidden from search until reviewed.
+ */
+export async function reportUserAction(_: FormState, fd: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const reportedId = str(fd, "reportedId", 128);
+  const reason = str(fd, "reason", 40);
+  const details = str(fd, "details", 1000);
+  const requestId = str(fd, "requestId", 128) || null;
+  if (!reportedId || reportedId === user.id) return { error: "You can't report this account." };
+  if (!REPORT_REASONS.some((r) => r.key === reason)) return { fieldErrors: { reason: "Choose what happened." } };
+  if (reason === "other" && details.length < 10) return { fieldErrors: { details: "Tell us briefly what happened." } };
+
+  const reportedRef = users().doc(reportedId);
+  const reportRef = reports().doc(`${user.id}__${reportedId}`);
+  let hidden = false;
+  const error = await db().runTransaction(async (t) => {
+    const [reportedSnap, existing] = await Promise.all([t.get(reportedRef), t.get(reportRef)]);
+    if (!reportedSnap.exists) return "This account no longer exists.";
+    const now = Date.now();
+    if (existing.exists) {
+      t.update(reportRef, { reason, details, requestId, status: "open", createdAt: now });
+      return null;
+    }
+    t.create(reportRef, { reporterId: user.id, reportedId, requestId, reason, details, status: "open", createdAt: now } satisfies ReportDoc);
+    const reported = reportedSnap.data() as UserDoc;
+    const count = (reported.reportCount ?? 0) + 1;
+    hidden = reported.role === "provider" && count >= AUTO_HIDE_AFTER && !reported.flagged;
+    t.update(reportedRef, { reportCount: count, ...(hidden ? { flagged: true } : {}) });
+    return null;
+  });
+  if (error) return { error };
+
+  if (fd.get("block") === "on") {
+    await blocks().doc(`${user.id}__${reportedId}`).set({ blockerId: user.id, blockedId: reportedId, createdAt: Date.now() } satisfies BlockDoc);
+  }
+  if (hidden) updateTag(CATALOG_TAG);
+  refresh();
+  return { ok: true, message: "Report received" };
+}
+
+/** Block or unblock someone: no requests or messages either way while blocked. */
+export async function setBlockAction(otherId: string, block: boolean): Promise<{ error?: string }> {
+  const user = await requireUser();
+  const id = String(otherId ?? "").slice(0, 128);
+  if (!id || id === user.id) return { error: "You can't block this account." };
+  const ref = blocks().doc(`${user.id}__${id}`);
+  if (block) await ref.set({ blockerId: user.id, blockedId: id, createdAt: Date.now() } satisfies BlockDoc);
+  else await ref.delete();
+  refresh();
+  return {};
+}
+
+/* ───────────────────────── notifications ───────────────────────── */
+
+export type NotificationItem = { id: string; kind: NotificationDoc["kind"]; title: string; body: string; href: string; read: boolean; createdAt: number };
+
+/** Latest notifications for the bell. */
+export async function getNotificationsAction(): Promise<NotificationItem[]> {
+  const uid = await getSessionUid();
+  if (!uid) return [];
+  const snap = await db().collection("notifications").where("userId", "==", uid).orderBy("createdAt", "desc").limit(20).get();
+  return snap.docs.map((d) => {
+    const n = d.data() as NotificationDoc;
+    return { id: d.id, kind: n.kind, title: n.title, body: n.body, href: n.href, read: n.read, createdAt: n.createdAt };
+  });
+}
+
+export async function markAllNotificationsReadAction() {
+  const uid = await getSessionUid();
+  if (!uid) return;
+  await markNotificationsRead(uid);
+  refresh();
+}
+
+/* ───────────────────────── account ───────────────────────── */
+
+/**
+ * Permanently deletes the signed-in account. The browser must have just re-entered the password
+ * (fresh ID token, signed in within 5 minutes). Conversations stay for the other person, shown
+ * as "findMe user"; profile, phone, services, skills and notifications are removed.
+ */
+export async function deleteAccountAction(idToken: string): Promise<{ error?: string }> {
+  const uid = await getSessionUid();
+  if (!uid) return { error: "Your session expired. Please sign in again." };
+  let decoded;
+  try {
+    decoded = await adminAuth().verifyIdToken(idToken);
+  } catch {
+    return { error: "Couldn't confirm it's you. Please try again." };
+  }
+  if (decoded.uid !== uid || Date.now() / 1000 - decoded.auth_time > 5 * 60) return { error: "Please re-enter your password and try again." };
+
+  const me = (await users().doc(uid).get()).data() as UserDoc | undefined;
+  const writer = db().bulkWriter();
+  const del = async (q: FirebaseFirestore.Query) => (await q.get()).docs.forEach((d) => writer.delete(d.ref));
+  await Promise.all([
+    del(services().where("userId", "==", uid)),
+    del(db().collection("notifications").where("userId", "==", uid)),
+    del(reports().where("reporterId", "==", uid)),
+    del(blocks().where("blockerId", "==", uid)),
+    del(blocks().where("blockedId", "==", uid)),
+    me?.role === "provider" ? del(reviews().where("providerId", "==", uid)) : Promise.resolve(),
+  ]);
+  writer.delete(users().doc(uid));
+  await writer.close();
+  await adminAuth().deleteUser(uid);
+  updateTag(CATALOG_TAG);
+  await destroySession().catch(() => {});
+  redirect("/?deleted=1");
+}
+
+/* ───────────────────────── contact ───────────────────────── */
+
+export async function contactAction(_: FormState, fd: FormData): Promise<FormState> {
+  const user = await getCurrentUser();
+  const name = str(fd, "name", 80) || user?.name || "";
+  const email = (str(fd, "email", 120) || user?.email || "").toLowerCase();
+  const topic = str(fd, "topic", 40) || "general";
+  const message = str(fd, "message", 3000);
+  const fieldErrors: Record<string, string> = {};
+  if (name.length < 2) fieldErrors.name = "Tell us your name.";
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) fieldErrors.email = "Enter a valid email so we can reply.";
+  if (message.length < 10) fieldErrors.message = "Tell us a bit more (at least 10 characters).";
+  if (Object.keys(fieldErrors).length) return { fieldErrors };
+  await db().collection("support").add({ name, email, topic, message, userId: user?.id ?? null, status: "open", createdAt: Date.now() } satisfies SupportDoc);
+  return { ok: true, message: "Message sent" };
+}
+
+/* ───────────────────────── phone / WhatsApp verification ───────────────────────── */
+
+const CODE_TTL_MS = 10 * 60_000;
+const RESEND_AFTER_MS = 60_000;
+const MAX_SENDS_PER_HOUR = 5;
+const MAX_ATTEMPTS = 5;
+const phoneCodes = () => db().collection("phone_codes");
+const hashCode = (uid: string, code: string) => createHash("sha256").update(`${uid}:${code}`).digest("hex");
+
+/** Sends a 6-digit code to the user's saved number, by WhatsApp (default) or SMS. */
+export async function sendPhoneCodeAction(channel: Channel): Promise<{ ok?: boolean; error?: string; to?: string; retryIn?: number }> {
+  const user = await requireUser();
+  const me = (await users().doc(user.id).get()).data() as UserDoc | undefined;
+  if (!me?.phone) return { error: "Add your phone number to your profile and save it first." };
+  if (me.phoneVerified) return { ok: true, to: me.phone };
+
+  const ref = phoneCodes().doc(user.id);
+  const now = Date.now();
+  const prev = (await ref.get()).data() as PhoneCodeDoc | undefined;
+  const recent = (prev?.sentAt ?? []).filter((t) => now - t < 3_600_000);
+  const last = recent.at(-1) ?? 0;
+  if (now - last < RESEND_AFTER_MS) return { error: "Please wait a moment before asking for another code.", retryIn: Math.ceil((RESEND_AFTER_MS - (now - last)) / 1000) };
+  if (recent.length >= MAX_SENDS_PER_HOUR) return { error: "Too many codes requested. Please try again in an hour." };
+
+  const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+  const sent = await sendTermii(me.phone, `Your findMe verification code is ${code}. It expires in 10 minutes. Never share this code with anyone.`, channel === "sms" ? "sms" : "whatsapp");
+  if (!sent.ok) return { error: sent.error };
+
+  await ref.set({ phone: me.phone, codeHash: hashCode(user.id, code), expiresAt: now + CODE_TTL_MS, attempts: 0, sentAt: [...recent, now] } satisfies PhoneCodeDoc);
+  return { ok: true, to: me.phone, retryIn: RESEND_AFTER_MS / 1000 };
+}
+
+/** Checks the code; on success the number is marked verified (and the badge appears). */
+export async function verifyPhoneCodeAction(rawCode: string): Promise<{ ok?: boolean; error?: string }> {
+  const user = await requireUser();
+  const code = String(rawCode ?? "").replace(/\D/g, "");
+  if (code.length !== 6) return { error: "Enter the 6-digit code." };
+
+  const ref = phoneCodes().doc(user.id);
+  const userRef = users().doc(user.id);
+  const result = await db().runTransaction(async (t) => {
+    const [codeSnap, userSnap] = await Promise.all([t.get(ref), t.get(userRef)]);
+    const c = codeSnap.data() as PhoneCodeDoc | undefined;
+    const me = userSnap.data() as UserDoc | undefined;
+    if (!c || !me) return "Ask for a new code first.";
+    if (c.phone !== me.phone) return "Your number changed — ask for a new code.";
+    if (Date.now() > c.expiresAt) return "That code has expired. Ask for a new one.";
+    if (c.attempts >= MAX_ATTEMPTS) return "Too many wrong tries. Ask for a new code.";
+    if (c.codeHash !== hashCode(user.id, code)) {
+      t.update(ref, { attempts: c.attempts + 1 });
+      const left = MAX_ATTEMPTS - c.attempts - 1;
+      return left > 0 ? `That code isn't right. ${left} ${left === 1 ? "try" : "tries"} left.` : "Too many wrong tries. Ask for a new code.";
+    }
+    t.update(userRef, { phoneVerified: true });
+    t.delete(ref);
+    return null;
+  });
+  if (result) return { error: result };
+  updateTag(CATALOG_TAG);
+  refresh();
+  return { ok: true };
 }

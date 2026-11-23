@@ -34,14 +34,14 @@ export function HeroVisual() {
             ))}
           </div>
           <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-            {[["4.9", "Rating"], ["128", "Jobs"], ["$45", "/hour"]].map(([v, l]) => (
+            {[["4.9", "Rating"], ["128", "Jobs"], ["₦15k", "/hour"]].map(([v, l]) => (
               <div key={l} className="rounded-xl bg-canvas py-2">
                 <p className="font-extrabold">{v}</p>
                 <p className="text-[11px] text-muted">{l}</p>
               </div>
             ))}
           </div>
-          <div className="mt-4 h-10 rounded-full bg-brand-600 text-center text-sm font-semibold leading-10 text-white">Hire via findIn</div>
+          <div className="mt-4 h-10 rounded-full bg-brand-600 text-center text-sm font-semibold leading-10 text-white">Hire via findMe</div>
         </div>
       </motion.div>
 
@@ -58,8 +58,8 @@ export function HeroVisual() {
           </div>
           <p className="mt-1.5 text-xs leading-relaxed text-ink-soft">&ldquo;Found the perfect designer in minutes. Our new logo is stunning!&rdquo;</p>
           <div className="mt-2 flex items-center gap-2">
-            <Avatar name="Olivia Grant" size={22} />
-            <span className="text-[11px] font-semibold">Olivia G.</span>
+            <Avatar name="Tolu Adewale" size={22} />
+            <span className="text-[11px] font-semibold">Tolu A., Lagos</span>
           </div>
         </div>
       </motion.div>

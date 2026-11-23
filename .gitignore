@@ -40,3 +40,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 data/
+
+# Firebase service-account keys
+.secrets/
+.firebase/

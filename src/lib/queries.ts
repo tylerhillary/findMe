@@ -1,7 +1,15 @@
 import "server-only";
+import { cache } from "react";
 import { connection } from "next/server";
-import { getDb } from "./db";
+import { cacheLife, cacheTag } from "next/cache";
+import { AggregateField } from "firebase-admin/firestore";
+import { db } from "./firebase-admin";
 import { CATEGORIES, categoryName, type RequestStatus } from "./categories";
+import { inState } from "./nigeria";
+import type { RequestDoc, ReviewDoc, ServiceDoc, UserDoc } from "./schema";
+
+/** Cache tag for the public provider catalog (search, featured, category counts). */
+export const CATALOG_TAG = "catalog";
 
 export type ProviderCard = {
   id: string;
@@ -17,70 +25,91 @@ export type ProviderCard = {
   jobsDone: number;
   skills: string[];
   startingPrice: number | null;
+  /** Phone/WhatsApp number confirmed with a code. */
+  phoneVerified: boolean;
   score?: number;
 };
 
-type ProviderRow = {
-  id: string;
-  name: string;
-  headline: string;
+type CatalogEntry = ProviderCard & {
   bio: string;
-  location: string;
-  category: string;
-  hourly_rate: number;
-  available: number;
-  avatar: string | null;
-  rating: number | null;
-  review_count: number;
-  jobs_done: number;
-  starting_price: number | null;
+  services: { title: string; description: string; category: string }[];
 };
 
-const PROVIDER_SELECT = `
-  SELECT u.id, u.name, u.headline, u.bio, u.location, u.category, u.hourly_rate, u.available, u.avatar,
-    (SELECT AVG(rating) FROM reviews r WHERE r.provider_id = u.id) AS rating,
-    (SELECT COUNT(*) FROM reviews r WHERE r.provider_id = u.id) AS review_count,
-    (SELECT COUNT(*) FROM requests q WHERE q.provider_id = u.id AND q.status = 'completed') AS jobs_done,
-    (SELECT MIN(price) FROM services s WHERE s.user_id = u.id) AS starting_price
-  FROM users u
-  WHERE u.role = 'provider'`;
+const round1 = (n: number) => Math.round(n * 10) / 10;
 
-function loadProviders(): { rows: ProviderRow[]; skills: Map<string, string[]>; services: Map<string, { title: string; description: string; category: string }[]> } {
-  const db = getDb();
-  const rows = db.prepare(PROVIDER_SELECT).all() as unknown as ProviderRow[];
-  const skills = new Map<string, string[]>();
-  for (const s of db.prepare("SELECT user_id, name FROM skills ORDER BY rowid").all() as { user_id: string; name: string }[]) {
-    skills.set(s.user_id, [...(skills.get(s.user_id) ?? []), s.name]);
-  }
-  const services = new Map<string, { title: string; description: string; category: string }[]>();
-  for (const s of db.prepare("SELECT user_id, title, description, category FROM services").all() as {
-    user_id: string; title: string; description: string; category: string;
-  }[]) {
-    services.set(s.user_id, [...(services.get(s.user_id) ?? []), s]);
-  }
-  return { rows, skills, services };
+function cardFrom(id: string, u: UserDoc): ProviderCard {
+  return {
+    id,
+    name: u.name,
+    headline: u.headline ?? "",
+    location: u.location ?? "",
+    category: u.category ?? "",
+    hourlyRate: u.hourlyRate ?? 0,
+    available: u.available !== false,
+    avatar: u.avatar ?? null,
+    rating: u.reviewCount ? round1((u.ratingSum ?? 0) / u.reviewCount) : 0,
+    reviewCount: u.reviewCount ?? 0,
+    jobsDone: u.jobsDone ?? 0,
+    skills: (u.skills ?? []).map((s) => s.name),
+    startingPrice: u.startingPrice ?? null,
+    phoneVerified: !!u.phoneVerified,
+  };
 }
 
-const toCard = (r: ProviderRow, skills: string[]): ProviderCard => ({
-  id: r.id,
-  name: r.name,
-  headline: r.headline,
-  location: r.location,
-  category: r.category,
-  hourlyRate: r.hourly_rate,
-  available: !!r.available,
-  avatar: r.avatar,
-  rating: r.rating ? Math.round(r.rating * 10) / 10 : 0,
-  reviewCount: r.review_count,
-  jobsDone: r.jobs_done,
-  skills,
-  startingPrice: r.starting_price,
-});
+// Public fields only — phone numbers and emails never enter the cached catalog.
+const PUBLIC_FIELDS = [
+  "name", "headline", "bio", "location", "category", "hourlyRate", "available", "avatar",
+  "skills", "ratingSum", "reviewCount", "jobsDone", "startingPrice", "flagged", "phoneVerified",
+] as const;
+
+/**
+ * Every provider plus their service titles, cached for a few minutes and refreshed immediately
+ * (via updateTag) whenever a profile, service, review or job status changes. This keeps search
+ * fast and Firestore reads low.
+ */
+async function loadCatalog(): Promise<CatalogEntry[]> {
+  "use cache";
+  cacheTag(CATALOG_TAG);
+  cacheLife("minutes");
+
+  const [users, services] = await Promise.all([
+    db().collection("users").where("role", "==", "provider").select(...PUBLIC_FIELDS).get(),
+    db().collection("services").select("userId", "title", "description", "category").get(),
+  ]);
+  const byUser = new Map<string, CatalogEntry["services"]>();
+  for (const d of services.docs) {
+    const s = d.data() as Pick<ServiceDoc, "userId" | "title" | "description" | "category">;
+    byUser.set(s.userId, [...(byUser.get(s.userId) ?? []), { title: s.title, description: s.description, category: s.category }]);
+  }
+  return users.docs
+    .filter((d) => !(d.data() as UserDoc).flagged) // reported by several people — hidden until reviewed
+    .map((d) => {
+      const u = d.data() as UserDoc;
+      return { ...cardFrom(d.id, u), bio: u.bio ?? "", services: byUser.get(d.id) ?? [] };
+    });
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- strip search-only fields
+const toCard = ({ bio, services, ...card }: CatalogEntry): ProviderCard => card;
 
 // Everyday words people type, mapped to the skills that solve them.
 const INTENTS: Record<string, string[]> = {
   sink: ["plumbing"], leak: ["plumbing"], pipe: ["plumbing"], toilet: ["plumbing"], tap: ["plumbing"],
-  light: ["electrical", "lighting"], socket: ["electrical"], wiring: ["electrical"], power: ["electrical"],
+  light: ["electrical", "lighting", "solar"], socket: ["electrical"], wiring: ["electrical"], changeover: ["changeover"],
+  power: ["solar", "inverter", "generator", "electrical"], nepa: ["solar", "inverter", "generator"], solar: ["solar"],
+  inverter: ["inverter"], generator: ["generator"], gen: ["generator"], borehole: ["borehole", "plumbing"],
+  car: ["car"], mechanic: ["car"], motor: ["car"], vehicle: ["car"],
+  tailor: ["tailoring"], sew: ["tailoring"], clothes: ["tailoring", "ankara"], ankara: ["ankara"], agbada: ["agbada"], aso: ["aso-ebi"], "aso-ebi": ["aso-ebi"],
+  delivery: ["delivery", "dispatch"], dispatch: ["dispatch"], parcel: ["dispatch"], moving: ["moving"], move: ["moving"],
+  jamb: ["jamb"], waec: ["waec"], neco: ["waec"], gele: ["gele"], owambe: ["makeup", "catering"],
+  food: ["catering", "small chops"], jollof: ["catering"], chops: ["small chops"], cake: ["cake"], party: ["catering", "makeup"],
+  paystack: ["paystack"], payment: ["paystack"], cac: ["cac"], hausa: ["hausa"],
+  chef: ["chef", "cooking", "catering"], cook: ["cooking", "chef", "catering"], cooking: ["cooking", "chef"], caterer: ["catering"],
+  catering: ["catering"], meal: ["meal prep", "cooking"], lunch: ["lunch", "catering"], dinner: ["chef"], soup: ["soups"],
+  egusi: ["soups"], baker: ["baking", "cake"], bakery: ["baking", "cake"], birthday: ["cake", "catering"],
+  clean: ["cleaning"], cleaner: ["cleaning"], cleaning: ["cleaning"], laundry: ["laundry"], wash: ["laundry", "cleaning"],
+  dryclean: ["dry cleaning"], iron: ["ironing"], fumigation: ["fumigation"], fumigate: ["fumigation"], pest: ["fumigation"],
+  cockroach: ["fumigation"], rats: ["fumigation"],
   website: ["website", "react", "next.js", "development"], site: ["website", "development"], web: ["website", "development"],
   app: ["mobile app", "flutter", "react native"], logo: ["logo", "brand"], brand: ["brand", "logo"],
   wedding: ["wedding", "bridal"], photos: ["photography"], photo: ["photography"], video: ["video editing"],
@@ -92,20 +121,15 @@ const INTENTS: Record<string, string[]> = {
   makeup: ["makeup"], fitness: ["yoga", "wellness"], translate: ["translation"], copy: ["copywriting"], writer: ["copywriting"],
 };
 
-function scoreProvider(
-  terms: string[],
-  r: ProviderRow,
-  skills: string[],
-  services: { title: string; description: string; category: string }[]
-) {
+function scoreProvider(terms: string[], p: CatalogEntry) {
   const hay = {
-    name: r.name.toLowerCase(),
-    headline: r.headline.toLowerCase(),
-    bio: r.bio.toLowerCase(),
-    category: categoryName(r.category).toLowerCase(),
-    skills: skills.map((s) => s.toLowerCase()),
-    titles: services.map((s) => s.title.toLowerCase()),
-    descs: services.map((s) => s.description.toLowerCase()),
+    name: p.name.toLowerCase(),
+    headline: p.headline.toLowerCase(),
+    bio: p.bio.toLowerCase(),
+    category: categoryName(p.category).toLowerCase(),
+    skills: p.skills.map((s) => s.toLowerCase()),
+    titles: p.services.map((s) => s.title.toLowerCase()),
+    descs: p.services.map((s) => s.description.toLowerCase()),
   };
   let score = 0;
   for (const raw of terms) {
@@ -131,62 +155,95 @@ export type SearchParams = {
   sort?: "relevance" | "rating" | "price_low" | "price_high";
   available?: boolean;
   maxRate?: number;
+  state?: string;
+  /** Only pros rated at least this (and with at least one review). */
+  minRating?: number;
 };
 
-export async function searchProviders(params: SearchParams): Promise<ProviderCard[]> {
+export type SearchResult = {
+  results: ProviderCard[];
+  /** How many pros match the current search and filters in each category (ignoring the category filter). */
+  categoryCounts: Record<string, number>;
+  /** Every pro on findMe, for "out of N". */
+  totalPros: number;
+};
+
+// Hourly rate when set, otherwise the cheapest service — what a client would pay to start.
+const cardPrice = (c: ProviderCard) => c.hourlyRate || c.startingPrice || 0;
+
+const STOP = new Set(["a", "an", "the", "i", "my", "me", "for", "to", "and", "of", "in", "need", "someone", "who", "can", "help", "with", "get", "want", "looking", "fix", "do", "make"]);
+
+// The catalog is cached, but always loaded at request time (connection) so builds never need Firestore access.
+export async function searchProviders(params: SearchParams): Promise<SearchResult> {
   await connection();
-  const { rows, skills, services } = loadProviders();
+  const catalog = await loadCatalog();
   const terms = (params.q ?? "")
     .toLowerCase()
     .split(/[^a-z0-9.+#-]+/i)
     .filter((t) => t.length > 1 && !STOP.has(t));
 
-  let list = rows
-    .filter((r) => !params.category || r.category === params.category)
-    .filter((r) => !params.available || r.available)
-    .filter((r) => !params.maxRate || r.hourly_rate <= params.maxRate)
-    .map((r) => {
-      const card = toCard(r, skills.get(r.id) ?? []);
-      card.score = terms.length ? scoreProvider(terms, r, card.skills, services.get(r.id) ?? []) : 0;
-      return card;
-    })
-    .filter((c) => !terms.length || (c.score ?? 0) > 0);
+  // Everything except the category filter, so the sidebar can show per-category counts.
+  let matches = catalog
+    .filter((p) => !params.available || p.available)
+    .filter((p) => !params.state || inState(p.location, params.state))
+    .filter((p) => !params.maxRate || cardPrice(p) <= params.maxRate)
+    .map((p) => ({ ...toCard(p), score: terms.length ? scoreProvider(terms, p) : 0 }))
+    .filter((c) => !params.minRating || (c.reviewCount > 0 && c.rating >= params.minRating))
+    .filter((c) => !terms.length || c.score > 0);
+
+  // Drop weak, incidental matches (e.g. "tailor" hitting "tailored to your level")
+  // when there are clearly better ones.
+  if (terms.length) {
+    const top = Math.max(0, ...matches.map((c) => c.score));
+    matches = matches.filter((c) => c.score >= Math.min(4, top * 0.2));
+  }
+
+  const categoryCounts: Record<string, number> = {};
+  for (const c of matches) categoryCounts[c.category] = (categoryCounts[c.category] ?? 0) + 1;
 
   const sort = params.sort ?? "relevance";
-  list = list.sort((a, b) => {
-    if (sort === "rating") return b.rating - a.rating || b.reviewCount - a.reviewCount;
-    if (sort === "price_low") return a.hourlyRate - b.hourlyRate;
-    if (sort === "price_high") return b.hourlyRate - a.hourlyRate;
-    return (b.score ?? 0) - (a.score ?? 0) || b.rating * b.reviewCount - a.rating * a.reviewCount;
-  });
-  return list;
-}
+  const results = matches
+    .filter((c) => !params.category || c.category === params.category)
+    .sort((a, b) => {
+      if (sort === "rating") return b.rating - a.rating || b.reviewCount - a.reviewCount;
+      if (sort === "price_low") return cardPrice(a) - cardPrice(b);
+      if (sort === "price_high") return cardPrice(b) - cardPrice(a);
+      return b.score - a.score || Number(b.phoneVerified) - Number(a.phoneVerified) || b.rating * b.reviewCount - a.rating * a.reviewCount;
+    });
 
-const STOP = new Set(["a", "an", "the", "i", "my", "me", "for", "to", "and", "of", "in", "need", "someone", "who", "can", "help", "with", "get", "want", "looking", "fix", "do", "make"]);
+  return { results, categoryCounts, totalPros: catalog.length };
+}
 
 export async function getFeaturedProviders(limit = 6): Promise<ProviderCard[]> {
   await connection();
-  const { rows, skills } = loadProviders();
-  return rows
-    .map((r) => toCard(r, skills.get(r.id) ?? []))
+  const catalog = await loadCatalog();
+  return catalog
+    .map(toCard)
     .sort((a, b) => b.rating * Math.log(1 + b.reviewCount) - a.rating * Math.log(1 + a.reviewCount))
     .slice(0, limit);
 }
 
 export async function getPlatformStats() {
   await connection();
-  const db = getDb();
-  const one = (sql: string) => (db.prepare(sql).get() as { n: number }).n;
-  const perCategory = new Map(
-    (db.prepare("SELECT category, COUNT(*) AS n FROM users WHERE role = 'provider' GROUP BY category").all() as {
-      category: string; n: number;
-    }[]).map((r) => [r.category, r.n])
-  );
+  return platformTotals();
+}
+
+async function platformTotals() {
+  "use cache";
+  cacheTag(CATALOG_TAG);
+  cacheLife("minutes");
+  const [catalog, completed, reviews] = await Promise.all([
+    loadCatalog(),
+    db().collection("requests").where("status", "==", "completed").count().get(),
+    db().collection("reviews").aggregate({ avg: AggregateField.average("rating") }).get(),
+  ]);
+  const perCategory = new Map<string, number>();
+  for (const p of catalog) perCategory.set(p.category, (perCategory.get(p.category) ?? 0) + 1);
   return {
-    providers: one("SELECT COUNT(*) AS n FROM users WHERE role = 'provider'"),
-    skills: one("SELECT COUNT(DISTINCT lower(name)) AS n FROM skills"),
-    completed: one("SELECT COUNT(*) AS n FROM requests WHERE status = 'completed'"),
-    rating: Math.round(((db.prepare("SELECT AVG(rating) AS n FROM reviews").get() as { n: number | null }).n ?? 0) * 10) / 10,
+    providers: catalog.length,
+    skills: new Set(catalog.flatMap((p) => p.skills.map((s) => s.toLowerCase()))).size,
+    completed: completed.data().count,
+    rating: round1(reviews.data().avg ?? 0),
     categories: CATEGORIES.map((c) => ({ ...c, count: perCategory.get(c.slug) ?? 0 })),
   };
 }
@@ -197,61 +254,94 @@ export type ProviderProfile = ProviderCard & {
   skillList: { id: string; name: string; level: string }[];
   services: { id: string; title: string; description: string; category: string; price: number; priceUnit: string; deliveryDays: number }[];
   reviews: { id: string; rating: number; comment: string; createdAt: number; clientName: string; clientAvatar: string | null }[];
+  /** Raw contact details — the page decides what is safe to reveal. */
+  contact: { phone: string; whatsapp: boolean; showPhone: boolean };
+  /** Reported by several people and under review. */
+  flagged: boolean;
 };
 
 export async function getProviderProfile(id: string): Promise<ProviderProfile | null> {
   await connection();
-  const db = getDb();
-  const r = db.prepare(`${PROVIDER_SELECT} AND u.id = ?`).get(id) as unknown as ProviderRow | undefined;
-  if (!r) return null;
-  const created = db.prepare("SELECT created_at FROM users WHERE id = ?").get(id) as { created_at: number };
-  const skillList = db.prepare("SELECT id, name, level FROM skills WHERE user_id = ? ORDER BY rowid").all(id) as ProviderProfile["skillList"];
-  const services = (db
-    .prepare("SELECT id, title, description, category, price, price_unit, delivery_days FROM services WHERE user_id = ? ORDER BY created_at")
-    .all(id) as { id: string; title: string; description: string; category: string; price: number; price_unit: string; delivery_days: number }[]
-  ).map((s) => ({ id: s.id, title: s.title, description: s.description, category: s.category, price: s.price, priceUnit: s.price_unit, deliveryDays: s.delivery_days }));
-  const reviews = (db
-    .prepare(
-      `SELECT rv.id, rv.rating, rv.comment, rv.created_at, u.name AS client_name, u.avatar AS client_avatar
-       FROM reviews rv JOIN users u ON u.id = rv.client_id WHERE rv.provider_id = ? ORDER BY rv.created_at DESC`
-    )
-    .all(id) as { id: string; rating: number; comment: string; created_at: number; client_name: string; client_avatar: string | null }[]
-  ).map((x) => ({ id: x.id, rating: x.rating, comment: x.comment, createdAt: x.created_at, clientName: x.client_name, clientAvatar: x.client_avatar }));
+  const snap = await db().collection("users").doc(id).get();
+  const u = snap.data() as UserDoc | undefined;
+  if (!u || u.role !== "provider") return null;
+
+  const [servicesSnap, reviewsSnap] = await Promise.all([
+    db().collection("services").where("userId", "==", id).get(),
+    db().collection("reviews").where("providerId", "==", id).get(),
+  ]);
+  const reviewDocs = reviewsSnap.docs.map((d) => ({ id: d.id, ...(d.data() as ReviewDoc) })).sort((a, b) => b.createdAt - a.createdAt);
+  const clients = await getUsersById(reviewDocs.map((r) => r.clientId));
 
   return {
-    ...toCard(r, skillList.map((s) => s.name)),
-    bio: r.bio,
-    memberSince: created.created_at,
-    skillList,
-    services,
-    reviews,
+    ...cardFrom(id, u),
+    bio: u.bio ?? "",
+    flagged: !!u.flagged,
+    memberSince: u.createdAt,
+    skillList: u.skills ?? [],
+    services: servicesSnap.docs
+      .map((d) => ({ id: d.id, ...(d.data() as ServiceDoc) }))
+      .sort((a, b) => a.createdAt - b.createdAt)
+      .map((s) => ({ id: s.id, title: s.title, description: s.description, category: s.category, price: s.price, priceUnit: s.priceUnit, deliveryDays: s.deliveryDays })),
+    reviews: reviewDocs.map((r) => ({
+      id: r.id,
+      rating: r.rating,
+      comment: r.comment,
+      createdAt: r.createdAt,
+      clientName: clients.get(r.clientId)?.name ?? "findMe user",
+      clientAvatar: clients.get(r.clientId)?.avatar ?? null,
+    })),
+    contact: { phone: u.phone ?? "", whatsapp: u.whatsapp !== false, showPhone: !!u.showPhone },
   };
+}
+
+/** Batch-load user docs (name/avatar lookups). */
+async function getUsersById(ids: string[]) {
+  const unique = [...new Set(ids)].filter(Boolean);
+  const out = new Map<string, UserDoc>();
+  if (!unique.length) return out;
+  const snaps = await db().getAll(...unique.map((id) => db().collection("users").doc(id)));
+  for (const s of snaps) if (s.exists) out.set(s.id, s.data() as UserDoc);
+  return out;
 }
 
 // ---------- Dashboard ----------
 
 export async function getMyProfile(userId: string) {
   await connection();
-  const db = getDb();
-  const user = db
-    .prepare("SELECT id, name, email, role, headline, bio, location, category, hourly_rate, available, avatar FROM users WHERE id = ?")
-    .get(userId) as {
-      id: string; name: string; email: string; role: string; headline: string; bio: string; location: string;
-      category: string; hourly_rate: number; available: number; avatar: string | null;
-    };
-  const skills = db.prepare("SELECT id, name, level FROM skills WHERE user_id = ? ORDER BY rowid").all(userId) as {
-    id: string; name: string; level: string;
-  }[];
-  return { ...user, available: !!user.available, skills };
+  const u = (await db().collection("users").doc(userId).get()).data() as UserDoc;
+  return {
+    id: userId,
+    name: u.name,
+    email: u.email,
+    role: u.role,
+    headline: u.headline ?? "",
+    bio: u.bio ?? "",
+    location: u.location ?? "",
+    category: u.category ?? "",
+    hourly_rate: u.hourlyRate ?? 0,
+    available: u.available !== false,
+    avatar: u.avatar ?? null,
+    phone: u.phone ?? "",
+    whatsapp: u.whatsapp !== false,
+    show_phone: !!u.showPhone,
+    phone_verified: !!u.phoneVerified && !!u.phone,
+    skills: u.skills ?? [],
+    review_count: u.reviewCount ?? 0,
+    rating: u.reviewCount ? round1((u.ratingSum ?? 0) / u.reviewCount) : 0,
+    jobs_done: u.jobsDone ?? 0,
+  };
 }
 
 export type MyService = { id: string; title: string; description: string; category: string; price: number; price_unit: string; delivery_days: number };
 
 export async function getMyServices(userId: string): Promise<MyService[]> {
   await connection();
-  return getDb()
-    .prepare("SELECT id, title, description, category, price, price_unit, delivery_days FROM services WHERE user_id = ? ORDER BY created_at DESC")
-    .all(userId) as MyService[];
+  const snap = await db().collection("services").where("userId", "==", userId).get();
+  return snap.docs
+    .map((d) => ({ id: d.id, ...(d.data() as ServiceDoc) }))
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .map((s) => ({ id: s.id, title: s.title, description: s.description, category: s.category, price: s.price, price_unit: s.priceUnit, delivery_days: s.deliveryDays }));
 }
 
 export type RequestSummary = {
@@ -265,92 +355,158 @@ export type RequestSummary = {
   other: { id: string; name: string; avatar: string | null };
   lastMessage: string | null;
   messageCount: number;
+  /** A completed job this user hired for and hasn't rated yet. */
+  needsReview: boolean;
 };
+
+async function myRequestDocs(userId: string) {
+  const snap = await db().collection("requests").where("participants", "array-contains", userId).get();
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as RequestDoc) }));
+}
 
 export async function getMyRequests(userId: string): Promise<RequestSummary[]> {
   await connection();
-  const rows = getDb()
-    .prepare(
-      `SELECT q.id, q.title, q.budget, q.status, q.created_at, q.updated_at, q.client_id, q.provider_id,
-         c.name AS client_name, c.avatar AS client_avatar, p.name AS provider_name, p.avatar AS provider_avatar,
-         (SELECT body FROM messages m WHERE m.request_id = q.id ORDER BY created_at DESC LIMIT 1) AS last_message,
-         (SELECT COUNT(*) FROM messages m WHERE m.request_id = q.id) AS message_count
-       FROM requests q
-       JOIN users c ON c.id = q.client_id
-       JOIN users p ON p.id = q.provider_id
-       WHERE q.client_id = ? OR q.provider_id = ?
-       ORDER BY q.updated_at DESC`
-    )
-    .all(userId, userId) as {
-      id: string; title: string; budget: number; status: RequestStatus; created_at: number; updated_at: number;
-      client_id: string; provider_id: string; client_name: string; client_avatar: string | null;
-      provider_name: string; provider_avatar: string | null; last_message: string | null; message_count: number;
-    }[];
-  return rows.map((r) => {
-    const incoming = r.provider_id === userId;
+  const reqs = (await myRequestDocs(userId)).sort((a, b) => b.updatedAt - a.updatedAt);
+  const people = await getUsersById(reqs.map((r) => (r.providerId === userId ? r.clientId : r.providerId)));
+  return reqs.map((r) => {
+    const incoming = r.providerId === userId;
+    const otherId = incoming ? r.clientId : r.providerId;
+    const o = people.get(otherId);
     return {
       id: r.id,
       title: r.title,
       budget: r.budget,
       status: r.status,
-      createdAt: r.created_at,
-      updatedAt: r.updated_at,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
       direction: incoming ? "incoming" : "outgoing",
-      other: incoming
-        ? { id: r.client_id, name: r.client_name, avatar: r.client_avatar }
-        : { id: r.provider_id, name: r.provider_name, avatar: r.provider_avatar },
-      lastMessage: r.last_message,
-      messageCount: r.message_count,
+      other: { id: otherId, name: o?.name ?? "findMe user", avatar: o?.avatar ?? null },
+      lastMessage: r.lastMessage ?? null,
+      messageCount: r.messageCount ?? 0,
+      needsReview: !incoming && r.status === "completed" && r.reviewed !== true,
     };
   });
 }
 
 export async function getRequestThread(requestId: string, userId: string) {
   await connection();
-  const db = getDb();
-  const req = db
-    .prepare(
-      `SELECT q.*, c.name AS client_name, c.avatar AS client_avatar, p.name AS provider_name, p.avatar AS provider_avatar,
-         p.headline AS provider_headline, s.title AS service_title
-       FROM requests q JOIN users c ON c.id = q.client_id JOIN users p ON p.id = q.provider_id
-       LEFT JOIN services s ON s.id = q.service_id
-       WHERE q.id = ? AND (q.client_id = ? OR q.provider_id = ?)`
-    )
-    .get(requestId, userId, userId) as
-    | {
-        id: string; client_id: string; provider_id: string; title: string; budget: number; status: RequestStatus;
-        created_at: number; client_name: string; client_avatar: string | null; provider_name: string;
-        provider_avatar: string | null; provider_headline: string; service_title: string | null;
-      }
-    | undefined;
-  if (!req) return null;
-  const messages = db
-    .prepare("SELECT id, sender_id, body, created_at FROM messages WHERE request_id = ? ORDER BY created_at")
-    .all(requestId) as { id: string; sender_id: string; body: string; created_at: number }[];
-  const review = db.prepare("SELECT rating, comment FROM reviews WHERE request_id = ?").get(requestId) as
-    | { rating: number; comment: string }
-    | undefined;
-  return { ...req, messages, review: review ?? null, isProvider: req.provider_id === userId };
+  const ref = db().collection("requests").doc(requestId);
+  const snap = await ref.get();
+  const r = snap.data() as RequestDoc | undefined;
+  if (!r || !r.participants.includes(userId)) return null;
+
+  const [people, messagesSnap, reviewSnap, serviceSnap] = await Promise.all([
+    getUsersById([r.clientId, r.providerId]),
+    ref.collection("messages").orderBy("createdAt").get(),
+    db().collection("reviews").doc(requestId).get(),
+    r.serviceId ? db().collection("services").doc(r.serviceId).get() : Promise.resolve(null),
+  ]);
+  const c = people.get(r.clientId);
+  const p = people.get(r.providerId);
+  const review = reviewSnap.data() as ReviewDoc | undefined;
+
+  return {
+    id: requestId,
+    client_id: r.clientId,
+    provider_id: r.providerId,
+    title: r.title,
+    budget: r.budget,
+    status: r.status,
+    message_count: r.messageCount ?? messagesSnap.size,
+    created_at: r.createdAt,
+    client_name: c?.name ?? "findMe user",
+    client_avatar: c?.avatar ?? null,
+    provider_name: p?.name ?? "findMe user",
+    provider_avatar: p?.avatar ?? null,
+    provider_headline: p?.headline ?? "",
+    service_title: (serviceSnap?.data() as ServiceDoc | undefined)?.title ?? null,
+    client_phone: c?.phone ?? "",
+    client_whatsapp: c?.whatsapp === false ? 0 : 1,
+    provider_phone: p?.phone ?? "",
+    provider_whatsapp: p?.whatsapp === false ? 0 : 1,
+    messages: messagesSnap.docs.map((d) => {
+      const m = d.data() as { senderId: string; body: string; createdAt: number };
+      return { id: d.id, sender_id: m.senderId, body: m.body, created_at: m.createdAt };
+    }),
+    review: review ? { rating: review.rating, comment: review.comment } : null,
+    isProvider: r.providerId === userId,
+  };
 }
 
 export async function getDashboardStats(userId: string) {
   await connection();
-  const db = getDb();
-  const n = (sql: string, ...p: unknown[]) => (db.prepare(sql).get(...p) as { n: number | null }).n ?? 0;
+  const [u, reqs] = await Promise.all([db().collection("users").doc(userId).get(), myRequestDocs(userId)]);
+  const me = u.data() as UserDoc;
+  const servicesCount = await db().collection("services").where("userId", "==", userId).count().get();
+  const incoming = reqs.filter((r) => r.providerId === userId);
   return {
-    incomingPending: n("SELECT COUNT(*) AS n FROM requests WHERE provider_id = ? AND status = 'pending'", userId),
-    active: n("SELECT COUNT(*) AS n FROM requests WHERE (provider_id = ? OR client_id = ?) AND status = 'accepted'", userId, userId),
-    completed: n("SELECT COUNT(*) AS n FROM requests WHERE provider_id = ? AND status = 'completed'", userId),
-    earnings: n("SELECT SUM(budget) AS n FROM requests WHERE provider_id = ? AND status = 'completed'", userId),
-    rating: Math.round(n("SELECT AVG(rating) AS n FROM reviews WHERE provider_id = ?", userId) * 10) / 10,
-    reviews: n("SELECT COUNT(*) AS n FROM reviews WHERE provider_id = ?", userId),
-    services: n("SELECT COUNT(*) AS n FROM services WHERE user_id = ?", userId),
-    sent: n("SELECT COUNT(*) AS n FROM requests WHERE client_id = ?", userId),
+    incomingPending: incoming.filter((r) => r.status === "pending").length,
+    active: reqs.filter((r) => r.status === "accepted").length,
+    completed: incoming.filter((r) => r.status === "completed").length,
+    earnings: incoming.filter((r) => r.status === "completed").reduce((sum, r) => sum + (r.budget || 0), 0),
+    rating: me.reviewCount ? round1((me.ratingSum ?? 0) / me.reviewCount) : 0,
+    reviews: me.reviewCount ?? 0,
+    services: servicesCount.data().count,
+    sent: reqs.filter((r) => r.clientId === userId).length,
   };
+}
+
+/**
+ * What needs this user's attention, for the badge on "Requests": new requests to answer (as a pro)
+ * and finished jobs to rate (as a client). Two count queries — about 2 reads, whatever the totals.
+ */
+export const getActionCounts = cache(async (userId: string) => {
+  await connection();
+  const requests = db().collection("requests");
+  const [toAnswer, toRate] = await Promise.all([
+    requests.where("providerId", "==", userId).where("status", "==", "pending").count().get(),
+    requests.where("clientId", "==", userId).where("status", "==", "completed").where("reviewed", "==", false).count().get(),
+  ]);
+  return { toAnswer: toAnswer.data().count, toRate: toRate.data().count };
+});
+
+/** Unread notifications for the bell (1 count query). */
+export const getUnreadCount = cache(async (userId: string) => {
+  await connection();
+  const snap = await db().collection("notifications").where("userId", "==", userId).where("read", "==", false).count().get();
+  return snap.data().count;
+});
+
+/** Whether either of two people has blocked the other (2 reads). */
+export async function getBlockState(me: string, other: string) {
+  await connection();
+  const blocks = db().collection("blocks");
+  const [mine, theirs] = await db().getAll(blocks.doc(`${me}__${other}`), blocks.doc(`${other}__${me}`));
+  return { iBlocked: mine.exists, blockedMe: theirs.exists };
+}
+
+/** Whether this user has already reported the other (1 read). */
+export async function hasReported(me: string, other: string) {
+  await connection();
+  return (await db().collection("reports").doc(`${me}__${other}`).get()).exists;
 }
 
 /** Current time for a request, read after the request has started. */
 export async function getNow() {
   await connection();
   return Date.now();
+}
+
+/** A user's own phone, to know whether to ask for one. */
+export async function getUserPhone(userId: string): Promise<string> {
+  await connection();
+  return ((await db().collection("users").doc(userId).get()).data() as UserDoc | undefined)?.phone ?? "";
+}
+
+/** True when the two users share a request the pro has accepted (or completed) — numbers unlock then. */
+export async function hasAcceptedRequest(clientId: string, providerId: string): Promise<boolean> {
+  await connection();
+  const snap = await db()
+    .collection("requests")
+    .where("clientId", "==", clientId)
+    .where("providerId", "==", providerId)
+    .where("status", "in", ["accepted", "completed"])
+    .limit(1)
+    .get();
+  return !snap.empty;
 }

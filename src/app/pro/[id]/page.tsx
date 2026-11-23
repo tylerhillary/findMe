@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, BadgeCheck, CalendarDays, Clock, MapPin, MessageSquareQuote, ShieldCheck, Trophy } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BadgeCheck, CalendarDays, Clock, Flag, MapPin, MessageSquareQuote, ShieldCheck, Trophy } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { CategoryIcon } from "@/components/category-icon";
@@ -10,7 +10,10 @@ import { FadeIn, Reveal, Stagger, StaggerItem } from "@/components/motion";
 import { Avatar, Rating, Stars, cn, formatMoney, timeAgo } from "@/components/ui";
 import { getCurrentUser } from "@/lib/auth";
 import { categoryName } from "@/lib/categories";
-import { getNow, getProviderProfile, type ProviderProfile } from "@/lib/queries";
+import { getNow, getProviderProfile, getUserPhone, hasAcceptedRequest, hasReported, type ProviderProfile } from "@/lib/queries";
+import { ReportButton } from "@/components/report-dialog";
+import { VerifiedNumberBadge } from "@/components/verify-phone";
+import { ContactButtons, LockedPhone } from "@/components/contact-card";
 import { HireButton, RequestPanel } from "./request-panel";
 
 export async function generateMetadata({ params }: PageProps<"/pro/[id]">): Promise<Metadata> {
@@ -44,73 +47,86 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
   return (
     <>
       {/* cover */}
-      <div className="relative h-44 overflow-hidden bg-brand-gradient sm:h-56">
+      <div className="relative h-28 overflow-hidden bg-brand-gradient sm:h-56">
         <div className="grid-bg absolute inset-0 opacity-40" />
         <div className="absolute -bottom-24 left-1/3 size-80 rounded-full bg-white/20 blur-3xl" />
-        <div className="relative mx-auto max-w-7xl px-4 pt-6 sm:px-6 lg:px-8">
-          <Link href="/search" className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/25">
-            <ArrowLeft className="size-4" /> Back to search
+        <div className="relative mx-auto max-w-7xl px-4 pt-3 sm:px-6 sm:pt-6 lg:px-8">
+          <Link href="/search" className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur transition hover:bg-white/25 sm:px-3 sm:py-1.5 sm:text-sm">
+            <ArrowLeft className="size-3.5 sm:size-4" /> Back to search
           </Link>
         </div>
       </div>
 
-      <div className="mx-auto grid max-w-7xl gap-8 px-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_380px] lg:px-8">
+      <div className="mx-auto grid max-w-7xl gap-6 px-4 pb-24 sm:gap-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_380px] lg:px-8 lg:pb-0">
         <div className="min-w-0">
           {/* identity */}
-          <FadeIn className="-mt-16 flex flex-col gap-5 sm:-mt-20 sm:flex-row sm:items-end">
+          <FadeIn className="-mt-11 flex flex-col gap-3 sm:-mt-20 sm:flex-row sm:items-start sm:gap-6">
             <div className="relative w-fit">
-              <Avatar name={p.name} src={p.avatar} size={136} ring className="shadow-lift" />
-              <span className={cn("absolute bottom-3 right-3 size-5 rounded-full ring-4 ring-white", p.available ? "bg-emerald-500" : "bg-zinc-300")} />
+              <Avatar name={p.name} src={p.avatar} size={88} ring className="shadow-lift sm:hidden" />
+              <Avatar name={p.name} src={p.avatar} size={136} ring className="shadow-lift max-sm:hidden" />
+              <span className={cn("absolute bottom-1.5 right-1.5 size-4 rounded-full ring-[3px] ring-white sm:bottom-3 sm:right-3 sm:size-5 sm:ring-4", p.available ? "bg-emerald-500" : "bg-zinc-300")} />
             </div>
-            <div className="pb-2">
+            {/* On wider screens the photo overlaps the cover by 5rem; start the text just below it so the name never sits on the purple. */}
+            <div className="min-w-0 sm:pt-[6.25rem]">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="font-display text-3xl font-extrabold tracking-tight sm:text-4xl">{p.name}</h1>
+                <h1 className="font-display text-[1.45rem] font-extrabold leading-tight tracking-tight sm:text-4xl">{p.name}</h1>
+                {p.phoneVerified && <VerifiedNumberBadge />}
                 {p.jobsDone >= 3 && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700">
                     <BadgeCheck className="size-3.5" /> Trusted pro
                   </span>
                 )}
               </div>
-              <p className="mt-1.5 text-lg text-ink-soft">{p.headline}</p>
-              <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted">
+              <p className="mt-1 text-[15px] leading-snug text-ink-soft sm:mt-1.5 sm:text-lg">{p.headline}</p>
+              <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13px] text-muted sm:mt-3 sm:gap-x-5 sm:gap-y-2 sm:text-sm">
                 <Rating rating={p.rating} count={p.reviewCount} />
                 {p.location && <span className="inline-flex items-center gap-1.5"><MapPin className="size-4" /> {p.location}</span>}
                 <span className="inline-flex items-center gap-1.5"><CategoryIcon slug={p.category} className="size-4" /> {categoryName(p.category)}</span>
-                <span className="inline-flex items-center gap-1.5"><CalendarDays className="size-4" /> Joined {new Date(p.memberSince).toLocaleDateString("en-US", { month: "short", year: "numeric" })}</span>
+                <span className="inline-flex items-center gap-1.5"><CalendarDays className="size-4" /> Joined {new Date(p.memberSince).toLocaleDateString("en-NG", { timeZone: "Africa/Lagos", month: "short", year: "numeric" })}</span>
               </div>
             </div>
           </FadeIn>
 
+          {p.flagged && (
+            <div className="mt-5 flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+              <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-600" />
+              <p>
+                <span className="font-bold">This profile is under review.</span> Several people have reported it. Don&apos;t pay anything upfront, and only agree terms
+                inside findMe chat.
+              </p>
+            </div>
+          )}
+
           {/* quick stats */}
-          <Stagger inView={false} className="mt-8 grid grid-cols-3 gap-3">
+          <Stagger inView={false} className="mt-5 grid grid-cols-3 gap-2 sm:mt-8 sm:gap-3">
             {[
               { icon: Trophy, v: p.jobsDone, l: "Jobs completed" },
               { icon: MessageSquareQuote, v: p.reviewCount, l: "Reviews" },
               { icon: Clock, v: p.available ? "Now" : "Busy", l: "Availability" },
             ].map(({ icon: Icon, v, l }) => (
-              <StaggerItem key={l} className="card p-4 sm:p-5">
-                <Icon className="size-5 text-brand-500" />
-                <p className="mt-3 text-2xl font-extrabold">{v}</p>
-                <p className="text-xs font-medium text-muted sm:text-sm">{l}</p>
+              <StaggerItem key={l} className="card rounded-2xl p-3 sm:rounded-[1.25rem] sm:p-5">
+                <Icon className="size-4 text-brand-500 sm:size-5" />
+                <p className="mt-2 text-lg font-extrabold sm:mt-3 sm:text-2xl">{v}</p>
+                <p className="text-[11px] font-medium text-muted sm:text-sm">{l}</p>
               </StaggerItem>
             ))}
           </Stagger>
 
-          <Reveal className="card mt-6 p-6 sm:p-8">
-            <h2 className="text-lg font-bold">About</h2>
-            <p className="mt-3 whitespace-pre-line leading-relaxed text-ink-soft">{p.bio || `${p.name.split(" ")[0]} hasn't written a bio yet.`}</p>
+          <Reveal className="card mt-3 rounded-2xl p-4 sm:mt-6 sm:rounded-[1.25rem] sm:p-8">
+            <h2 className="text-[15px] font-bold sm:text-lg">About</h2>
+            <p className="mt-2 whitespace-pre-line text-[15px] leading-relaxed text-ink-soft sm:mt-3 sm:text-base">{p.bio || `${p.name.split(" ")[0]} hasn't written a bio yet.`}</p>
           </Reveal>
 
-          <Reveal className="card mt-6 p-6 sm:p-8">
-            <h2 className="text-lg font-bold">Skills</h2>
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <Reveal className="card mt-3 rounded-2xl p-4 sm:mt-6 sm:rounded-[1.25rem] sm:p-8">
+            <h2 className="text-[15px] font-bold sm:text-lg">Skills</h2>
+            <div className="mt-3 grid gap-3 sm:mt-5 sm:grid-cols-2 sm:gap-4">
               {p.skillList.map((s) => (
                 <div key={s.id}>
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-semibold">{s.name}</span>
                     <span className="text-xs font-medium text-muted">{s.level}</span>
                   </div>
-                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-brand-50">
+                  <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-brand-50 sm:mt-2 sm:h-2">
                     <div className="h-full rounded-full bg-brand-gradient" style={{ width: `${levelPct[s.level] ?? 50}%` }} />
                   </div>
                 </div>
@@ -119,21 +135,21 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
             </div>
           </Reveal>
 
-          <section className="mt-10">
-            <h2 className="text-2xl font-extrabold tracking-tight">Services</h2>
-            <Stagger className="mt-5 grid gap-4 md:grid-cols-2">
+          <section className="mt-7 sm:mt-10">
+            <h2 className="text-lg font-extrabold tracking-tight sm:text-2xl">Services</h2>
+            <Stagger className="mt-3 grid gap-3 sm:mt-5 sm:gap-4 md:grid-cols-2">
               {p.services.map((s) => (
-                <StaggerItem key={s.id} className="group card flex flex-col p-6 transition-all duration-300 hover:-translate-y-1 hover:border-brand-200 hover:shadow-lift">
+                <StaggerItem key={s.id} className="group card flex flex-col rounded-2xl p-4 transition-all duration-300 hover:-translate-y-1 hover:border-brand-200 hover:shadow-lift sm:rounded-[1.25rem] sm:p-6">
                   <div className="flex items-start justify-between gap-3">
-                    <h3 className="font-bold leading-snug">{s.title}</h3>
+                    <h3 className="text-[15px] font-bold leading-snug sm:text-base">{s.title}</h3>
                     <span className="shrink-0 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700">
                       {s.priceUnit === "hour" ? "Hourly" : "Fixed"}
                     </span>
                   </div>
-                  <p className="mt-2 flex-1 text-sm leading-relaxed text-ink-soft">{s.description}</p>
-                  <div className="mt-5 flex items-end justify-between">
+                  <p className="mt-1.5 flex-1 text-[13px] leading-relaxed text-ink-soft sm:mt-2 sm:text-sm">{s.description}</p>
+                  <div className="mt-4 flex items-end justify-between sm:mt-5">
                     <div>
-                      <p className="text-2xl font-extrabold">
+                      <p className="text-xl font-extrabold sm:text-2xl">
                         {formatMoney(s.price)}
                         <span className="text-sm font-medium text-muted">{s.priceUnit === "hour" ? "/hr" : ""}</span>
                       </p>
@@ -144,17 +160,17 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
                 </StaggerItem>
               ))}
             </Stagger>
-            {p.services.length === 0 && <p className="card mt-5 p-6 text-sm text-muted">No fixed services yet — send a custom request instead.</p>}
+            {p.services.length === 0 && <p className="card mt-3 rounded-2xl p-4 text-sm text-muted sm:mt-5 sm:rounded-[1.25rem] sm:p-6">No fixed services yet — send a custom request instead.</p>}
           </section>
 
-          <section className="mt-10 pb-16">
-            <h2 className="text-2xl font-extrabold tracking-tight">Reviews</h2>
+          <section className="mt-7 pb-4 sm:mt-10 sm:pb-16">
+            <h2 className="text-lg font-extrabold tracking-tight sm:text-2xl">Reviews</h2>
             {p.reviewCount > 0 ? (
-              <div className="mt-5 grid gap-6 md:grid-cols-[220px_1fr]">
-                <div className="card h-fit p-6 text-center">
-                  <p className="text-5xl font-extrabold">{p.rating.toFixed(1)}</p>
+              <div className="mt-3 grid gap-3 sm:mt-5 sm:gap-6 md:grid-cols-[220px_1fr]">
+                <div className="card h-fit rounded-2xl p-4 text-center sm:rounded-[1.25rem] sm:p-6">
+                  <p className="text-4xl font-extrabold sm:text-5xl">{p.rating.toFixed(1)}</p>
                   <Stars value={p.rating} size={18} className="mt-2 justify-center" />
-                  <p className="mt-1 text-sm text-muted">{p.reviewCount} reviews</p>
+                  <p className="mt-1 text-sm text-muted">{p.reviewCount} {p.reviewCount === 1 ? "review" : "reviews"}</p>
                   <div className="mt-5 space-y-1.5">
                     {dist.map(({ s, n }) => (
                       <div key={s} className="flex items-center gap-2 text-xs">
@@ -167,9 +183,9 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
                     ))}
                   </div>
                 </div>
-                <Stagger className="space-y-4">
+                <Stagger className="space-y-3 sm:space-y-4">
                   {p.reviews.map((r) => (
-                    <StaggerItem key={r.id} className="card p-5">
+                    <StaggerItem key={r.id} className="card rounded-2xl p-4 sm:rounded-[1.25rem] sm:p-5">
                       <div className="flex items-center gap-3">
                         <Avatar name={r.clientName} src={r.clientAvatar} size={38} />
                         <div className="flex-1">
@@ -178,13 +194,13 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
                         </div>
                         <span className="text-xs text-muted">{timeAgo(r.createdAt, now)}</span>
                       </div>
-                      {r.comment && <p className="mt-3 leading-relaxed text-ink-soft">{r.comment}</p>}
+                      {r.comment && <p className="mt-2.5 text-[15px] leading-relaxed text-ink-soft sm:mt-3 sm:text-base">{r.comment}</p>}
                     </StaggerItem>
                   ))}
                 </Stagger>
               </div>
             ) : (
-              <p className="card mt-5 p-6 text-sm text-muted">No reviews yet. Be the first to work with {p.name.split(" ")[0]}!</p>
+              <p className="card mt-3 rounded-2xl p-4 text-sm text-muted sm:mt-5 sm:rounded-[1.25rem] sm:p-6">No reviews yet. Be the first to work with {p.name.split(" ")[0]}!</p>
             )}
           </section>
         </div>
@@ -195,13 +211,15 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
             <Suspense fallback={<div className="skeleton h-80 rounded-3xl" />}>
               <Panel p={p} />
             </Suspense>
-            <div className="mt-4 flex items-start gap-3 rounded-2xl border border-line bg-white p-4 text-sm text-ink-soft">
+            <div className="mt-3 flex items-start gap-3 rounded-2xl border border-line bg-white p-4 text-[13px] text-ink-soft sm:mt-4 sm:text-sm">
               <ShieldCheck className="mt-0.5 size-5 shrink-0 text-emerald-500" />
               <p>
-                <span className="font-semibold text-ink">Protected by findIn.</span> Your request and messages go through findIn — no personal contact details
-                are shared until you choose to.
+                <span className="font-semibold text-ink">Protected by findMe.</span> Your request goes through findMe first. Phone numbers are only exchanged once the pro accepts, so nobody gets spam calls.
               </p>
             </div>
+            <Suspense fallback={null}>
+              <ReportLink p={p} />
+            </Suspense>
           </div>
         </aside>
       </div>
@@ -211,23 +229,61 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
 
 async function Panel({ p }: { p: ProviderProfile }) {
   const viewer = await getCurrentUser();
+  const first = p.name.split(" ")[0];
+  const [viewerPhone, unlocked] = viewer
+    ? await Promise.all([getUserPhone(viewer.id), viewer.id === p.id || hasAcceptedRequest(viewer.id, p.id)])
+    : ["", false];
+  const { phone, whatsapp, showPhone } = p.contact;
+
   return (
-    <RequestPanel
-      provider={{ id: p.id, name: p.name, hourlyRate: p.hourlyRate, available: p.available, avatar: p.avatar, headline: p.headline }}
-      services={p.services.map((s) => ({ id: s.id, title: s.title, price: s.price, priceUnit: s.priceUnit }))}
-      viewer={viewer ? { id: viewer.id } : null}
-    />
+    <>
+      <RequestPanel
+        provider={{ id: p.id, name: p.name, hourlyRate: p.hourlyRate, available: p.available, avatar: p.avatar, headline: p.headline }}
+        services={p.services.map((s) => ({ id: s.id, title: s.title, price: s.price, priceUnit: s.priceUnit }))}
+        viewer={viewer ? { id: viewer.id, hasPhone: !!viewerPhone } : null}
+      />
+      {phone && (
+        <div className="mt-3 rounded-2xl border border-line bg-white p-4 shadow-soft sm:mt-4 sm:rounded-3xl sm:p-5">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-muted sm:text-xs">{showPhone ? "Business line" : "Phone"}</p>
+          <div className="mt-2">
+            {/* The full number only reaches the browser when it may be shown. */}
+            {showPhone || unlocked ? (
+              <ContactButtons phone={phone} whatsapp={whatsapp} waMessage={`Hi ${first}, I found you on findMe.`} />
+            ) : (
+              <LockedPhone phone={phone} reason={`Revealed with Call and WhatsApp buttons once ${first} accepts your request.`} />
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+async function ReportLink({ p }: { p: ProviderProfile }) {
+  const viewer = await getCurrentUser();
+  if (viewer?.id === p.id) return null;
+  return (
+    <div className="mt-3 flex items-center justify-between gap-3 px-1 text-[13px] text-muted">
+      <span>Something not right?</span>
+      {viewer ? (
+        <ReportButton reportedId={p.id} name={p.name} alreadyReported={await hasReported(viewer.id, p.id)} />
+      ) : (
+        <Link href={`/login?next=${encodeURIComponent(`/pro/${p.id}`)}`} className="inline-flex items-center gap-1.5 font-semibold text-red-600 hover:text-red-700">
+          <Flag className="size-3.5" /> Sign in to report
+        </Link>
+      )}
+    </div>
   );
 }
 
 function ProfileSkeleton() {
   return (
     <div>
-      <div className="h-44 bg-brand-100 sm:h-56" />
+      <div className="h-28 bg-brand-100 sm:h-56" />
       <div className="mx-auto grid max-w-7xl gap-8 px-4 sm:px-6 lg:grid-cols-[1fr_380px] lg:px-8">
         <div>
-          <div className="-mt-16 flex items-end gap-5">
-            <div className="skeleton size-[136px] rounded-full ring-4 ring-white" />
+          <div className="-mt-11 flex items-end gap-5 sm:-mt-16">
+            <div className="skeleton size-[88px] rounded-full ring-4 ring-white sm:size-[136px]" />
             <div className="flex-1 space-y-3 pb-3">
               <div className="skeleton h-8 w-64" />
               <div className="skeleton h-4 w-80 max-w-full" />

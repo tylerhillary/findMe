@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowDownLeft, ArrowUpRight, ChevronRight, Inbox, MessageSquare } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, ChevronRight, Inbox, MessageSquare, Star } from "lucide-react";
 import type { RequestSummary } from "@/lib/queries";
 import { Avatar, StatusPill, btn, cn, formatMoney, timeAgo } from "@/components/ui";
 
@@ -63,6 +63,11 @@ export function RequestList({ requests, isPro, now }: { requests: RequestSummary
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     <p className="truncate font-bold">{r.title}</p>
+                    {r.needsReview && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-950">
+                        <Star className="size-2.5 fill-current" /> Rate now
+                      </span>
+                    )}
                     {r.status === "pending" && r.direction === "incoming" && (
                       <span className="rounded-full bg-coral-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">New</span>
                     )}

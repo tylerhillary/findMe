@@ -27,8 +27,8 @@ export function ServicesManager({ services, defaultCategory, openNew, userId }: 
       <Toast message={toast?.msg} trigger={toast?.at} />
       <FadeIn className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <h1 className="font-display text-3xl font-extrabold tracking-tight sm:text-4xl">My services</h1>
-          <p className="mt-2 text-ink-soft">Packages clients can request with one click from your profile.</p>
+          <h1 className="font-display text-[1.5rem] font-extrabold leading-tight tracking-tight sm:text-4xl">My services</h1>
+          <p className="mt-1 text-sm text-ink-soft sm:mt-2 sm:text-base">Packages clients can request with one click from your profile.</p>
         </div>
         <div className="flex gap-2">
           {services.length > 0 && (
@@ -43,7 +43,7 @@ export function ServicesManager({ services, defaultCategory, openNew, userId }: 
       </FadeIn>
 
       {services.length === 0 ? (
-        <FadeIn delay={0.1} className="card mt-8 px-6 py-16 text-center">
+        <FadeIn delay={0.1} className="card mt-5 rounded-2xl px-5 py-10 text-center sm:mt-8 sm:rounded-[1.25rem] sm:px-6 sm:py-16">
           <span className="mx-auto grid size-16 place-items-center rounded-2xl bg-brand-gradient text-white shadow-glow">
             <Package className="size-8" />
           </span>
@@ -65,7 +65,7 @@ export function ServicesManager({ services, defaultCategory, openNew, userId }: 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0, transition: { delay: i * 0.05 } }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="group card flex flex-col p-6 transition-shadow hover:shadow-lift"
+                className="group card flex flex-col rounded-2xl p-4 transition-shadow hover:shadow-lift sm:rounded-[1.25rem] sm:p-6"
               >
                 <div className="flex items-start justify-between gap-3">
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700">
@@ -191,10 +191,10 @@ function ServiceDrawer({ service, defaultCategory, onClose, onSaved }: { service
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="price">Price (USD)</Label>
+              <Label htmlFor="price">Price (₦)</Label>
               <div className="relative">
-                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-semibold text-muted">$</span>
-                <Input id="price" name="price" type="number" min={1} defaultValue={service?.price} placeholder="100" className="pl-8" aria-invalid={!!state.fieldErrors?.price} />
+                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-semibold text-muted">₦</span>
+                <Input id="price" name="price" type="number" min={1} defaultValue={service?.price} placeholder="50000" className="pl-8" aria-invalid={!!state.fieldErrors?.price} />
               </div>
               <FieldError msg={state.fieldErrors?.price} />
             </div>

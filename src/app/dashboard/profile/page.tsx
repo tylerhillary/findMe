@@ -11,8 +11,8 @@ export default function ProfilePage() {
   return (
     <div>
       <FadeIn>
-        <h1 className="font-display text-3xl font-extrabold tracking-tight sm:text-4xl">Profile & skills</h1>
-        <p className="mt-2 text-ink-soft">This is how people see you when they search on findIn.</p>
+        <h1 className="font-display text-[1.5rem] font-extrabold leading-tight tracking-tight sm:text-4xl">Profile & skills</h1>
+        <p className="mt-1 text-sm text-ink-soft sm:mt-2 sm:text-base">This is how people see you when they search on findMe.</p>
       </FadeIn>
       <Suspense fallback={<div className="mt-8 grid gap-6 lg:grid-cols-[1fr_380px]"><div className="skeleton h-[640px]" /><div className="skeleton h-96" /></div>}>
         <Content />

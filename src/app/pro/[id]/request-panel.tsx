@@ -7,8 +7,9 @@ import { AnimatePresence, motion } from "motion/react";
 import { ArrowRight, Loader2, Lock, Send, X } from "lucide-react";
 import { sendRequestAction, type FormState } from "@/app/actions";
 import { Avatar, FieldError, Input, Label, Select, Textarea, btn, formatMoney } from "@/components/ui";
+import { PhoneInput } from "@/components/phone-input";
 
-const EVENT = "findin:hire";
+const EVENT = "findme:hire";
 
 export function HireButton({ serviceId }: { serviceId: string }) {
   return (
@@ -18,10 +19,11 @@ export function HireButton({ serviceId }: { serviceId: string }) {
   );
 }
 
+type Viewer = { id: string; hasPhone: boolean } | null;
 type Provider = { id: string; name: string; hourlyRate: number; available: boolean; avatar: string | null; headline: string };
 type Service = { id: string; title: string; price: number; priceUnit: string };
 
-export function RequestPanel({ provider, services, viewer }: { provider: Provider; services: Service[]; viewer: { id: string } | null }) {
+export function RequestPanel({ provider, services, viewer }: { provider: Provider; services: Service[]; viewer: Viewer }) {
   const [open, setOpen] = useState(false);
   const [serviceId, setServiceId] = useState("");
   const first = provider.name.split(" ")[0];
@@ -38,11 +40,11 @@ export function RequestPanel({ provider, services, viewer }: { provider: Provide
 
   return (
     <>
-      <div className="relative overflow-hidden rounded-3xl border border-line bg-white p-6 shadow-lift">
+      <div className="relative overflow-hidden rounded-2xl border border-line bg-white p-5 shadow-lift sm:rounded-3xl sm:p-6">
         <div className="pointer-events-none absolute -right-10 -top-10 size-40 rounded-full bg-brand-100 blur-2xl" />
         <div className="relative">
-          <p className="text-sm font-medium text-muted">Starting at</p>
-          <p className="mt-1 text-4xl font-extrabold tracking-tight">
+          <p className="text-[13px] font-medium text-muted sm:text-sm">Starting at</p>
+          <p className="mt-1 text-3xl font-extrabold tracking-tight sm:text-4xl">
             {provider.hourlyRate > 0 ? (
               <>
                 {formatMoney(provider.hourlyRate)}
@@ -54,22 +56,51 @@ export function RequestPanel({ provider, services, viewer }: { provider: Provide
               <span className="text-2xl">Custom quote</span>
             )}
           </p>
-          <div className="mt-4 flex items-center gap-2 text-sm">
+          <div className="mt-3 flex items-center gap-2 text-[13px] sm:mt-4 sm:text-sm">
             <span className={provider.available ? "size-2.5 animate-pulse rounded-full bg-emerald-500" : "size-2.5 rounded-full bg-zinc-300"} />
             <span className="font-medium text-ink-soft">{provider.available ? `${first} is available for new work` : `${first} is busy but accepts requests`}</span>
           </div>
           {isSelf ? (
-            <Link href="/dashboard/profile" className={btn("dark", "lg", "mt-6 w-full")}>
+            <Link href="/dashboard/profile" className={btn("dark", "lg", "mt-5 w-full sm:mt-6")}>
               Edit your profile
             </Link>
           ) : (
-            <button onClick={() => { setServiceId(""); setOpen(true); }} className={btn("primary", "lg", "group mt-6 w-full")}>
-              Hire {first} via findIn <ArrowRight className="size-4.5 transition-transform group-hover:translate-x-0.5" />
+            <button onClick={() => { setServiceId(""); setOpen(true); }} className={btn("primary", "lg", "group mt-5 w-full sm:mt-6")}>
+              Hire {first} via findMe <ArrowRight className="size-4.5 transition-transform group-hover:translate-x-0.5" />
             </button>
           )}
           <p className="mt-3 text-center text-xs text-muted">Free to send · No commitment until they accept</p>
         </div>
       </div>
+
+      {/* Phones: keep the hire action within thumb reach while scrolling the profile. */}
+      {!isSelf && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_-12px_rgb(15_12_29/0.18)] backdrop-blur-xl lg:hidden">
+          <div className="mx-auto flex max-w-xl items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[11px] font-medium text-muted">{provider.available ? "Available now" : "Busy · accepts requests"}</p>
+              <p className="truncate text-base font-extrabold tracking-tight">
+                {provider.hourlyRate > 0 ? (
+                  <>
+                    {formatMoney(provider.hourlyRate)}
+                    <span className="text-xs font-semibold text-muted">/hr</span>
+                  </>
+                ) : services[0] ? (
+                  <>
+                    <span className="text-xs font-semibold text-muted">from </span>
+                    {formatMoney(Math.min(...services.map((s) => s.price)))}
+                  </>
+                ) : (
+                  "Custom quote"
+                )}
+              </p>
+            </div>
+            <button onClick={() => { setServiceId(""); setOpen(true); }} className={btn("primary", "md", "shrink-0")}>
+              Hire {first} <ArrowRight className="size-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       <AnimatePresence>
         {open && !isSelf && (
@@ -83,7 +114,7 @@ export function RequestPanel({ provider, services, viewer }: { provider: Provide
 function RequestModal({
   provider, services, initialService, viewer, onClose,
 }: {
-  provider: Provider; services: Service[]; initialService: string; viewer: { id: string } | null; onClose: () => void;
+  provider: Provider; services: Service[]; initialService: string; viewer: Viewer; onClose: () => void;
 }) {
   const [state, action, pending] = useActionState<FormState, FormData>(sendRequestAction, {});
   const [serviceId, setServiceId] = useState(initialService);
@@ -112,7 +143,7 @@ function RequestModal({
         animate={{ y: 0, opacity: 1, scale: 1 }}
         exit={{ y: 60, opacity: 0, scale: 0.97 }}
         transition={{ type: "spring", stiffness: 320, damping: 30 }}
-        className="relative max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-t-[2rem] bg-white p-6 shadow-2xl sm:rounded-[2rem] sm:p-8"
+        className="relative max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl sm:rounded-[2rem] sm:p-8"
       >
         <button onClick={onClose} className="absolute right-4 top-4 grid size-9 place-items-center rounded-full text-muted hover:bg-brand-50 hover:text-ink" aria-label="Close">
           <X className="size-5" />
@@ -120,17 +151,17 @@ function RequestModal({
         <div className="flex items-center gap-3 pr-8">
           <Avatar name={provider.name} src={provider.avatar} size={48} />
           <div className="min-w-0">
-            <h2 id="req-title" className="text-xl font-extrabold">Request {first}</h2>
+            <h2 id="req-title" className="text-lg font-extrabold sm:text-xl">Request {first}</h2>
             <p className="truncate text-sm text-muted">{provider.headline}</p>
           </div>
         </div>
 
         {!viewer ? (
-          <div className="mt-8 rounded-2xl bg-brand-50 p-6 text-center">
+          <div className="mt-6 rounded-2xl bg-brand-50 p-5 text-center sm:mt-8 sm:p-6">
             <Lock className="mx-auto size-8 text-brand-600" />
             <h3 className="mt-3 text-lg font-bold">Sign in to send your request</h3>
             <p className="mt-1.5 text-sm text-ink-soft">
-              Requests go through findIn so both sides stay protected. It only takes a minute to join.
+              Requests go through findMe so both sides stay protected. It only takes a minute to join.
             </p>
             <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
               <Link href={`/register?next=${encodeURIComponent(pathname)}`} className={btn("primary")}>Create free account</Link>
@@ -138,7 +169,7 @@ function RequestModal({
             </div>
           </div>
         ) : (
-          <form action={action} className="mt-7 space-y-5">
+          <form action={action} className="mt-5 space-y-4 sm:mt-7 sm:space-y-5">
             <input type="hidden" name="providerId" value={provider.id} />
             {services.length > 0 && (
               <div>
@@ -159,10 +190,10 @@ function RequestModal({
               <FieldError msg={state.fieldErrors?.title} />
             </div>
             <div>
-              <Label htmlFor="budget" hint="optional">Budget (USD)</Label>
+              <Label htmlFor="budget" hint="optional">Budget (₦)</Label>
               <div className="relative">
-                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-semibold text-muted">$</span>
-                <Input key={serviceId + "b"} id="budget" name="budget" type="number" min={0} defaultValue={svc?.price ?? ""} placeholder="100" className="pl-8" />
+                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-semibold text-muted">₦</span>
+                <Input key={serviceId + "b"} id="budget" name="budget" type="number" min={0} defaultValue={svc?.price ?? ""} placeholder="50000" className="pl-8" />
               </div>
             </div>
             <div>
@@ -170,11 +201,19 @@ function RequestModal({
               <Textarea id="message" name="message" rows={5} placeholder={`Hi ${first}, I'm looking for help with… Ideal timing is… Location is…`} aria-invalid={!!state.fieldErrors?.message} />
               <FieldError msg={state.fieldErrors?.message} />
             </div>
+            {!viewer.hasPhone && (
+              <div>
+                <Label htmlFor="phone" hint="optional">Your phone number</Label>
+                <PhoneInput id="phone" name="phone" aria-invalid={!!state.fieldErrors?.phone} />
+                <FieldError msg={state.fieldErrors?.phone} />
+                <p className="mt-1.5 text-xs text-muted">So {first} can call you back. Only shared if they accept.</p>
+              </div>
+            )}
             {state.error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{state.error}</p>}
             <button disabled={pending} className={btn("primary", "lg", "w-full")}>
               {pending ? <Loader2 className="size-5 animate-spin" /> : <>Send request <Send className="size-4.5" /></>}
             </button>
-            <p className="text-center text-xs text-muted">{first} will be notified on findIn and can accept or reply.</p>
+            <p className="text-center text-xs text-muted">{first} will be notified on findMe and can accept or reply.</p>
           </form>
         )}
       </motion.div>

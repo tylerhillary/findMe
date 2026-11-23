@@ -4,25 +4,121 @@ import { useActionState, useEffect, useLayoutEffect, useRef, useState, useTransi
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { Check, CheckCircle2, Loader2, Send, Star, X } from "lucide-react";
-import { leaveReviewAction, sendMessageAction, updateRequestStatusAction, type FormState } from "@/app/actions";
+import { leaveReviewAction, pollThreadAction, sendMessageAction, updateRequestStatusAction, type FormState } from "@/app/actions";
 import type { RequestStatus } from "@/lib/categories";
 import { Avatar, Textarea, btn, cn } from "@/components/ui";
 
-/** Re-fetches the thread periodically so new messages appear without a reload. */
-export function LiveRefresh({ every = 8000 }: { every?: number }) {
-  const router = useRouter();
-  useEffect(() => {
-    const t = setInterval(() => {
-      if (document.visibilityState === "visible") router.refresh();
-    }, every);
-    return () => clearInterval(t);
-  }, [router, every]);
-  return null;
+const POLL_MS = 5000;
+
+type Msg = { id: string; body: string; at: number; senderId: string };
+type Person = { name: string; avatar: string | null };
+
+/** Adds new messages to the list, skipping ones already shown, in time order. */
+function merge(current: Msg[], incoming: Msg[]) {
+  if (!incoming.length) return current;
+  const seen = new Set(current.map((m) => m.id));
+  const fresh = incoming.filter((m) => !seen.has(m.id));
+  return fresh.length ? [...current, ...fresh].sort((a, b) => a.at - b.at) : current;
 }
 
-type Msg = { id: string; body: string; at: number; mine: boolean };
+/**
+ * The live conversation. While the tab is visible it asks the server every few seconds whether
+ * anything changed (1 Firestore read when nothing did) and only downloads messages it hasn't seen.
+ */
+export function ThreadChat({
+  requestId,
+  userId,
+  status,
+  initialMessages,
+  initialCount,
+  me,
+  other,
+  justSent,
+  closed,
+  notice,
+}: {
+  requestId: string;
+  userId: string;
+  status: RequestStatus;
+  initialMessages: Msg[];
+  initialCount: number;
+  me: Person;
+  other: Person;
+  justSent: boolean;
+  closed: boolean;
+  /** Shown instead of the message box when messaging is off (e.g. blocked). */
+  notice?: string;
+}) {
+  const router = useRouter();
+  const [messages, setMessages] = useState(initialMessages);
+  const [count, setCount] = useState(initialCount);
+  // When the server re-renders the page (e.g. after a status change), fold its data in.
+  const [base, setBase] = useState({ initialMessages, initialCount });
+  if (base.initialMessages !== initialMessages || base.initialCount !== initialCount) {
+    setBase({ initialMessages, initialCount });
+    setMessages((m) => merge(m, initialMessages));
+    setCount((c) => Math.max(c, initialCount));
+  }
 
-export function MessageList({ messages, me, other, justSent }: { messages: Msg[]; me: { name: string; avatar: string | null }; other: { name: string; avatar: string | null }; justSent: boolean }) {
+  const latest = useRef({ messages, count });
+  useEffect(() => {
+    latest.current = { messages, count };
+  });
+
+  useEffect(() => {
+    if (closed) return;
+    let stopped = false;
+    let busy = false;
+    const tick = async () => {
+      if (busy || document.visibilityState !== "visible") return;
+      busy = true;
+      try {
+        const { messages: shown, count: known } = latest.current;
+        const since = shown.length ? shown[shown.length - 1].at : 0;
+        const res = await pollThreadAction(requestId, known, status, since);
+        if (stopped || !res) return;
+        if (res.status !== status) {
+          router.refresh(); // accepted / completed / cancelled: reload the side panels once
+          return;
+        }
+        if (res.messages.length) setMessages((m) => merge(m, res.messages));
+        setCount(res.count);
+      } catch {
+        // Offline or a hiccup — try again on the next tick.
+      } finally {
+        busy = false;
+      }
+    };
+    const timer = setInterval(tick, POLL_MS);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") tick();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [requestId, status, closed, router]);
+
+  function onSent(m: Msg) {
+    setMessages((list) => merge(list, [m]));
+    setCount((c) => c + 1);
+  }
+
+  return (
+    <>
+      <MessageList messages={messages} userId={userId} me={me} other={other} justSent={justSent} />
+      {closed ? (
+        <p className="border-t border-line bg-canvas px-5 py-4 text-center text-sm text-muted">{notice ?? "This request is closed. Messages are read-only."}</p>
+      ) : (
+        <Composer requestId={requestId} onSent={onSent} />
+      )}
+    </>
+  );
+}
+
+function MessageList({ messages, userId, me, other, justSent }: { messages: Msg[]; userId: string; me: Person; other: Person; justSent: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const count = useRef(messages.length);
 
@@ -31,9 +127,9 @@ export function MessageList({ messages, me, other, justSent }: { messages: Msg[]
     count.current = messages.length;
   }, [messages.length]);
 
-  const dayOf = (at: number) => new Date(at).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  const dayOf = (at: number) => new Date(at).toLocaleDateString("en-NG", { timeZone: "Africa/Lagos", weekday: "short", month: "short", day: "numeric" });
   return (
-    <div ref={ref} className="flex-1 space-y-3 overflow-y-auto bg-canvas/60 px-4 py-6 sm:px-6">
+    <div ref={ref} className="flex-1 space-y-3 overflow-y-auto bg-canvas/60 px-3 py-5 sm:px-6 sm:py-6">
       {justSent && (
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="mx-auto mb-4 flex max-w-sm items-center gap-2 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800 ring-1 ring-emerald-200">
           <CheckCircle2 className="size-4.5 shrink-0" /> Request sent! {other.name.split(" ")[0]} has been notified.
@@ -41,6 +137,7 @@ export function MessageList({ messages, me, other, justSent }: { messages: Msg[]
       )}
       <AnimatePresence initial={false}>
         {messages.map((m, i) => {
+          const mine = m.senderId === userId;
           const day = dayOf(m.at);
           const showDay = i === 0 || day !== dayOf(messages[i - 1].at);
           const isStatus = m.body.startsWith("__status__:");
@@ -48,16 +145,16 @@ export function MessageList({ messages, me, other, justSent }: { messages: Msg[]
             <motion.div key={m.id} layout initial={{ opacity: 0, y: 12, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.25 }}>
               {showDay && <p className="my-4 text-center text-[11px] font-semibold uppercase tracking-wider text-muted">{day}</p>}
               {isStatus ? (
-                <p className="mx-auto w-fit rounded-full bg-white px-3 py-1.5 text-xs font-medium text-muted ring-1 ring-line">
-                  {m.mine ? "You" : other.name.split(" ")[0]} {m.body.replace("__status__:", "")}
+                <p className="mx-auto w-fit max-w-full rounded-full bg-white px-3 py-1.5 text-center text-xs font-medium text-muted ring-1 ring-line">
+                  {mine ? "You" : other.name.split(" ")[0]} {m.body.replace("__status__:", "")}
                 </p>
               ) : (
-                <div className={cn("flex items-end gap-2", m.mine && "flex-row-reverse")}>
-                  <Avatar name={m.mine ? me.name : other.name} src={m.mine ? me.avatar : other.avatar} size={28} className="mb-1" />
-                  <div className={cn("max-w-[78%] rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed shadow-sm", m.mine ? "rounded-br-md bg-brand-600 text-white" : "rounded-bl-md bg-white text-ink ring-1 ring-line")}>
+                <div className={cn("flex items-end gap-2", mine && "flex-row-reverse")}>
+                  <Avatar name={mine ? me.name : other.name} src={mine ? me.avatar : other.avatar} size={28} className="mb-1" />
+                  <div className={cn("max-w-[78%] rounded-2xl px-3.5 py-2 text-[15px] leading-relaxed shadow-sm sm:px-4 sm:py-2.5", mine ? "rounded-br-md bg-brand-600 text-white" : "rounded-bl-md bg-white text-ink ring-1 ring-line")}>
                     <p className="whitespace-pre-wrap break-words">{m.body}</p>
-                    <p className={cn("mt-1 text-right text-[10px]", m.mine ? "text-white/60" : "text-muted")}>
-                      {new Date(m.at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                    <p className={cn("mt-1 text-right text-[10px]", mine ? "text-white/60" : "text-muted")}>
+                      {new Date(m.at).toLocaleTimeString("en-NG", { timeZone: "Africa/Lagos", hour: "numeric", minute: "2-digit" })}
                     </p>
                   </div>
                 </div>
@@ -70,21 +167,34 @@ export function MessageList({ messages, me, other, justSent }: { messages: Msg[]
   );
 }
 
-export function Composer({ requestId }: { requestId: string }) {
-  const [state, action, pending] = useActionState<FormState, FormData>(sendMessageAction, {});
+function Composer({ requestId, onSent }: { requestId: string; onSent: (m: Msg) => void }) {
   const [body, setBody] = useState("");
-  const formRef = useRef<HTMLFormElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+
+  function send() {
+    const text = body.trim();
+    if (!text || pending) return;
+    setBody("");
+    setError(null);
+    start(async () => {
+      const res = await sendMessageAction(requestId, text);
+      if (res.message) onSent(res.message);
+      else {
+        setBody(text); // keep what they typed so nothing is lost
+        setError(res.error ?? "Couldn't send. Please try again.");
+      }
+    });
+  }
 
   return (
     <form
-      ref={formRef}
-      action={(fd) => {
-        setBody("");
-        return action(fd);
+      onSubmit={(e) => {
+        e.preventDefault();
+        send();
       }}
       className="border-t border-line bg-white p-3 sm:p-4"
     >
-      <input type="hidden" name="requestId" value={requestId} />
       <div className="flex items-end gap-2">
         <Textarea
           name="body"
@@ -93,18 +203,18 @@ export function Composer({ requestId }: { requestId: string }) {
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
-              if (body.trim()) formRef.current?.requestSubmit();
+              send();
             }
           }}
           rows={1}
           placeholder="Write a message…"
-          className="max-h-40 min-h-12 flex-1 resize-none py-3"
+          className="max-h-40 min-h-11 flex-1 resize-none rounded-2xl py-2.5 sm:min-h-12 sm:py-3"
         />
-        <button disabled={pending || !body.trim()} className={btn("primary", "md", "size-12 shrink-0 rounded-xl px-0")} aria-label="Send message">
+        <button disabled={pending || !body.trim()} className={btn("primary", "md", "size-11 shrink-0 rounded-full px-0 sm:size-12 sm:rounded-xl")} aria-label="Send message">
           {pending ? <Loader2 className="size-5 animate-spin" /> : <Send className="size-5" />}
         </button>
       </div>
-      {state.error && <p className="mt-2 text-sm text-red-600">{state.error}</p>}
+      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
       <p className="mt-1.5 hidden text-[11px] text-muted sm:block">Enter to send · Shift + Enter for a new line</p>
     </form>
   );

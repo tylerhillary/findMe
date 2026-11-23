@@ -1,46 +1,76 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { motion } from "motion/react";
+import { signInWithEmailAndPassword } from "firebase/auth";
 import { AlertCircle, ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
-import { loginAction, type FormState } from "@/app/actions";
+import { startSessionAction } from "@/app/actions";
+import { authErrorMessage, clientAuth } from "@/lib/firebase-client";
 import { Input, Label, btn } from "@/components/ui";
 import { FadeIn } from "@/components/motion";
 
 export function LoginForm() {
   const next = useSearchParams().get("next") ?? "/dashboard";
-  const [state, action, pending] = useActionState<FormState, FormData>(loginAction, {});
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
   const [show, setShow] = useState(false);
+  const [email, setEmail] = useState("");
+
+  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    setError(null);
+    start(async () => {
+      try {
+        const cred = await signInWithEmailAndPassword(clientAuth(), String(fd.get("email")).trim(), String(fd.get("password")));
+        const res = await startSessionAction(await cred.user.getIdToken(), next);
+        if (res?.error) setError(res.error);
+      } catch (err) {
+        // A successful sign-in ends in a redirect, which arrives here as a special error — not a failure.
+        if (String((err as { digest?: string }).digest ?? "").startsWith("NEXT_REDIRECT")) return;
+        setError(authErrorMessage((err as { code?: string }).code));
+      }
+    });
+  }
 
   return (
     <div>
       <FadeIn>
-        <h1 className="font-display text-4xl font-extrabold tracking-tight">Welcome back</h1>
-        <p className="mt-3 text-ink-soft">Sign in to manage your requests, messages and profile.</p>
+        <h1 className="font-display text-[1.75rem] font-extrabold leading-tight tracking-tight sm:text-4xl">Welcome back</h1>
+        <p className="mt-2 text-[15px] text-ink-soft sm:mt-3 sm:text-base">Sign in to manage your requests, messages and profile.</p>
       </FadeIn>
 
       <FadeIn delay={0.08}>
-        <form action={action} className="mt-10 space-y-5">
-          <input type="hidden" name="next" value={next} />
-          {state.error && (
+        <form onSubmit={onSubmit} className="mt-7 space-y-4 sm:mt-10 sm:space-y-5">
+          {error && (
             <motion.div
+              key={error}
               initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0, x: [0, -6, 6, -4, 4, 0] }}
               transition={{ duration: 0.4 }}
               className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
               role="alert"
             >
-              <AlertCircle className="mt-0.5 size-4 shrink-0" /> {state.error}
+              <AlertCircle className="mt-0.5 size-4 shrink-0" /> {error}
             </motion.div>
           )}
           <div>
             <Label htmlFor="email">Email</Label>
-            <Input id="email" name="email" type="email" autoComplete="email" required placeholder="you@example.com" />
+            <Input id="email" name="email" type="email" autoComplete="email" required placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
           <div>
-            <Label htmlFor="password">Password</Label>
+            <Label
+              htmlFor="password"
+              hint={
+                <Link href={`/forgot-password${email ? `?email=${encodeURIComponent(email)}` : ""}`} className="font-semibold text-brand-700 hover:underline">
+                  Forgot password?
+                </Link>
+              }
+            >
+              Password
+            </Label>
             <div className="relative">
               <Input id="password" name="password" type={show ? "text" : "password"} autoComplete="current-password" required placeholder="Your password" className="pr-12" />
               <button
@@ -58,7 +88,7 @@ export function LoginForm() {
           </button>
         </form>
         <p className="mt-8 text-center text-sm text-muted">
-          New to findIn?{" "}
+          New to findMe?{" "}
           <Link href={`/register${next !== "/dashboard" ? `?next=${encodeURIComponent(next)}` : ""}`} className="font-semibold text-brand-700 hover:underline">
             Create a free account
           </Link>

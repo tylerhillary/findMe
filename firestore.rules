@@ -1,0 +1,54 @@
+rules_version = '2';
+
+// ===============================================================
+// findMe — Cloud Firestore Security Rules
+// ===============================================================
+//
+// Architecture: every read and write happens on the Next.js server through the
+// Firebase Admin SDK, which bypasses these rules. Browsers only use the Firebase
+// client SDK for Authentication (email/password sign-in) and never talk to
+// Firestore directly. All business rules (who can see a phone number, which
+// request status changes are allowed, etc.) are enforced in src/app/actions.ts
+// and src/lib/queries.ts on the server.
+//
+// Therefore clients get NO direct access to any document. This keeps private
+// data — emails, phone numbers, messages — from ever being readable by a
+// browser, even a signed-in one.
+//
+// ===============================================================
+// Assumed Data Model (written only by the server)
+// ===============================================================
+//
+// Collection: users            Document ID: Firebase Auth uid
+//   name, email (PII), role ('client' | 'provider'), headline, bio, location,
+//   category, hourlyRate, available, avatar (data URL), phone (PII, E.164),
+//   whatsapp, showPhone, skills [{ id, name, level }], createdAt
+//
+// Collection: services         Document ID: auto
+//   userId, title, description, category, price, priceUnit, deliveryDays, createdAt
+//
+// Collection: requests         Document ID: auto
+//   clientId, providerId, participants [uid, uid], serviceId, title, budget,
+//   status ('pending' | 'accepted' | 'declined' | 'completed' | 'cancelled'),
+//   lastMessage, messageCount, createdAt, updatedAt
+//
+// Subcollection: requests/{requestId}/messages    Document ID: auto
+//   senderId, body, createdAt
+//
+// Collection: reviews          Document ID: request id
+//   requestId, providerId, clientId, rating (1–5), comment, createdAt
+//
+// ===============================================================
+// If the app ever needs direct client access (e.g. real-time chat listeners),
+// add narrowly scoped, validated rules here — never open the users collection,
+// because it contains emails and phone numbers.
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny: no client may read or write anything.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
