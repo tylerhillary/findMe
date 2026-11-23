@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
-import { BadgeCheck, Loader2, MessageSquareText, ShieldCheck } from "lucide-react";
-import { sendPhoneCodeAction, verifyPhoneCodeAction } from "@/app/actions";
+import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { BadgeCheck, Check, Copy, Loader2, ShieldCheck } from "lucide-react";
+import { checkVerificationAction, startWhatsAppVerificationAction, type WhatsAppVerification } from "@/app/actions";
 import { formatNgPhone } from "@/lib/phone";
 import { cn } from "./ui";
+
+const FINDME_WA = (process.env.NEXT_PUBLIC_FINDME_WHATSAPP ?? "").replace(/[^\d+]/g, "");
 
 function WhatsAppIcon({ className }: { className?: string }) {
   return (
@@ -14,49 +17,56 @@ function WhatsAppIcon({ className }: { className?: string }) {
   );
 }
 
-/** Confirms the saved phone number with a 6-digit code sent by WhatsApp (or SMS). */
+/**
+ * Free number verification: the pro sends their personal code to findMe on WhatsApp.
+ * It's approved automatically (Meta webhook) or by an admin, and this card updates by itself.
+ */
 export function VerifyPhone({ phone, verified, className }: { phone: string; verified: boolean; className?: string }) {
-  const [step, setStep] = useState<"start" | "code" | "done">(verified ? "done" : "start");
-  const [code, setCode] = useState("");
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [wait, setWait] = useState(0);
-  const [sending, startSend] = useTransition();
-  const [checking, startCheck] = useTransition();
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (wait <= 0) return;
-    const t = setTimeout(() => setWait((w) => w - 1), 1000);
-    return () => clearTimeout(t);
-  }, [wait]);
-
+  const router = useRouter();
+  const [state, setState] = useState<"idle" | "waiting" | "done" | "rejected">(verified ? "done" : "idle");
+  const [req, setReq] = useState<WhatsAppVerification | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [starting, start] = useTransition();
   const pretty = phone ? formatNgPhone(phone) : "";
 
-  function send(channel: "whatsapp" | "sms") {
-    setMsg(null);
-    startSend(async () => {
-      const res = await sendPhoneCodeAction(channel);
-      if (res.retryIn) setWait(res.retryIn);
-      if (res.error) return setMsg({ ok: false, text: res.error });
-      setStep("code");
-      setCode("");
-      setMsg({ ok: true, text: channel === "whatsapp" ? `Code sent on WhatsApp to ${pretty}.` : `Code sent by SMS to ${pretty}.` });
-      setTimeout(() => inputRef.current?.focus(), 50);
+  // While waiting, check every few seconds (only when the tab is visible).
+  useEffect(() => {
+    if (state !== "waiting") return;
+    let stop = false;
+    const tick = async () => {
+      if (document.visibilityState !== "visible") return;
+      const res = await checkVerificationAction().catch(() => null);
+      if (stop || !res) return;
+      if (res.verified) {
+        setState("done");
+        router.refresh();
+      } else if (res.status === "rejected") setState("rejected");
+    };
+    const t = setInterval(tick, 6000);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      stop = true;
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, [state, router]);
+
+  function begin() {
+    setError(null);
+    start(async () => {
+      const res = await startWhatsAppVerificationAction();
+      if (res.error || !res.ok) return setError(res.error ?? "Something went wrong. Please try again.");
+      setReq(res.ok);
+      setState("waiting");
     });
   }
 
-  function check(value = code) {
-    if (value.length !== 6) return;
-    setMsg(null);
-    startCheck(async () => {
-      const res = await verifyPhoneCodeAction(value);
-      if (res.error) {
-        setMsg({ ok: false, text: res.error });
-        setCode("");
-        return;
-      }
-      setStep("done");
-    });
+  async function copy() {
+    if (!req) return;
+    await navigator.clipboard?.writeText(`Verify my findMe number: ${req.code}`).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
   }
 
   if (!phone) {
@@ -67,7 +77,7 @@ export function VerifyPhone({ phone, verified, className }: { phone: string; ver
     );
   }
 
-  if (step === "done") {
+  if (state === "done") {
     return (
       <div className={cn("flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3.5", className)}>
         <span className="grid size-9 shrink-0 place-items-center rounded-full bg-emerald-500 text-white">
@@ -88,85 +98,74 @@ export function VerifyPhone({ phone, verified, className }: { phone: string; ver
           <ShieldCheck className="size-5" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold">Verify your number</p>
+          <p className="text-sm font-semibold">Verify your number — free</p>
           <p className="text-[13px] text-muted">
-            Get a <span className="font-semibold text-ink">Verified number</span> badge — clients trust verified pros more, and they rank higher in search.
+            Send one WhatsApp message to findMe from <span className="font-semibold text-ink">{pretty}</span>. Verified pros get a badge and rank higher.
           </p>
         </div>
       </div>
 
-      {step === "start" ? (
-        <div className="mt-3.5 flex flex-wrap items-center gap-x-4 gap-y-2">
-          <button
-            type="button"
-            onClick={() => send("whatsapp")}
-            disabled={sending || wait > 0}
-            className="inline-flex h-10 items-center gap-2 rounded-full bg-[#25D366] px-4 text-sm font-semibold text-white transition hover:bg-[#1ebe5b] disabled:opacity-60"
-          >
-            {sending ? <Loader2 className="size-4 animate-spin" /> : <WhatsAppIcon className="size-4" />} Send code to {pretty}
-          </button>
-          <button type="button" onClick={() => send("sms")} disabled={sending || wait > 0} className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-ink-soft hover:text-brand-700 disabled:opacity-60">
-            <MessageSquareText className="size-3.5" /> Send by SMS instead
-          </button>
-        </div>
-      ) : (
-        <div className="mt-3.5">
-          <label htmlFor="otp" className="text-[13px] font-semibold">Enter the 6-digit code</label>
-          <div className="mt-1.5 flex flex-wrap items-center gap-2">
-            <input
-              ref={inputRef}
-              id="otp"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={6}
-              value={code}
-              onChange={(e) => {
-                const v = e.target.value.replace(/\D/g, "").slice(0, 6);
-                setCode(v);
-                if (v.length === 6) check(v);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  check();
-                }
-              }}
-              placeholder="••••••"
-              aria-label="Verification code"
-              className="h-11 w-40 rounded-xl border border-line bg-white px-3 text-center font-mono text-lg tracking-[0.4em] outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-100"
-            />
-            <button
-              type="button"
-              onClick={() => check()}
-              disabled={checking || code.length !== 6}
-              className="inline-flex h-11 items-center gap-2 rounded-full bg-ink px-5 text-sm font-semibold text-white transition hover:bg-black disabled:opacity-50"
-            >
-              {checking && <Loader2 className="size-4 animate-spin" />} Verify
+      {state === "idle" && (
+        <button
+          type="button"
+          onClick={begin}
+          disabled={starting}
+          className="mt-3.5 inline-flex h-10 items-center gap-2 rounded-full bg-[#25D366] px-4 text-sm font-semibold text-white transition hover:bg-[#1ebe5b] disabled:opacity-60"
+        >
+          {starting ? <Loader2 className="size-4 animate-spin" /> : <WhatsAppIcon className="size-4" />} Verify on WhatsApp
+        </button>
+      )}
+
+      {(state === "waiting" || state === "rejected") && req && (
+        <div className="mt-3.5 space-y-3">
+          <ol className="space-y-2 text-[13px] text-ink-soft">
+            <li className="flex gap-2">
+              <span className="grid size-5 shrink-0 place-items-center rounded-full bg-ink text-[11px] font-bold text-white">1</span>
+              <span>
+                Tap <span className="font-semibold text-ink">Open WhatsApp</span> on the phone with <span className="font-semibold text-ink">{pretty}</span>.
+              </span>
+            </li>
+            <li className="flex gap-2">
+              <span className="grid size-5 shrink-0 place-items-center rounded-full bg-ink text-[11px] font-bold text-white">2</span>
+              <span>Send the message as it is — don&apos;t change the code.</span>
+            </li>
+          </ol>
+          <div className="flex flex-wrap items-center gap-2 rounded-xl bg-canvas p-2.5">
+            <code className="min-w-0 flex-1 truncate px-1 font-mono text-[13px]">Verify my findMe number: <strong>{req.code}</strong></code>
+            <button type="button" onClick={copy} className="inline-flex h-8 items-center gap-1 rounded-full border border-line bg-white px-3 text-xs font-semibold text-ink-soft hover:text-ink">
+              {copied ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />} {copied ? "Copied" : "Copy"}
             </button>
           </div>
-          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px]">
-            {wait > 0 ? (
-              <span className="text-muted">Resend in {wait}s</span>
-            ) : (
-              <>
-                <button type="button" onClick={() => send("whatsapp")} disabled={sending} className="font-semibold text-brand-700 hover:underline">
-                  Resend on WhatsApp
-                </button>
-                <button type="button" onClick={() => send("sms")} disabled={sending} className="font-semibold text-ink-soft hover:underline">
-                  Send by SMS
-                </button>
-              </>
-            )}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <a
+              href={req.link}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex h-10 items-center gap-2 rounded-full bg-[#25D366] px-4 text-sm font-semibold text-white transition hover:bg-[#1ebe5b]"
+            >
+              <WhatsAppIcon className="size-4" /> Open WhatsApp
+            </a>
+            {FINDME_WA && <span className="text-xs text-muted">or send it to {formatNgPhone(FINDME_WA)}</span>}
           </div>
+          {state === "waiting" ? (
+            <p className="flex items-center gap-2 text-[13px] font-medium text-ink-soft" role="status">
+              <Loader2 className="size-4 animate-spin text-brand-600" /> Waiting for your message… this page updates by itself.
+            </p>
+          ) : (
+            <p className="text-[13px] font-medium text-red-600" role="alert">
+              We couldn&apos;t confirm that message. Make sure you send it from {pretty}, then{" "}
+              <button type="button" onClick={begin} className="underline">start again</button>.
+            </p>
+          )}
         </div>
       )}
 
-      {msg && <p className={cn("mt-2.5 text-[13px] font-medium", msg.ok ? "text-emerald-700" : "text-red-600")} role={msg.ok ? "status" : "alert"}>{msg.text}</p>}
+      {error && <p className="mt-2.5 text-[13px] font-medium text-red-600" role="alert">{error}</p>}
     </div>
   );
 }
 
-/** Small green badge shown on cards and profiles of pros with a verified number. */
+/** Green badge shown on cards and profiles of pros with a verified number. */
 export function VerifiedNumberBadge({ compact }: { compact?: boolean }) {
   return compact ? (
     <ShieldCheck className="size-4 shrink-0 text-emerald-500" aria-label="Verified number" />

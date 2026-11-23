@@ -113,12 +113,15 @@ export type SupportDoc = {
   createdAt: number;
 };
 
-/** phone_codes/{uid} — the pending verification code (hashed), with limits against abuse. */
-export type PhoneCodeDoc = {
+/** phone_verifications/{uid} — a pending (or decided) WhatsApp number verification. */
+export type PhoneVerificationDoc = {
+  userId: string;
+  name: string;
   phone: string;
-  codeHash: string;
+  code: string;
+  status: "pending" | "approved" | "rejected";
+  approvedVia?: "whatsapp" | "admin";
+  createdAt: number;
   expiresAt: number;
-  attempts: number;
-  /** Times codes were sent in the last hour, for rate limiting. */
-  sentAt: number[];
+  decidedAt?: number;
 };

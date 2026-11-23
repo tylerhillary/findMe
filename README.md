@@ -44,7 +44,7 @@ Every seeded account uses the password `findme-demo-2026`.
 
 | What | Variables | Without it |
 |---|---|---|
-| **WhatsApp / SMS verification codes** for pros — [Termii](https://termii.com) | `TERMII_API_KEY`, `TERMII_SENDER_ID`, `TERMII_BASE_URL` (your account's API URL from the Termii dashboard) | In development the code is printed in the server log; in production verification is unavailable |
+| **WhatsApp number verification** for pros — free: pros send their code to findMe on WhatsApp | `NEXT_PUBLIC_FINDME_WHATSAPP` (findMe's WhatsApp number), `ADMIN_EMAILS` (who can approve at `/admin/verifications`); for automatic approval with Meta's free WhatsApp Cloud API: `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`, optional `WHATSAPP_ACCESS_TOKEN` + `WHATSAPP_PHONE_NUMBER_ID` for a confirmation reply. Webhook URL: `https://<your-domain>/api/whatsapp/webhook` | Verification is unavailable |
 | **Email alerts** for requests, messages and reviews — [Resend](https://resend.com) | `RESEND_API_KEY`, `EMAIL_FROM`, `NEXT_PUBLIC_APP_URL` | In-app notifications (bell) only |
 
 Email confirmation links are sent by Firebase Authentication and need no setup.

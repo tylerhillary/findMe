@@ -6,12 +6,11 @@ import { FieldValue } from "firebase-admin/firestore";
 import { adminAuth, db } from "@/lib/firebase-admin";
 import { createSession, destroySession, getCurrentUser, getSessionUid, requireUser } from "@/lib/auth";
 import { markNotificationsRead, notify } from "@/lib/notify";
-import { sendTermii, type Channel } from "@/lib/termii";
-import { createHash, randomInt } from "node:crypto";
+import { FINDME_WHATSAPP, VERIFY_TTL_MS, approveVerification, isAdmin, newCode, verifications, waLink } from "@/lib/whatsapp";
 import { isCategory, SKILL_LEVELS, type RequestStatus } from "@/lib/categories";
 import { normalizeNgPhone } from "@/lib/phone";
 import { CATALOG_TAG } from "@/lib/queries";
-import type { BlockDoc, MessageDoc, NotificationDoc, PhoneCodeDoc, ReportDoc, RequestDoc, ReviewDoc, ServiceDoc, Skill, SupportDoc, UserDoc } from "@/lib/schema";
+import type { BlockDoc, MessageDoc, NotificationDoc, PhoneVerificationDoc, ReportDoc, RequestDoc, ReviewDoc, ServiceDoc, Skill, SupportDoc, UserDoc } from "@/lib/schema";
 import { AUTO_HIDE_AFTER, REPORT_REASONS } from "@/lib/safety";
 
 const PHONE_ERROR = "Enter a valid Nigerian number, e.g. 0803 123 4567.";
@@ -641,65 +640,61 @@ export async function contactAction(_: FormState, fd: FormData): Promise<FormSta
   return { ok: true, message: "Message sent" };
 }
 
-/* ───────────────────────── phone / WhatsApp verification ───────────────────────── */
+/* ───────────────────────── phone verification (free, via WhatsApp) ───────────────────────── */
 
-const CODE_TTL_MS = 10 * 60_000;
-const RESEND_AFTER_MS = 60_000;
-const MAX_SENDS_PER_HOUR = 5;
-const MAX_ATTEMPTS = 5;
-const phoneCodes = () => db().collection("phone_codes");
-const hashCode = (uid: string, code: string) => createHash("sha256").update(`${uid}:${code}`).digest("hex");
+export type WhatsAppVerification = { code: string; link: string; phone: string; expiresAt: number };
 
-/** Sends a 6-digit code to the user's saved number, by WhatsApp (default) or SMS. */
-export async function sendPhoneCodeAction(channel: Channel): Promise<{ ok?: boolean; error?: string; to?: string; retryIn?: number }> {
+/** Starts (or resumes) verification: returns the pro's code and a wa.me link to send it to findMe. */
+export async function startWhatsAppVerificationAction(): Promise<{ ok?: WhatsAppVerification; error?: string }> {
   const user = await requireUser();
+  if (!FINDME_WHATSAPP) return { error: "WhatsApp verification isn't set up yet. Please try again later." };
   const me = (await users().doc(user.id).get()).data() as UserDoc | undefined;
   if (!me?.phone) return { error: "Add your phone number to your profile and save it first." };
-  if (me.phoneVerified) return { ok: true, to: me.phone };
+  if (me.phoneVerified) return { error: "Your number is already verified." };
 
-  const ref = phoneCodes().doc(user.id);
+  const ref = verifications().doc(user.id);
   const now = Date.now();
-  const prev = (await ref.get()).data() as PhoneCodeDoc | undefined;
-  const recent = (prev?.sentAt ?? []).filter((t) => now - t < 3_600_000);
-  const last = recent.at(-1) ?? 0;
-  if (now - last < RESEND_AFTER_MS) return { error: "Please wait a moment before asking for another code.", retryIn: Math.ceil((RESEND_AFTER_MS - (now - last)) / 1000) };
-  if (recent.length >= MAX_SENDS_PER_HOUR) return { error: "Too many codes requested. Please try again in an hour." };
-
-  const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
-  const sent = await sendTermii(me.phone, `Your findMe verification code is ${code}. It expires in 10 minutes. Never share this code with anyone.`, channel === "sms" ? "sms" : "whatsapp");
-  if (!sent.ok) return { error: sent.error };
-
-  await ref.set({ phone: me.phone, codeHash: hashCode(user.id, code), expiresAt: now + CODE_TTL_MS, attempts: 0, sentAt: [...recent, now] } satisfies PhoneCodeDoc);
-  return { ok: true, to: me.phone, retryIn: RESEND_AFTER_MS / 1000 };
+  const prev = (await ref.get()).data() as PhoneVerificationDoc | undefined;
+  // Reuse a live request for the same number so the code in their WhatsApp stays valid.
+  if (prev && prev.status === "pending" && prev.phone === me.phone && prev.expiresAt > now) {
+    return { ok: { code: prev.code, link: waLink(prev.code), phone: prev.phone, expiresAt: prev.expiresAt } };
+  }
+  const code = newCode();
+  await ref.set({ userId: user.id, name: me.name, phone: me.phone, code, status: "pending", createdAt: now, expiresAt: now + VERIFY_TTL_MS } satisfies PhoneVerificationDoc);
+  return { ok: { code, link: waLink(code), phone: me.phone, expiresAt: now + VERIFY_TTL_MS } };
 }
 
-/** Checks the code; on success the number is marked verified (and the badge appears). */
-export async function verifyPhoneCodeAction(rawCode: string): Promise<{ ok?: boolean; error?: string }> {
-  const user = await requireUser();
-  const code = String(rawCode ?? "").replace(/\D/g, "");
-  if (code.length !== 6) return { error: "Enter the 6-digit code." };
+/** Polled by the pro's screen while they wait: has the message arrived and been approved? */
+export async function checkVerificationAction(): Promise<{ verified: boolean; status?: PhoneVerificationDoc["status"] }> {
+  const uid = await getSessionUid();
+  if (!uid) return { verified: false };
+  const me = (await users().doc(uid).get()).data() as UserDoc | undefined;
+  if (me?.phoneVerified) return { verified: true };
+  const v = (await verifications().doc(uid).get()).data() as PhoneVerificationDoc | undefined;
+  return { verified: false, status: v?.status };
+}
 
-  const ref = phoneCodes().doc(user.id);
-  const userRef = users().doc(user.id);
-  const result = await db().runTransaction(async (t) => {
-    const [codeSnap, userSnap] = await Promise.all([t.get(ref), t.get(userRef)]);
-    const c = codeSnap.data() as PhoneCodeDoc | undefined;
-    const me = userSnap.data() as UserDoc | undefined;
-    if (!c || !me) return "Ask for a new code first.";
-    if (c.phone !== me.phone) return "Your number changed — ask for a new code.";
-    if (Date.now() > c.expiresAt) return "That code has expired. Ask for a new one.";
-    if (c.attempts >= MAX_ATTEMPTS) return "Too many wrong tries. Ask for a new code.";
-    if (c.codeHash !== hashCode(user.id, code)) {
-      t.update(ref, { attempts: c.attempts + 1 });
-      const left = MAX_ATTEMPTS - c.attempts - 1;
-      return left > 0 ? `That code isn't right. ${left} ${left === 1 ? "try" : "tries"} left.` : "Too many wrong tries. Ask for a new code.";
-    }
-    t.update(userRef, { phoneVerified: true });
-    t.delete(ref);
-    return null;
-  });
-  if (result) return { error: result };
-  updateTag(CATALOG_TAG);
+/** Admin: approve or reject a pending verification after checking the WhatsApp message. */
+export async function decideVerificationAction(userId: string, approve: boolean): Promise<{ error?: string }> {
+  const admin = await requireUser();
+  if (!(await isAdmin(admin.id, admin.email))) return { error: "Only admins can do this." };
+  const id = String(userId ?? "").slice(0, 128);
+  if (approve) {
+    const res = await approveVerification(id, "admin");
+    if (res === "changed") return { error: "They changed their number since — ask them to verify again." };
+    if (res === "missing") return { error: "This request no longer exists." };
+    await notify({
+      userId: id,
+      kind: "status",
+      title: "Your number is verified",
+      body: "Clients now see the Verified number badge on your profile, and you rank higher in search.",
+      href: `/pro/${id}`,
+      cta: "See your profile",
+    });
+    updateTag(CATALOG_TAG);
+  } else {
+    await verifications().doc(id).update({ status: "rejected", approvedVia: "admin", decidedAt: Date.now() });
+  }
   refresh();
-  return { ok: true };
+  return {};
 }
