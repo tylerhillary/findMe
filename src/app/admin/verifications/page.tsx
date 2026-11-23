@@ -1,10 +1,10 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { connection } from "next/server";
 import { Clock, MessageCircle, ShieldCheck } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { requireUser } from "@/lib/auth";
+import { getNow } from "@/lib/queries";
 import { formatNgPhone } from "@/lib/phone";
 import type { PhoneVerificationDoc } from "@/lib/schema";
 import { FINDME_WHATSAPP, isAdmin, verificationText, verifications } from "@/lib/whatsapp";
@@ -33,8 +33,7 @@ function ago(ts: number, now: number) {
 async function Content() {
   const user = await requireUser("/admin/verifications");
   if (!(await isAdmin(user.id, user.email))) notFound();
-  await connection();
-  const now = Date.now();
+  const now = await getNow();
 
   const snap = await verifications().where("status", "==", "pending").get();
   const pending = snap.docs
