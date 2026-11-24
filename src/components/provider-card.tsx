@@ -49,7 +49,7 @@ export function ProviderCard({ p, highlight }: { p: Card; highlight?: string[] }
       </div>
 
       <div className="relative mt-3 flex flex-wrap gap-1.5 sm:mt-4">
-        {skills.slice(0, 4).map((s) => {
+        {skills.slice(0, 3).map((s) => {
           const match = hl.some((h) => s.toLowerCase().includes(h));
           return (
             <span
@@ -63,7 +63,7 @@ export function ProviderCard({ p, highlight }: { p: Card; highlight?: string[] }
             </span>
           );
         })}
-        {skills.length > 4 && <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-muted sm:px-2.5 sm:py-1 sm:text-xs">+{skills.length - 4}</span>}
+        {skills.length > 3 && <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-muted sm:px-2.5 sm:py-1 sm:text-xs">+{skills.length - 3} more</span>}
       </div>
 
       <div className="relative mt-4 flex items-center justify-between border-t border-line pt-3 sm:mt-5 sm:pt-4">

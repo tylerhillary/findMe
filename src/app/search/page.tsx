@@ -4,9 +4,10 @@ import Link from "next/link";
 import { ArrowRight, BadgeCheck, Lock, SearchX, ShieldCheck, Sparkles } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { ShowMore } from "./show-more";
 import { SearchBar } from "@/components/search-bar";
 import { ProviderCard, ProviderCardSkeleton } from "@/components/provider-card";
-import { Stagger, StaggerItem } from "@/components/motion";
+import { StaggerItem } from "@/components/motion";
 import { btn } from "@/components/ui";
 import { categoryName, isCategory } from "@/lib/categories";
 import { NIGERIAN_STATES } from "@/lib/nigeria";
@@ -144,13 +145,15 @@ async function SearchBody({ searchParams }: { searchParams: Promise<Raw> }) {
                   )}
                 </div>
               ) : (
-                <Stagger inView={false} className="mt-4 grid gap-3 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3">
-                  {results.map((p) => (
+                <ShowMore
+                  key={JSON.stringify(params)}
+                  className="mt-4 grid gap-3 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3"
+                  items={results.map((p) => (
                     <StaggerItem key={p.id}>
                       <ProviderCard p={p} highlight={terms} />
                     </StaggerItem>
                   ))}
-                </Stagger>
+                />
               )}
             </ResultsFrame>
 
