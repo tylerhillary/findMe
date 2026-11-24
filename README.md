@@ -44,7 +44,7 @@ Every seeded account uses the password `findme-demo-2026`.
 
 | What | Variables | Without it |
 |---|---|---|
-| **Email alerts** for requests, messages and reviews — [Resend](https://resend.com) | `RESEND_API_KEY`, `EMAIL_FROM`, `NEXT_PUBLIC_APP_URL` | In-app notifications (bell) only |
+| **Email alerts** for requests, messages and reviews: Gmail (free, no domain) or [Resend](https://resend.com) | Gmail: `GMAIL_USER`, `GMAIL_APP_PASSWORD` (a Google app password). Or Resend: `RESEND_API_KEY`, `EMAIL_FROM`. Optional `NEXT_PUBLIC_APP_URL` (defaults to the live Vercel address) | In-app notifications (bell) only |
 
 Email confirmation links are sent by Firebase Authentication and need no setup.
 

@@ -376,14 +376,27 @@ export async function sendRequestAction(_: FormState, fd: FormData): Promise<For
   batch.set(reqRef.collection("messages").doc(), { senderId: user.id, body: message, createdAt: now } satisfies MessageDoc);
   await batch.commit();
   const budget = int(fd, "budget");
+  const naira = (n: number) => new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", currencyDisplay: "narrowSymbol", maximumFractionDigits: 0 }).format(n);
+  const clientFirst = user.name.split(" ")[0];
   await notify({
     userId: providerId,
     kind: "request",
     requestId: reqRef.id,
     title: `New request from ${user.name}`,
-    body: `“${title}”${budget > 0 ? ` · budget ${new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", currencyDisplay: "narrowSymbol", maximumFractionDigits: 0 }).format(budget)}` : ""}. Reply quickly — fast responses win more jobs.`,
+    body: `“${title}”${budget > 0 ? ` · budget ${naira(budget)}` : ""}. Reply quickly to win the job.`,
     href: `/dashboard/requests/${reqRef.id}`,
-    cta: "View request",
+    cta: "View & reply",
+    // The email a professional gets when someone reaches out for their help.
+    email: {
+      subject: `${clientFirst} needs your help: ${title}`,
+      quote: { from: user.name, text: message.length > 600 ? `${message.slice(0, 600)}…` : message },
+      details: [
+        ["Job", title],
+        ...(service && service.userId === providerId ? [["Service", service.title] as [string, string]] : []),
+        ["Budget", budget > 0 ? naira(budget) : "Not stated"],
+      ],
+      footnote: "Accept to share phone numbers and agree the details in chat. Fast replies win more jobs.",
+    },
   });
   redirect(`/dashboard/requests/${reqRef.id}?sent=1`);
 }

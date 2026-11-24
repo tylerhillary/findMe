@@ -1,7 +1,7 @@
 import "server-only";
 import { after } from "next/server";
 import { db } from "./firebase-admin";
-import { emailLayout, sendEmail } from "./email";
+import { emailLayout, sendEmail, type EmailExtras } from "./email";
 import type { NotificationDoc, NotificationKind, UserDoc } from "./schema";
 
 const notifications = () => db().collection("notifications");
@@ -19,6 +19,8 @@ export async function notify(n: {
   href: string;
   requestId?: string | null;
   cta?: string;
+  /** Email-only: a custom subject line and extra content (quote, details). */
+  email?: EmailExtras & { subject?: string };
 }) {
   if (n.kind === "message" && n.requestId) {
     const unread = await notifications()
@@ -48,8 +50,8 @@ export async function notify(n: {
     if (!u?.email) return;
     await sendEmail({
       to: u.email,
-      subject: n.title,
-      html: emailLayout({ name: u.name, title: n.title, body: n.body, href: n.href, cta: n.cta ?? "Open findMe" }),
+      subject: n.email?.subject ?? n.title,
+      html: emailLayout({ name: u.name, title: n.title, body: n.body, href: n.href, cta: n.cta ?? "Open findMe", ...n.email }),
     });
   });
 }
