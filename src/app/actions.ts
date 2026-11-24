@@ -238,6 +238,66 @@ export async function requestPasswordResetAction(rawEmail: string): Promise<{ ok
   return sent ? { ok: true } : { fallback: true };
 }
 
+/**
+ * Checks an ID token from the browser's SMS-code sign-in and returns the phone number it proves.
+ * That sign-in creates a throwaway phone-only Firebase user, which is deleted here.
+ */
+async function provenPhone(idToken: string): Promise<string | null> {
+  let decoded;
+  try {
+    decoded = await adminAuth().verifyIdToken(String(idToken ?? ""));
+  } catch {
+    return null;
+  }
+  const phone = decoded.phone_number;
+  // Only a fresh SMS sign-in counts (not an old token).
+  if (!phone || Date.now() / 1000 - decoded.auth_time > 600) return null;
+  const temp = await adminAuth().getUser(decoded.uid).catch(() => null);
+  if (temp && !temp.email && temp.providerData.every((p) => p.providerId === "phone")) {
+    await adminAuth().deleteUser(temp.uid).catch(() => {});
+  }
+  return phone;
+}
+
+/** Profile page: marks the saved phone number as confirmed by SMS, so it can be used to reset the password. */
+export async function confirmPhoneAction(idToken: string): Promise<{ ok?: true; error?: string }> {
+  const user = await requireUser();
+  const phone = await provenPhone(idToken);
+  if (!phone) return { error: "We couldn't confirm that code. Please try again." };
+  const me = (await users().doc(user.id).get()).data() as UserDoc | undefined;
+  if (!me?.phone || me.phone !== phone) return { error: "That code was for a different number. Save your number first, then confirm it." };
+  await users().doc(user.id).update({ smsVerifiedPhone: phone });
+  refresh();
+  return { ok: true };
+}
+
+/**
+ * Forgot password by phone: after an SMS code proves the number, finds the one account that has it
+ * confirmed and returns a one-time reset code for the /reset-password page.
+ */
+export async function phoneResetAction(idToken: string): Promise<{ code?: string; error?: string }> {
+  const phone = await provenPhone(idToken);
+  if (!phone) return { error: "We couldn't confirm that code. Please try again." };
+  const snap = await users().where("smsVerifiedPhone", "==", phone).limit(3).get();
+  const matches = snap.docs.filter((d) => (d.data() as UserDoc).phone === phone);
+  if (matches.length !== 1) {
+    return {
+      error: matches.length
+        ? "More than one account uses this number. Please reset with your email instead."
+        : "No account has this number confirmed. Please reset with your email instead. (You can confirm your number on your profile page.)",
+    };
+  }
+  const email = (matches[0].data() as UserDoc).email;
+  try {
+    const code = new URL(await adminAuth().generatePasswordResetLink(email)).searchParams.get("oobCode");
+    if (!code) throw new Error("no oobCode in reset link");
+    return { code };
+  } catch (e) {
+    console.error("[findMe] phone reset failed:", e);
+    return { error: "Something went wrong on our side. Please try again." };
+  }
+}
+
 export async function logoutAction() {
   await destroySession();
   redirect("/");

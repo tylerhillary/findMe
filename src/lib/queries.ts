@@ -338,7 +338,7 @@ export async function getMyProfile(userId: string) {
     phone: u.phone ?? "",
     whatsapp: u.whatsapp !== false,
     show_phone: !!u.showPhone,
-    phone_verified: !!u.phoneVerified && !!u.phone,
+    phone_verified: !!u.phone && u.smsVerifiedPhone === u.phone,
     skills: u.skills ?? [],
     review_count: u.reviewCount ?? 0,
     rating: u.reviewCount ? round1((u.ratingSum ?? 0) / u.reviewCount) : 0,
