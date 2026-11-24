@@ -12,7 +12,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { categoryName } from "@/lib/categories";
 import { getNow, getProviderProfile, getUserPhone, hasAcceptedRequest, hasReported, type ProviderProfile } from "@/lib/queries";
 import { ReportButton } from "@/components/report-dialog";
-import { VerifiedNumberBadge } from "@/components/verify-phone";
+import { VerifiedAccountBadge, VerifiedNumberBadge } from "@/components/verify-phone";
 import { ContactButtons, LockedPhone } from "@/components/contact-card";
 import { HireButton, RequestPanel } from "./request-panel";
 
@@ -70,6 +70,7 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
             <div className="min-w-0 sm:pt-[6.25rem]">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="font-display text-[1.45rem] font-extrabold leading-tight tracking-tight sm:text-4xl">{p.name}</h1>
+                {p.emailVerified && <VerifiedAccountBadge />}
                 {p.phoneVerified && <VerifiedNumberBadge />}
                 {p.jobsDone >= 3 && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700">

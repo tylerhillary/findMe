@@ -27,6 +27,8 @@ export type ProviderCard = {
   startingPrice: number | null;
   /** Phone/WhatsApp number confirmed with a code. */
   phoneVerified: boolean;
+  /** Email address confirmed by link. */
+  emailVerified: boolean;
   score?: number;
 };
 
@@ -53,13 +55,14 @@ function cardFrom(id: string, u: UserDoc): ProviderCard {
     skills: (u.skills ?? []).map((s) => s.name),
     startingPrice: u.startingPrice ?? null,
     phoneVerified: !!u.phoneVerified,
+    emailVerified: !!u.emailVerified,
   };
 }
 
 // Public fields only — phone numbers and emails never enter the cached catalog.
 const PUBLIC_FIELDS = [
   "name", "headline", "bio", "location", "category", "hourlyRate", "available", "avatar",
-  "skills", "ratingSum", "reviewCount", "jobsDone", "startingPrice", "flagged", "phoneVerified",
+  "skills", "ratingSum", "reviewCount", "jobsDone", "startingPrice", "flagged", "phoneVerified", "emailVerified",
 ] as const;
 
 /**
@@ -416,8 +419,10 @@ export async function getRequestThread(requestId: string, userId: string) {
     created_at: r.createdAt,
     client_name: c?.name ?? "findMe user",
     client_avatar: c?.avatar ?? null,
+    client_email_verified: !!c?.emailVerified,
     provider_name: p?.name ?? "findMe user",
     provider_avatar: p?.avatar ?? null,
+    provider_email_verified: !!p?.emailVerified,
     provider_headline: p?.headline ?? "",
     service_title: (serviceSnap?.data() as ServiceDoc | undefined)?.title ?? null,
     client_phone: c?.phone ?? "",

@@ -1,7 +1,8 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { BadgeCheck, ExternalLink, LogOut, Settings } from "lucide-react";
-import { Avatar, Logo, cn } from "@/components/ui";
+import { ExternalLink, LogOut, Settings } from "lucide-react";
+import { Avatar, Logo } from "@/components/ui";
+import { VerifiedAccountBadge } from "@/components/verify-phone";
 import { getEmailStatus, requireUser } from "@/lib/auth";
 import { getActionCounts, getUnreadCount } from "@/lib/queries";
 import { SignOutForm } from "@/components/sign-out-form";
@@ -77,15 +78,6 @@ async function BottomTabs() {
   return <MobileTabs badge={await attentionCount()} />;
 }
 
-/** Small check shown next to the name once the account's email is confirmed. */
-function VerifiedMark({ className }: { className?: string }) {
-  return (
-    <BadgeCheck className={cn("shrink-0 text-brand-500", className)} aria-label="Verified email" role="img">
-      <title>Verified email</title>
-    </BadgeCheck>
-  );
-}
-
 async function SidebarUser() {
   const user = await requireUser();
   const { verified } = await getEmailStatus(user.id);
@@ -96,7 +88,7 @@ async function SidebarUser() {
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-1 text-sm font-bold">
             <span className="truncate">{user.name}</span>
-            {verified && <VerifiedMark className="size-4" />}
+            {verified && <VerifiedAccountBadge compact />}
           </p>
           <p className="truncate text-xs text-muted">{user.role === "provider" ? "Professional" : "Client"}</p>
         </div>
@@ -131,7 +123,7 @@ async function MobileUser() {
         <Avatar name={user.name} src={user.avatar} size={32} />
         {verified && (
           <span className="absolute -bottom-0.5 -right-0.5 grid place-items-center rounded-full bg-white">
-            <BadgeCheck className="size-3.5 text-brand-500" aria-hidden />
+            <VerifiedAccountBadge compact className="size-3.5" />
           </span>
         )}
       </Link>

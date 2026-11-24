@@ -60,12 +60,20 @@ export async function startSessionAction(idToken: string, next: string): Promise
     // Both lookups at once: each is a full round trip to Google.
     const [existing, authUser] = await Promise.all([ref.get(), adminAuth().getUser(uid)]);
     if (existing.exists) {
-      // If they changed their email (confirmed by link), keep the profile in step.
-      if (authUser.email && authUser.email !== (existing.data() as UserDoc).email) await ref.update({ email: authUser.email });
+      // If they changed or confirmed their email (by link), keep the profile in step.
+      const before = existing.data() as UserDoc;
+      const update: Partial<UserDoc> = {};
+      if (authUser.email && authUser.email !== before.email) update.email = authUser.email;
+      if (!!before.emailVerified !== authUser.emailVerified) update.emailVerified = authUser.emailVerified;
+      if (Object.keys(update).length) {
+        await ref.update(update);
+        if ("emailVerified" in update) updateTag(CATALOG_TAG);
+      }
     } else {
       await ref.set({
         name: authUser.displayName || authUser.email?.split("@")[0] || "findMe user",
         email: authUser.email ?? "",
+        emailVerified: authUser.emailVerified,
         role: "client",
         createdAt: Date.now(),
       } satisfies UserDoc);

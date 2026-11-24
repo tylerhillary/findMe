@@ -20,6 +20,8 @@ export type UserDoc = {
   showPhone?: boolean;
   /** True once the current phone number was confirmed with a code (reset when the number changes). */
   phoneVerified?: boolean;
+  /** Copy of Firebase Auth's "email confirmed" flag, so public pages can show it without extra lookups. */
+  emailVerified?: boolean;
   skills?: Skill[];
   // Denormalised counters, kept up to date by server actions.
   ratingSum?: number;

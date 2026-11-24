@@ -93,7 +93,13 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
 export const getEmailStatus = cache(async (uid: string) => {
   try {
     const u = await adminAuth().getUser(uid);
-    return { email: u.email ?? "", verified: !!u.emailVerified };
+    const verified = !!u.emailVerified;
+    // Confirming happens by email link while signed in, so copy the flag onto the profile here too
+    // (public pages read it from there). Only writes when it actually changed.
+    const ref = db().collection("users").doc(uid);
+    const stored = (await ref.get()).get("emailVerified");
+    if (!!stored !== verified) await ref.update({ emailVerified: verified }).catch(() => {});
+    return { email: u.email ?? "", verified };
   } catch {
     return { email: "", verified: false };
   }

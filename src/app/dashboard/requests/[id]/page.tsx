@@ -8,6 +8,7 @@ import { getBlockState, getRequestThread, hasReported } from "@/lib/queries";
 import { markNotificationsRead } from "@/lib/notify";
 import { BlockButton, ReportButton } from "@/components/report-dialog";
 import { Avatar, StatusPill, formatMoney } from "@/components/ui";
+import { VerifiedAccountBadge } from "@/components/verify-phone";
 import { ContactButtons } from "@/components/contact-card";
 import { FadeIn } from "@/components/motion";
 import { ReviewForm, StatusActions, ThreadChat } from "./thread-client";
@@ -29,8 +30,8 @@ async function Thread({ params, searchParams }: { params: Promise<{ id: string }
   if (!t) notFound();
 
   const other = t.isProvider
-    ? { id: t.client_id, name: t.client_name, avatar: t.client_avatar, role: "Client" }
-    : { id: t.provider_id, name: t.provider_name, avatar: t.provider_avatar, role: t.provider_headline };
+    ? { id: t.client_id, name: t.client_name, avatar: t.client_avatar, role: "Client", verified: t.client_email_verified }
+    : { id: t.provider_id, name: t.provider_name, avatar: t.provider_avatar, role: t.provider_headline, verified: t.provider_email_verified };
   const me = t.isProvider ? { name: t.provider_name, avatar: t.provider_avatar } : { name: t.client_name, avatar: t.client_avatar };
   const closed = t.status === "declined" || t.status === "cancelled";
   // Numbers are exchanged only after the pro accepts, and never sent to the browser before that.
@@ -56,11 +57,14 @@ async function Thread({ params, searchParams }: { params: Promise<{ id: string }
           <div className="flex items-center gap-3 border-b border-line px-4 py-3 sm:px-5 sm:py-4">
             <Avatar name={other.name} src={other.avatar} size={38} />
             <div className="min-w-0 flex-1">
-              {t.isProvider ? (
-                <p className="truncate font-bold">{other.name}</p>
-              ) : (
-                <Link href={`/pro/${other.id}`} className="truncate font-bold hover:text-brand-700">{other.name}</Link>
-              )}
+              <div className="flex min-w-0 items-center gap-1">
+                {t.isProvider ? (
+                  <p className="truncate font-bold">{other.name}</p>
+                ) : (
+                  <Link href={`/pro/${other.id}`} className="truncate font-bold hover:text-brand-700">{other.name}</Link>
+                )}
+                {other.verified && <VerifiedAccountBadge compact />}
+              </div>
               <p className="truncate text-xs text-muted">{other.role}</p>
             </div>
             <StatusPill status={t.status} />

@@ -4,7 +4,7 @@ import type { ProviderCard as Card } from "@/lib/queries";
 import { categoryName } from "@/lib/categories";
 import { Avatar, Rating, cn, formatMoney } from "./ui";
 import { CategoryIcon } from "./category-icon";
-import { VerifiedNumberBadge } from "./verify-phone";
+import { VerifiedAccountBadge, VerifiedNumberBadge } from "./verify-phone";
 
 export function ProviderCard({ p, highlight }: { p: Card; highlight?: string[] }) {
   const hl = (highlight ?? []).map((h) => h.toLowerCase());
@@ -31,6 +31,7 @@ export function ProviderCard({ p, highlight }: { p: Card; highlight?: string[] }
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <h3 className="truncate text-[15px] font-bold sm:text-[17px]">{p.name}</h3>
+            {p.emailVerified && <VerifiedAccountBadge compact />}
             {p.phoneVerified && <VerifiedNumberBadge compact />}
             {p.jobsDone >= 3 && <BadgeCheck className="size-4.5 shrink-0 text-brand-500" aria-label="Trusted pro" />}
           </div>
