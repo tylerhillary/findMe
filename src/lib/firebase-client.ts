@@ -69,7 +69,16 @@ export function authErrorMessage(code: string | undefined): string {
       return "Can't reach the server. Check your internet connection and try again.";
     case "auth/user-disabled":
       return "This account has been disabled. Contact findMe support.";
+    case "auth/invalid-api-key":
+    case "auth/api-key-not-valid.-please-pass-a-valid-api-key.":
+    case "auth/operation-not-allowed":
+    case "auth/configuration-not-found":
+    case "auth/unauthorized-domain":
+      // Site misconfiguration, not the user's fault — surface the code for whoever deploys it.
+      console.error("[findMe] Firebase Auth is misconfigured:", code);
+      return "Sign-in is temporarily unavailable on our side. Please try again later.";
     default:
+      if (code) console.error("[findMe] unexpected Firebase Auth error:", code);
       return "Something went wrong signing you in. Please try again.";
   }
 }

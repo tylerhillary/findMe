@@ -57,13 +57,12 @@ export async function startSessionAction(idToken: string, next: string): Promise
     const uid = await createSession(idToken);
     // Accounts created outside the app (e.g. in the Firebase console) still need a profile.
     const ref = users().doc(uid);
-    const existing = await ref.get();
+    // Both lookups at once: each is a full round trip to Google.
+    const [existing, authUser] = await Promise.all([ref.get(), adminAuth().getUser(uid)]);
     if (existing.exists) {
       // If they changed their email (confirmed by link), keep the profile in step.
-      const authUser = await adminAuth().getUser(uid);
       if (authUser.email && authUser.email !== (existing.data() as UserDoc).email) await ref.update({ email: authUser.email });
     } else {
-      const authUser = await adminAuth().getUser(uid);
       await ref.set({
         name: authUser.displayName || authUser.email?.split("@")[0] || "findMe user",
         email: authUser.email ?? "",
@@ -71,7 +70,8 @@ export async function startSessionAction(idToken: string, next: string): Promise
         createdAt: Date.now(),
       } satisfies UserDoc);
     }
-  } catch {
+  } catch (e) {
+    console.error("[findMe] startSession failed:", e);
     return { error: "Your sign-in couldn't be confirmed. Please try again." };
   }
   redirect(safeNext(next));

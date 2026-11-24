@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { ExternalLink, LogOut, Settings } from "lucide-react";
-import { Avatar, Logo } from "@/components/ui";
+import { BadgeCheck, ExternalLink, LogOut, Settings } from "lucide-react";
+import { Avatar, Logo, cn } from "@/components/ui";
 import { getEmailStatus, requireUser } from "@/lib/auth";
 import { getActionCounts, getUnreadCount } from "@/lib/queries";
 import { SignOutForm } from "@/components/sign-out-form";
@@ -77,14 +77,27 @@ async function BottomTabs() {
   return <MobileTabs badge={await attentionCount()} />;
 }
 
+/** Small check shown next to the name once the account's email is confirmed. */
+function VerifiedMark({ className }: { className?: string }) {
+  return (
+    <BadgeCheck className={cn("shrink-0 text-brand-500", className)} aria-label="Verified email" role="img">
+      <title>Verified email</title>
+    </BadgeCheck>
+  );
+}
+
 async function SidebarUser() {
   const user = await requireUser();
+  const { verified } = await getEmailStatus(user.id);
   return (
     <div className="rounded-2xl border border-line bg-canvas p-3">
       <div className="flex items-center gap-3">
         <Avatar name={user.name} src={user.avatar} size={40} />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold">{user.name}</p>
+          <p className="flex items-center gap-1 text-sm font-bold">
+            <span className="truncate">{user.name}</span>
+            {verified && <VerifiedMark className="size-4" />}
+          </p>
           <p className="truncate text-xs text-muted">{user.role === "provider" ? "Professional" : "Client"}</p>
         </div>
         <Link href="/dashboard/settings" className="grid size-9 place-items-center rounded-lg text-muted transition hover:bg-white hover:text-ink" aria-label="Account settings" title="Account settings">
@@ -107,14 +120,20 @@ async function SidebarUser() {
 
 async function MobileUser() {
   const user = await requireUser();
+  const [unread, { verified }] = await Promise.all([getUnreadCount(user.id), getEmailStatus(user.id)]);
   return (
     <div className="flex items-center gap-0.5">
-      <NotificationBell unread={await getUnreadCount(user.id)} />
+      <NotificationBell unread={unread} />
       <Link href="/dashboard/settings" className="grid size-9 place-items-center rounded-full text-muted hover:bg-brand-50 hover:text-brand-700" aria-label="Account settings">
         <Settings className="size-[18px]" />
       </Link>
-      <Link href="/dashboard/profile" aria-label="Your profile" className="ml-1">
+      <Link href="/dashboard/profile" aria-label={verified ? "Your profile (verified email)" : "Your profile"} className="relative ml-1">
         <Avatar name={user.name} src={user.avatar} size={32} />
+        {verified && (
+          <span className="absolute -bottom-0.5 -right-0.5 grid place-items-center rounded-full bg-white">
+            <BadgeCheck className="size-3.5 text-brand-500" aria-hidden />
+          </span>
+        )}
       </Link>
       <SignOutForm>
         <button className="grid size-9 place-items-center rounded-lg text-muted hover:bg-red-50 hover:text-red-600" aria-label="Sign out">

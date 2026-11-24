@@ -69,12 +69,16 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
   let uid: string;
   try {
     uid = (await adminAuth().verifySessionCookie(cookie)).uid;
-  } catch {
+  } catch (e) {
+    console.warn("[findMe] session cookie rejected:", (e as { code?: string }).code ?? e);
     return null; // expired, revoked or tampered
   }
   const snap = await db().collection("users").doc(uid).get();
   const u = snap.data();
-  if (!u) return null;
+  if (!u) {
+    console.warn("[findMe] signed-in user has no profile:", uid);
+    return null;
+  }
   return {
     id: uid,
     name: u.name,
