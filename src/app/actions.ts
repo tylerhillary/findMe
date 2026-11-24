@@ -13,6 +13,7 @@ import { CATALOG_TAG } from "@/lib/queries";
 import { MODE_COOKIE, MODE_COOKIE_OPTIONS } from "@/lib/mode";
 import { cleanNin, deleteNinRecords, isNinFormat, verifyNin } from "@/lib/nin";
 import { APP_URL, emailConfigured, emailLayout, sendEmail } from "@/lib/email";
+import { publicName } from "@/lib/names";
 import { createHash } from "node:crypto";
 import type { BlockDoc, MessageDoc, NotificationDoc, ReportDoc, RequestDoc, ReviewDoc, ServiceDoc, Skill, SupportDoc, UserDoc } from "@/lib/schema";
 import { AUTO_HIDE_AFTER, REPORT_REASONS } from "@/lib/safety";
@@ -472,14 +473,23 @@ export async function sendMessageAction(requestId: string, rawBody: string): Pro
   batch.update(ref, { lastMessage: body, messageCount: FieldValue.increment(1), updatedAt: now });
   await batch.commit();
   const sender = (await users().doc(uid).get()).data() as UserDoc | undefined;
+  // A pro writing to a client shows their business name if they have one.
+  const from = sender ? (uid === r.providerId ? publicName(sender) : sender.name) : "Someone";
   await notify({
     userId: otherId,
     kind: "message",
     requestId: ref.id,
-    title: `${sender?.name ?? "Someone"} sent you a message`,
+    title: `${from} sent you a message`,
     body: `About “${r.title}”: ${body.length > 140 ? body.slice(0, 140) + "…" : body}`,
     href: `/dashboard/requests/${ref.id}`,
     cta: "Reply",
+    // Sent once per conversation until it's read (see notify), so a busy chat doesn't flood the inbox.
+    email: {
+      subject: `New message from ${from}: ${r.title}`,
+      quote: { from, text: body.length > 600 ? `${body.slice(0, 600)}…` : body },
+      details: [["About", r.title]],
+      footnote: "Reply on findMe to keep a record of what you agree. We email you once per conversation until you've read it.",
+    },
   });
   return { message: { id: msgRef.id, body, at: now, senderId: uid } };
 }
