@@ -4,6 +4,7 @@ import { motion } from "motion/react";
 import { BadgeCheck, CheckCircle2, MessageCircle } from "lucide-react";
 import type { ProviderCard } from "@/lib/queries";
 import { Avatar, formatMoney } from "./ui";
+import { publicName } from "@/lib/names";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -34,10 +35,10 @@ export function HeroVisual({ pro }: { pro: ProviderCard | null }) {
         <div className="animate-float rounded-3xl border border-white/70 bg-white/90 p-5 shadow-lift backdrop-blur">
           {!pro && <p className="mb-3 text-[11px] font-bold uppercase tracking-wider text-muted">Example profile</p>}
           <div className="flex items-center gap-3">
-            <Avatar name={pro?.name ?? "Your name"} src={pro?.avatar ?? null} size={52} />
+            <Avatar name={pro ? publicName(pro) : "Your name"} src={pro?.avatar ?? null} size={52} />
             <div className="min-w-0">
               <p className="flex items-center gap-1 font-bold">
-                <span className="truncate">{pro?.name ?? "Your name here"}</span>
+                <span className="truncate">{pro ? publicName(pro) : "Your name here"}</span>
                 {pro?.emailVerified && <BadgeCheck className="size-4 shrink-0 fill-sky-500 text-white" aria-label="Verified account" />}
               </p>
               <p className="line-clamp-1 text-sm text-muted">{pro?.headline || "What you do, in one line"}</p>
@@ -62,7 +63,7 @@ export function HeroVisual({ pro }: { pro: ProviderCard | null }) {
             <p className="mt-4 rounded-xl bg-canvas px-3 py-2.5 text-xs text-ink-soft">Ratings and jobs appear here as you complete work.</p>
           )}
           {pro ? (
-            <a href={`/pro/${pro.id}`} className="mt-4 block h-10 rounded-full bg-brand-600 text-center text-sm font-semibold leading-10 text-white transition hover:bg-brand-700">View {pro.name.split(" ")[0]}&apos;s profile</a>
+            <a href={`/pro/${pro.id}`} className="mt-4 block h-10 rounded-full bg-brand-600 text-center text-sm font-semibold leading-10 text-white transition hover:bg-brand-700">View profile</a>
           ) : (
             <div className="mt-4 h-10 rounded-full bg-brand-600 text-center text-sm font-semibold leading-10 text-white">Hire via findMe</div>
           )}

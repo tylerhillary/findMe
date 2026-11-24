@@ -11,7 +11,7 @@ import { Avatar, FieldError, Input, Label, LocationInput, Select, Textarea, btn,
 import { Toast } from "@/components/toast";
 
 type Profile = {
-  name: string; email: string; role: string; headline: string; bio: string; location: string;
+  name: string; business_name: string; email: string; role: string; headline: string; bio: string; location: string;
   category: string; hourly_rate: number; available: boolean; avatar: string | null;
   phone: string; whatsapp: boolean; show_phone: boolean; phone_verified: boolean;
 };
@@ -98,6 +98,11 @@ export function ProfileForm({ profile, startListed }: { profile: Profile; startL
             <Label htmlFor="name">Full name</Label>
             <Input id="name" name="name" value={name} onChange={(e) => setName(e.target.value)} aria-invalid={!!state.fieldErrors?.name} />
             <FieldError msg={state.fieldErrors?.name} />
+          </div>
+          <div className="sm:col-span-2">
+            <Label htmlFor="businessName" hint="Optional">Business name</Label>
+            <Input id="businessName" name="businessName" defaultValue={profile.business_name} maxLength={80} placeholder="e.g. Amara Designs" />
+            <p className="mt-1 text-xs text-muted">Clients see this instead of your name. Your full name stays on your account.</p>
           </div>
           <div className="sm:col-span-2">
             <Label htmlFor="headline">Headline</Label>

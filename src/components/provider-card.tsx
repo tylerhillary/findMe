@@ -5,6 +5,7 @@ import { categoryName } from "@/lib/categories";
 import { Avatar, Rating, cn, formatMoney } from "./ui";
 import { CategoryIcon } from "./category-icon";
 import { VerifiedAccountBadge } from "./verify-phone";
+import { publicName } from "@/lib/names";
 
 export function ProviderCard({ p, highlight }: { p: Card; highlight?: string[] }) {
   const hl = (highlight ?? []).map((h) => h.toLowerCase());
@@ -21,8 +22,8 @@ export function ProviderCard({ p, highlight }: { p: Card; highlight?: string[] }
       <div className="pointer-events-none absolute -right-16 -top-16 size-40 rounded-full bg-brand-100/0 blur-2xl transition-all duration-500 group-hover:bg-brand-100/80" />
       <div className="relative flex items-start gap-3 sm:gap-3.5">
         <div className="relative shrink-0">
-          <Avatar name={p.name} src={p.avatar} size={48} className="sm:hidden" />
-          <Avatar name={p.name} src={p.avatar} size={56} className="max-sm:hidden" />
+          <Avatar name={publicName(p)} src={p.avatar} size={48} className="sm:hidden" />
+          <Avatar name={publicName(p)} src={p.avatar} size={56} className="max-sm:hidden" />
           <span
             className={cn("absolute bottom-0 right-0 size-3 rounded-full ring-2 ring-white sm:bottom-0.5 sm:right-0.5 sm:size-3.5", p.available ? "bg-emerald-500" : "bg-zinc-300")}
             title={p.available ? "Available now" : "Currently busy"}
@@ -30,7 +31,7 @@ export function ProviderCard({ p, highlight }: { p: Card; highlight?: string[] }
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            <h3 className="truncate text-[15px] font-bold sm:text-[17px]">{p.name}</h3>
+            <h3 className="truncate text-[15px] font-bold sm:text-[17px]" title={p.businessName ? `${p.businessName} · ${p.name}` : undefined}>{publicName(p)}</h3>
             {p.emailVerified && <VerifiedAccountBadge compact />}
             {p.jobsDone >= 3 && <BadgeCheck className="size-4.5 shrink-0 text-brand-500" aria-label="Trusted pro" />}
           </div>

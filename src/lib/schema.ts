@@ -8,6 +8,8 @@ export type UserDoc = {
   name: string;
   email: string;
   role: "client" | "provider";
+  /** Optional trading name shown publicly in place of the person's name (e.g. "Amara Designs"). */
+  businessName?: string;
   headline?: string;
   bio?: string;
   location?: string;

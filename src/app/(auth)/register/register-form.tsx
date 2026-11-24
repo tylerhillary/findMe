@@ -59,6 +59,7 @@ export function RegisterForm({ ninEnabled }: { ninEnabled: boolean }) {
   const [whatsapp, setWhatsapp] = useState(true);
   const [showPw, setShowPw] = useState(false);
   const [headline, setHeadline] = useState("");
+  const [businessName, setBusinessName] = useState("");
   const [category, setCategory] = useState("");
   const [location, setLocation] = useState("");
   const [rate, setRate] = useState("");
@@ -121,7 +122,7 @@ export function RegisterForm({ ninEnabled }: { ninEnabled: boolean }) {
     if (step < last) return go(step + 1);
     if (!validate(step)) return;
     const fd = new FormData();
-    Object.entries({ name, email, password, phone, nin: ninEnabled ? nin : "", whatsapp: whatsapp ? "1" : "0", role: role ?? "client", headline, category, location, rate, next }).forEach(([k, v]) => fd.set(k, v));
+    Object.entries({ name, businessName: role === "provider" ? businessName : "", email, password, phone, nin: ninEnabled ? nin : "", whatsapp: whatsapp ? "1" : "0", role: role ?? "client", headline, category, location, rate, next }).forEach(([k, v]) => fd.set(k, v));
     fd.set("skills", JSON.stringify(skills));
     startTransition(async () => {
       // 1) Server validates and creates the Firebase account + profile.
@@ -306,6 +307,11 @@ export function RegisterForm({ ninEnabled }: { ninEnabled: boolean }) {
                   <h1 className="font-display text-[1.75rem] font-extrabold leading-tight tracking-tight sm:text-4xl">Your professional profile</h1>
                   <p className="mt-2 text-[15px] text-ink-soft sm:mt-3 sm:text-base">This is what clients see in search.</p>
                   <div className="mt-6 space-y-4 sm:mt-8 sm:space-y-5">
+                    <div>
+                      <Label htmlFor="businessName" hint="Optional">Business name</Label>
+                      <Input id="businessName" value={businessName} maxLength={80} onChange={(e) => setBusinessName(e.target.value)} placeholder="e.g. Amara Designs" />
+                      <p className="mt-1 text-xs text-muted">If you add one, clients see it instead of your name.</p>
+                    </div>
                     <div>
                       <Label htmlFor="headline" hint={`${headline.length}/120`}>Headline</Label>
                       <Input id="headline" value={headline} maxLength={120} onChange={(e) => setHeadline(e.target.value)} placeholder="e.g. Certified electrician for homes & offices" aria-invalid={!!errors.headline} autoFocus />

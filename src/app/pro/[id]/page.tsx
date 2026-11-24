@@ -9,6 +9,7 @@ import { CategoryIcon } from "@/components/category-icon";
 import { FadeIn, Reveal, Stagger, StaggerItem } from "@/components/motion";
 import { Avatar, Rating, Stars, cn, formatMoney, timeAgo } from "@/components/ui";
 import { getCurrentUser } from "@/lib/auth";
+import { publicName } from "@/lib/names";
 import { categoryName } from "@/lib/categories";
 import { getNow, getProviderProfile, getUserPhone, hasAcceptedRequest, hasReported, type ProviderProfile } from "@/lib/queries";
 import { ReportButton } from "@/components/report-dialog";
@@ -18,7 +19,7 @@ import { HireButton, RequestPanel } from "./request-panel";
 
 export async function generateMetadata({ params }: PageProps<"/pro/[id]">): Promise<Metadata> {
   const p = await getProviderProfile((await params).id);
-  return { title: p ? `${p.name} — ${p.headline}` : "Profile not found" };
+  return { title: p ? `${publicName(p)} — ${p.headline}` : "Profile not found" };
 }
 
 export default function ProfilePage({ params }: PageProps<"/pro/[id]">) {
@@ -62,14 +63,14 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
           {/* identity */}
           <FadeIn className="-mt-11 flex flex-col gap-3 sm:-mt-20 sm:flex-row sm:items-start sm:gap-6">
             <div className="relative w-fit">
-              <Avatar name={p.name} src={p.avatar} size={88} ring className="shadow-lift sm:hidden" />
-              <Avatar name={p.name} src={p.avatar} size={136} ring className="shadow-lift max-sm:hidden" />
+              <Avatar name={publicName(p)} src={p.avatar} size={88} ring className="shadow-lift sm:hidden" />
+              <Avatar name={publicName(p)} src={p.avatar} size={136} ring className="shadow-lift max-sm:hidden" />
               <span className={cn("absolute bottom-1.5 right-1.5 size-4 rounded-full ring-[3px] ring-white sm:bottom-3 sm:right-3 sm:size-5 sm:ring-4", p.available ? "bg-emerald-500" : "bg-zinc-300")} />
             </div>
             {/* On wider screens the photo overlaps the cover by 5rem; start the text just below it so the name never sits on the purple. */}
             <div className="min-w-0 sm:pt-[6.25rem]">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="font-display text-[1.45rem] font-extrabold leading-tight tracking-tight sm:text-4xl">{p.name}</h1>
+                <h1 className="font-display text-[1.45rem] font-extrabold leading-tight tracking-tight sm:text-4xl">{publicName(p)}</h1>
                 {p.emailVerified && <VerifiedAccountBadge />}
                 {p.ninVerified && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700" title="Identity confirmed with their NIN">
@@ -82,6 +83,7 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
                   </span>
                 )}
               </div>
+              {p.businessName && <p className="mt-0.5 text-sm font-medium text-muted">Run by {p.name}</p>}
               <p className="mt-1 text-[15px] leading-snug text-ink-soft sm:mt-1.5 sm:text-lg">{p.headline}</p>
               <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13px] text-muted sm:mt-3 sm:gap-x-5 sm:gap-y-2 sm:text-sm">
                 <Rating rating={p.rating} count={p.reviewCount} />

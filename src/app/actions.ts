@@ -105,6 +105,7 @@ export async function registerAction(_: FormState, fd: FormData): Promise<FormSt
   if (password.length < 8) fieldErrors.password = "Use at least 8 characters.";
 
   const headline = str(fd, "headline", 120);
+  const businessName = str(fd, "businessName", 80);
   const location = str(fd, "location", 80);
   const category = str(fd, "category", 40);
   const rate = int(fd, "rate");
@@ -155,6 +156,7 @@ export async function registerAction(_: FormState, fd: FormData): Promise<FormSt
   try {
     await users().doc(uid).set({
       name, email, role, headline, location,
+      ...(role === "provider" && businessName ? { businessName } : {}),
       category: isCategory(category) ? category : "",
       hourlyRate: rate, available: true, avatar: null,
       phone: phone ?? "", whatsapp, showPhone: false,
@@ -262,6 +264,7 @@ export async function updateProfileAction(_: FormState, fd: FormData): Promise<F
 
   const update: Partial<UserDoc> = {
     name,
+    businessName: str(fd, "businessName", 80),
     headline: str(fd, "headline", 120),
     bio: str(fd, "bio", 1500),
     location: str(fd, "location", 80),

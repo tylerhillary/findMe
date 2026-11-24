@@ -6,6 +6,7 @@ import { AggregateField } from "firebase-admin/firestore";
 import { db } from "./firebase-admin";
 import { CATEGORIES, categoryName, type RequestStatus } from "./categories";
 import { inState } from "./nigeria";
+import { publicName } from "./names";
 import type { RequestDoc, ReviewDoc, ServiceDoc, UserDoc } from "./schema";
 
 /** Cache tag for the public provider catalog (search, featured, category counts). */
@@ -14,6 +15,8 @@ export const CATALOG_TAG = "catalog";
 export type ProviderCard = {
   id: string;
   name: string;
+  /** Optional business / trading name; shown as the main name when set. */
+  businessName: string;
   headline: string;
   location: string;
   category: string;
@@ -45,6 +48,7 @@ function cardFrom(id: string, u: UserDoc): ProviderCard {
   return {
     id,
     name: u.name,
+    businessName: u.businessName ?? "",
     headline: u.headline ?? "",
     location: u.location ?? "",
     category: u.category ?? "",
@@ -64,7 +68,7 @@ function cardFrom(id: string, u: UserDoc): ProviderCard {
 
 // Public fields only — phone numbers and emails never enter the cached catalog.
 const PUBLIC_FIELDS = [
-  "name", "headline", "bio", "location", "category", "hourlyRate", "available", "avatar",
+  "name", "businessName", "headline", "bio", "location", "category", "hourlyRate", "available", "avatar",
   "skills", "ratingSum", "reviewCount", "jobsDone", "startingPrice", "flagged", "phoneVerified", "emailVerified", "ninVerified",
 ] as const;
 
@@ -129,7 +133,7 @@ const INTENTS: Record<string, string[]> = {
 
 function scoreProvider(terms: string[], p: CatalogEntry) {
   const hay = {
-    name: p.name.toLowerCase(),
+    name: `${p.name} ${p.businessName}`.toLowerCase(),
     headline: p.headline.toLowerCase(),
     bio: p.bio.toLowerCase(),
     category: categoryName(p.category).toLowerCase(),
@@ -321,6 +325,7 @@ export async function getMyProfile(userId: string) {
   return {
     id: userId,
     name: u.name,
+    business_name: u.businessName ?? "",
     email: u.email,
     role: u.role,
     headline: u.headline ?? "",
@@ -388,7 +393,8 @@ export async function getMyRequests(userId: string): Promise<RequestSummary[]> {
       createdAt: r.createdAt,
       updatedAt: r.updatedAt,
       direction: incoming ? "incoming" : "outgoing",
-      other: { id: otherId, name: o?.name ?? "findMe user", avatar: o?.avatar ?? null },
+      // Clients see the pro's business name in their list when they have one.
+      other: { id: otherId, name: o ? (incoming ? o.name : publicName(o)) : "findMe user", avatar: o?.avatar ?? null },
       lastMessage: r.lastMessage ?? null,
       messageCount: r.messageCount ?? 0,
       needsReview: !incoming && r.status === "completed" && r.reviewed !== true,
