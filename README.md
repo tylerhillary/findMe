@@ -44,7 +44,6 @@ Every seeded account uses the password `findme-demo-2026`.
 
 | What | Variables | Without it |
 |---|---|---|
-| **WhatsApp number verification** for pros — free: pros send their code to findMe on WhatsApp | `NEXT_PUBLIC_FINDME_WHATSAPP` (findMe's WhatsApp number), `ADMIN_EMAILS` (who can approve at `/admin/verifications`); for automatic approval with Meta's free WhatsApp Cloud API: `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`, optional `WHATSAPP_ACCESS_TOKEN` + `WHATSAPP_PHONE_NUMBER_ID` for a confirmation reply. Webhook URL: `https://<your-domain>/api/whatsapp/webhook` | Verification is unavailable |
 | **Email alerts** for requests, messages and reviews — [Resend](https://resend.com) | `RESEND_API_KEY`, `EMAIL_FROM`, `NEXT_PUBLIC_APP_URL` | In-app notifications (bell) only |
 
 Email confirmation links are sent by Firebase Authentication and need no setup.
@@ -74,4 +73,4 @@ Search reads a cached provider catalog (`use cache` + `cacheTag("catalog")`) tha
 
 > Data access lives in `src/lib/queries.ts` (reads) and `src/app/actions.ts` (writes); document shapes are in `src/lib/schema.ts`. For hosting, set `FIREBASE_SERVICE_ACCOUNT` (the key JSON as one line) instead of a file path, or use Firebase App Hosting, which provides credentials automatically.
 
-> **Optional NIN checks ("ID verified" badge, search boost for pros).** Pros are listed once their WhatsApp number is approved; NIN is extra. Create an account at dojah.io and set `DOJAH_APP_ID`, `DOJAH_SECRET_KEY` and `NIN_HASH_SECRET` (any long random string; never change it once set). For testing, also set `DOJAH_BASE_URL=https://sandbox.dojah.io` with the sandbox keys, and use the test NIN `70123456789`. The full NIN is never stored (see `src/lib/nin.ts`).
+> **Optional NIN checks ("ID verified" badge, search boost for pros).** Create an account at dojah.io and set `DOJAH_APP_ID`, `DOJAH_SECRET_KEY` and `NIN_HASH_SECRET` (any long random string; never change it once set). For testing, also set `DOJAH_BASE_URL=https://sandbox.dojah.io` with the sandbox keys, and use the test NIN `70123456789`. The full NIN is never stored (see `src/lib/nin.ts`).

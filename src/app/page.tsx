@@ -61,7 +61,7 @@ export default function Home() {
                 </div>
               </FadeIn>
               <FadeIn delay={0.32} className="mt-6 flex items-center gap-5 text-xs text-muted sm:mt-10 sm:gap-6 sm:text-sm">
-                <span className="inline-flex items-center gap-1.5 sm:gap-2"><ShieldCheck className="size-4 text-emerald-500 sm:size-4.5" /> Verified pros</span>
+                <span className="inline-flex items-center gap-1.5 sm:gap-2"><ShieldCheck className="size-4 text-emerald-500 sm:size-4.5" /> Private contact</span>
                 <span className="inline-flex items-center gap-1.5 sm:gap-2"><BadgeCheck className="size-4 text-emerald-500 sm:size-4.5" /> Verified reviews</span>
                 <span className="inline-flex items-center gap-1.5 sm:gap-2"><Lock className="size-4 text-brand-500 sm:size-4.5" /> Private messaging</span>
               </FadeIn>
@@ -174,7 +174,7 @@ export default function Home() {
                 points={[
                   { icon: Lock, title: "Numbers stay private", body: "Numbers stay hidden until a request is accepted, so you are never cold-called." },
                   { icon: History, title: "A record of every job", body: "Requests, agreed terms and messages are kept in one place if anything goes wrong." },
-                  { icon: Flag, title: "Accountable people", body: "Every listed pro has a verified phone number, and you can report or block anyone in one tap." },
+                  { icon: Flag, title: "Accountable people", body: "Report or block anyone in one tap. Every review comes from a real completed job." },
                   { icon: Search, title: "Faster next time", body: "Need someone else next time? Search shows who is available now." },
                 ]}
               />
@@ -326,8 +326,8 @@ async function Featured() {
   if (pros.length === 0) {
     return (
       <div className="card p-6 text-center sm:p-10">
-        <p className="font-bold">Verified pros are being added.</p>
-        <p className="mt-1 text-sm text-ink-soft">Every pro confirms their phone number before appearing here.</p>
+        <p className="font-bold">The first professionals are joining now.</p>
+        <p className="mt-1 text-sm text-ink-soft">List your skills today and be among the first clients find.</p>
         <a href="/mode?to=work" className={btn("primary", "md", "mt-4")}>Be one of the first</a>
       </div>
     );

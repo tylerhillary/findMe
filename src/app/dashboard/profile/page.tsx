@@ -39,7 +39,7 @@ async function Content({ searchParams }: { searchParams: PageProps<"/dashboard/p
           <div className="min-w-0">
             <p className="font-bold">Set up your pro profile</p>
             <p className="mt-0.5 text-sm text-ink-soft">
-              Choose a category, add your number and skills, then save. Verify your number to appear in search.
+              Choose a category, add your number and skills, then save to appear in search.
             </p>
           </div>
         </FadeIn>

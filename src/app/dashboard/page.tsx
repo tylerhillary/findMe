@@ -373,7 +373,6 @@ function ExplorePanel() {
 function ProfilePanel({ profile, services }: { profile: Profile; services: MyService[] }) {
   const steps = [
     { done: !!profile.phone, label: "Add your phone or business line", href: "/dashboard/profile" },
-    { done: profile.phone_verified, label: "Verify your number on WhatsApp", href: "/dashboard/profile#verify-phone" },
     { done: profile.headline.length > 5, label: "Write a headline", href: "/dashboard/profile" },
     { done: profile.bio.length > 40, label: "Tell people about yourself", href: "/dashboard/profile" },
     { done: profile.skills.length >= 3, label: "List at least 3 skills", href: "/dashboard/profile" },

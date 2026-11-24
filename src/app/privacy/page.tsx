@@ -29,7 +29,6 @@ export default function PrivacyPage() {
               <li><strong>Contact number:</strong> the phone or business line you add, and whether it&apos;s on WhatsApp.</li>
               <li><strong>Profile:</strong> photo, headline, bio, location, category, skills, rates and services (professionals).</li>
               <li><strong>NIN (optional):</strong> if you choose to verify your ID, your National Identification Number, used once to confirm it — see <a href="#nin">Identity checks</a>.</li>
-              <li><strong>Number verification:</strong> professionals send a WhatsApp message with a code to findMe from their own number. Our team sees that message, including the WhatsApp profile name, and uses it only to confirm the number belongs to them.</li>
               <li><strong>Activity:</strong> requests, messages, job status, reviews and ratings, reports and blocks.</li>
               <li><strong>Support:</strong> anything you send through our contact form.</li>
             </ul>

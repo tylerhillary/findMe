@@ -88,9 +88,7 @@ async function loadCatalog(): Promise<CatalogEntry[]> {
     byUser.set(s.userId, [...(byUser.get(s.userId) ?? []), { title: s.title, description: s.description, category: s.category }]);
   }
   return users.docs
-    // Hidden: anyone reported by several people (until reviewed), and anyone whose WhatsApp number
-    // findMe hasn't confirmed yet.
-    .filter((d) => !(d.data() as UserDoc).flagged && !!(d.data() as UserDoc).phoneVerified)
+    .filter((d) => !(d.data() as UserDoc).flagged) // reported by several people — hidden until reviewed
     .map((d) => {
       const u = d.data() as UserDoc;
       return { ...cardFrom(d.id, u), bio: u.bio ?? "", services: byUser.get(d.id) ?? [] };

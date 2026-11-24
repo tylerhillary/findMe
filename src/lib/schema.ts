@@ -18,7 +18,7 @@ export type UserDoc = {
   phone?: string; // E.164 (+234…)
   whatsapp?: boolean;
   showPhone?: boolean;
-  /** True once the current phone number was confirmed with a code (reset when the number changes). */
+  /** Legacy: from the old WhatsApp number check (no longer used). */
   phoneVerified?: boolean;
   /** Copy of Firebase Auth's "email confirmed" flag, so public pages can show it without extra lookups. */
   emailVerified?: boolean;
@@ -115,19 +115,6 @@ export type SupportDoc = {
   userId: string | null;
   status: "open" | "closed";
   createdAt: number;
-};
-
-/** phone_verifications/{uid} — a pending (or decided) WhatsApp number verification. */
-export type PhoneVerificationDoc = {
-  userId: string;
-  name: string;
-  phone: string;
-  code: string;
-  status: "pending" | "approved" | "rejected";
-  approvedVia?: "whatsapp" | "admin";
-  createdAt: number;
-  expiresAt: number;
-  decidedAt?: number;
 };
 
 /** identity/{uid} — NIN check state. Never holds the full NIN. Server access only. */

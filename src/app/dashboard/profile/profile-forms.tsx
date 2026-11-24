@@ -4,7 +4,6 @@ import { useActionState, useRef, useState, useTransition } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Camera, Loader2, Phone, Plus, Save, Trash2, X } from "lucide-react";
 import { PhoneInput } from "@/components/phone-input";
-import { VerifyPhone } from "@/components/verify-phone";
 import { formatNgPhone } from "@/lib/phone";
 import { addSkillAction, removeSkillAction, updateProfileAction, type FormState } from "@/app/actions";
 import { CATEGORIES, SKILL_LEVELS } from "@/lib/categories";
@@ -144,7 +143,6 @@ export function ProfileForm({ profile, startListed }: { profile: Profile; startL
               <PhoneInput id="phone" name="phone" defaultValue={profile.phone ? formatNgPhone(profile.phone).replace(/^\+234 /, "") : ""} aria-invalid={!!state.fieldErrors?.phone} />
               <FieldError msg={state.fieldErrors?.phone} />
             </div>
-            {listed && <VerifyPhone phone={profile.phone} verified={profile.phone_verified} className="mt-4" />}
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <div className="flex items-start gap-3 rounded-xl border border-line bg-white p-3">
                 <Toggle name="whatsapp" checked={whatsapp} onChange={setWhatsapp} label="Number is on WhatsApp" />

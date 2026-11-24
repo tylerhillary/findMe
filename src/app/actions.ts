@@ -3,18 +3,16 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { refresh, updateTag } from "next/cache";
-import { after } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { adminAuth, db } from "@/lib/firebase-admin";
 import { createSession, destroySession, getCurrentUser, getSessionUid, requireUser } from "@/lib/auth";
 import { markNotificationsRead, notify } from "@/lib/notify";
-import { FINDME_WHATSAPP, VERIFY_TTL_MS, adminUserIds, approveVerification, autoVerification, isAdmin, newCode, verificationText, verifications, waLink } from "@/lib/whatsapp";
 import { isCategory, SKILL_LEVELS, type RequestStatus } from "@/lib/categories";
 import { normalizeNgPhone } from "@/lib/phone";
 import { CATALOG_TAG } from "@/lib/queries";
 import { MODE_COOKIE, MODE_COOKIE_OPTIONS } from "@/lib/mode";
 import { cleanNin, deleteNinRecords, isNinFormat, verifyNin } from "@/lib/nin";
-import type { BlockDoc, MessageDoc, NotificationDoc, PhoneVerificationDoc, ReportDoc, RequestDoc, ReviewDoc, ServiceDoc, Skill, SupportDoc, UserDoc } from "@/lib/schema";
+import type { BlockDoc, MessageDoc, NotificationDoc, ReportDoc, RequestDoc, ReviewDoc, ServiceDoc, Skill, SupportDoc, UserDoc } from "@/lib/schema";
 import { AUTO_HIDE_AFTER, REPORT_REASONS } from "@/lib/safety";
 
 const PHONE_ERROR = "Enter a valid Nigerian number, e.g. 0803 123 4567.";
@@ -231,7 +229,6 @@ export async function updateProfileAction(_: FormState, fd: FormData): Promise<F
   if (avatar) update.avatar = avatar;
   if (fd.get("removeAvatar") === "1") update.avatar = null;
   const before = (await users().doc(user.id).get()).data() as UserDoc | undefined;
-  if ((before?.phone ?? "") !== (phone ?? "")) update.phoneVerified = false;
 
   await users().doc(user.id).update(update);
   await adminAuth().updateUser(user.id, { displayName: name }).catch(() => {});
@@ -347,7 +344,6 @@ export async function sendRequestAction(_: FormState, fd: FormData): Promise<For
 
   const provider = (await users().doc(providerId).get()).data() as UserDoc | undefined;
   if (!provider || provider.role !== "provider") return { error: "This professional is no longer available." };
-  if (!provider.phoneVerified) return { error: "This professional can't take requests until their number is verified." };
   if (await isBlockedBetween(user.id, providerId)) return { error: "You can't send requests to this person." };
   const authUser = await adminAuth().getUser(user.id);
   if (!authUser.emailVerified) {
@@ -681,77 +677,4 @@ export async function contactAction(_: FormState, fd: FormData): Promise<FormSta
   if (Object.keys(fieldErrors).length) return { fieldErrors };
   await db().collection("support").add({ name, email, topic, message, userId: user?.id ?? null, status: "open", createdAt: Date.now() } satisfies SupportDoc);
   return { ok: true, message: "Message sent" };
-}
-
-/* ───────────────────────── phone verification (free, via WhatsApp) ───────────────────────── */
-
-/** `auto`: approved by the Meta webhook within seconds. Otherwise a findMe admin approves it by hand. */
-export type WhatsAppVerification = { code: string; link: string; phone: string; expiresAt: number; auto: boolean };
-
-/** Starts (or resumes) verification: returns the pro's code and a wa.me link to send it to findMe. */
-export async function startWhatsAppVerificationAction(): Promise<{ ok?: WhatsAppVerification; error?: string }> {
-  const user = await requireUser();
-  if (!FINDME_WHATSAPP) return { error: "Number verification is not available yet. Please try again later." };
-  const me = (await users().doc(user.id).get()).data() as UserDoc | undefined;
-  if (!me?.phone) return { error: "Save a phone number on your profile first." };
-  if (me.phoneVerified) return { error: "Your number is already verified." };
-
-  const ref = verifications().doc(user.id);
-  const now = Date.now();
-  const prev = (await ref.get()).data() as PhoneVerificationDoc | undefined;
-  // Reuse a live request for the same number so the code in their WhatsApp stays valid.
-  if (prev && prev.status === "pending" && prev.phone === me.phone && prev.expiresAt > now) {
-    return { ok: { code: prev.code, link: waLink(prev.code), phone: prev.phone, expiresAt: prev.expiresAt, auto: autoVerification() } };
-  }
-  const code = newCode();
-  await ref.set({ userId: user.id, name: me.name, phone: me.phone, code, status: "pending", createdAt: now, expiresAt: now + VERIFY_TTL_MS } satisfies PhoneVerificationDoc);
-  if (!autoVerification()) {
-    // Tell the admins there's a WhatsApp message to check (after responding, so the pro never waits).
-    after(() => notifyAdmins(`${me.name} is verifying ${me.phone}`, `Look for "${verificationText(code)}" in findMe's WhatsApp, sent from ${me.phone}. Approve it if it matches.`));
-  }
-  return { ok: { code, link: waLink(code), phone: me.phone, expiresAt: now + VERIFY_TTL_MS, auto: autoVerification() } };
-}
-
-async function notifyAdmins(title: string, body: string) {
-  const ids = await adminUserIds().catch((e) => {
-    console.error("[findMe] couldn't look up admins:", e);
-    return [] as string[];
-  });
-  if (!ids.length) console.warn("[findMe] no admins set (ADMIN_EMAILS) — nobody was told about a new number verification");
-  await Promise.all(ids.map((userId) => notify({ userId, kind: "status", title, body, href: "/admin/verifications", cta: "Review verifications" })));
-}
-
-/** Polled by the pro's screen while they wait: has the message arrived and been approved? */
-export async function checkVerificationAction(): Promise<{ verified: boolean; status?: PhoneVerificationDoc["status"] }> {
-  const uid = await getSessionUid();
-  if (!uid) return { verified: false };
-  const me = (await users().doc(uid).get()).data() as UserDoc | undefined;
-  if (me?.phoneVerified) return { verified: true };
-  const v = (await verifications().doc(uid).get()).data() as PhoneVerificationDoc | undefined;
-  return { verified: false, status: v?.status };
-}
-
-/** Admin: approve or reject a pending verification after checking the WhatsApp message. */
-export async function decideVerificationAction(userId: string, approve: boolean): Promise<{ error?: string }> {
-  const admin = await requireUser();
-  if (!(await isAdmin(admin.id, admin.email))) return { error: "Only admins can do this." };
-  const id = String(userId ?? "").slice(0, 128);
-  if (approve) {
-    const res = await approveVerification(id, "admin");
-    if (res === "changed") return { error: "They changed their number. Ask them to verify again." };
-    if (res === "missing") return { error: "This request no longer exists." };
-    await notify({
-      userId: id,
-      kind: "status",
-      title: "Your number is verified",
-      body: "You now appear in search and can receive requests.",
-      href: `/pro/${id}`,
-      cta: "See your profile",
-    });
-    updateTag(CATALOG_TAG);
-  } else {
-    await verifications().doc(id).update({ status: "rejected", approvedVia: "admin", decidedAt: Date.now() });
-  }
-  refresh();
-  return {};
 }

@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { ExternalLink, LogOut, Phone, Settings, ShieldCheck } from "lucide-react";
+import { ExternalLink, LogOut, Settings } from "lucide-react";
 import { Avatar, Logo } from "@/components/ui";
 import { VerifiedAccountBadge } from "@/components/verify-phone";
 import { getEmailStatus, requireUser } from "@/lib/auth";
@@ -11,7 +11,6 @@ import { SignOutForm } from "@/components/sign-out-form";
 import { DashNav, MobileTabs } from "./dash-nav";
 import { NotificationBell } from "./notification-bell";
 import { VerifyEmailBanner } from "./verify-email-banner";
-import { getPhoneStatus, isAdmin, pendingVerificationCount } from "@/lib/whatsapp";
 
 export default function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
   return (
@@ -33,9 +32,6 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
             <SideNav />
           </Suspense>
         </div>
-        <Suspense fallback={null}>
-          <AdminLink />
-        </Suspense>
         <Suspense fallback={<div className="skeleton h-16" />}>
           <SidebarUser />
         </Suspense>
@@ -54,13 +50,7 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
               <Suspense fallback={<div className="skeleton h-11" />}>
                 <Switch />
               </Suspense>
-              <Suspense fallback={null}>
-                <div className="mt-3 empty:hidden"><AdminLink /></div>
-              </Suspense>
             </div>
-            <Suspense fallback={null}>
-              <PhoneBanner />
-            </Suspense>
             <Suspense fallback={null}>
               <EmailBanner />
             </Suspense>
@@ -90,50 +80,6 @@ async function EmailBanner() {
   const user = await requireUser();
   const status = await getEmailStatus(user.id);
   return status.verified || !status.email ? null : <VerifyEmailBanner email={status.email} />;
-}
-
-/** Pros aren't listed until findMe has confirmed their WhatsApp number. */
-async function PhoneBanner() {
-  const user = await requireUser();
-  if (user.role !== "provider") return null;
-  const status = await getPhoneStatus(user.id);
-  if (status === "verified") return null;
-  const pending = status === "pending";
-  return (
-    <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 sm:mb-6 sm:flex-row sm:items-center sm:p-5">
-      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-700">
-        <Phone className="size-5" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="font-bold text-amber-950">{pending ? "Number pending approval" : "Verify your number to get work"}</p>
-        <p className="mt-0.5 text-sm text-amber-900/80">
-          {pending
-            ? "We'll notify you once approved. You'll then appear in search."
-            : status === "rejected"
-              ? "We couldn't confirm your message. Send your code again from the number on your profile."
-              : "You're hidden from search until your number is verified. It takes one WhatsApp message."}
-        </p>
-      </div>
-      {!pending && (
-        <Link href="/dashboard/profile#verify-phone" className="inline-flex h-10 shrink-0 items-center justify-center rounded-full bg-ink px-4 text-sm font-semibold text-white hover:bg-ink/90">
-          Verify my number
-        </Link>
-      )}
-    </div>
-  );
-}
-
-/** Shortcut to the approval queue, only for admins. */
-async function AdminLink() {
-  const user = await requireUser();
-  if (!(await isAdmin(user.id, user.email))) return null;
-  const n = await pendingVerificationCount();
-  return (
-    <Link href="/admin/verifications" className="mb-3 flex items-center gap-2 rounded-xl border border-line bg-canvas px-3 py-2 text-sm font-semibold text-ink-soft hover:text-ink">
-      <ShieldCheck className="size-4 text-brand-600" /> Number verifications
-      {n > 0 && <span className="ml-auto rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold text-white">{n}</span>}
-    </Link>
-  );
 }
 
 async function Switch() {

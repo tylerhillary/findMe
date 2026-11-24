@@ -12,7 +12,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { categoryName } from "@/lib/categories";
 import { getNow, getProviderProfile, getUserPhone, hasAcceptedRequest, hasReported, type ProviderProfile } from "@/lib/queries";
 import { ReportButton } from "@/components/report-dialog";
-import { VerifiedAccountBadge, VerifiedNumberBadge } from "@/components/verify-phone";
+import { VerifiedAccountBadge } from "@/components/verify-phone";
 import { ContactButtons, LockedPhone } from "@/components/contact-card";
 import { HireButton, RequestPanel } from "./request-panel";
 
@@ -39,9 +39,6 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const p = await getProviderProfile(id);
   if (!p) notFound();
-  // Pros whose number findMe hasn't confirmed yet aren't shown to anyone but themselves.
-  const isOwner = !p.phoneVerified && (await getCurrentUser())?.id === p.id;
-  if (!p.phoneVerified && !isOwner) notFound();
   const now = await getNow();
 
   const levelPct = { Beginner: 33, Intermediate: 66, Expert: 100 } as Record<string, number>;
@@ -79,7 +76,6 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
                     <ShieldCheck className="size-3.5" /> ID verified
                   </span>
                 )}
-                {p.phoneVerified && <VerifiedNumberBadge />}
                 {p.jobsDone >= 3 && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700">
                     <BadgeCheck className="size-3.5" /> Trusted pro
@@ -95,16 +91,6 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
               </div>
             </div>
           </FadeIn>
-
-          {isOwner && (
-            <div className="mt-5 flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
-              <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-600" />
-              <p>
-                <span className="font-bold">Only you can see this page.</span> Verify your WhatsApp number from your{" "}
-                <Link href="/dashboard/profile#verify-phone" className="font-semibold underline">profile</Link> to appear in search and receive requests.
-              </p>
-            </div>
-          )}
 
           {p.flagged && (
             <div className="mt-5 flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
