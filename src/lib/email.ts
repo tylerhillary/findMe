@@ -19,6 +19,10 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&
  *  - Resend: RESEND_API_KEY + EMAIL_FROM (needs a domain you own).
  * With neither, it does nothing and the app relies on in-app notifications.
  */
+/** True when an email service (Gmail or Resend) is set up. */
+export const emailConfigured = () =>
+  !!((process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) || (process.env.RESEND_API_KEY && process.env.EMAIL_FROM));
+
 export async function sendEmail({ to, subject, html }: { to: string; subject: string; html: string }): Promise<boolean> {
   if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) return sendWithGmail(to, subject, html);
   if (process.env.RESEND_API_KEY && process.env.EMAIL_FROM) return sendWithResend(to, subject, html);

@@ -12,6 +12,8 @@ import { normalizeNgPhone } from "@/lib/phone";
 import { CATALOG_TAG } from "@/lib/queries";
 import { MODE_COOKIE, MODE_COOKIE_OPTIONS } from "@/lib/mode";
 import { cleanNin, deleteNinRecords, isNinFormat, verifyNin } from "@/lib/nin";
+import { APP_URL, emailConfigured, emailLayout, sendEmail } from "@/lib/email";
+import { createHash } from "node:crypto";
 import type { BlockDoc, MessageDoc, NotificationDoc, ReportDoc, RequestDoc, ReviewDoc, ServiceDoc, Skill, SupportDoc, UserDoc } from "@/lib/schema";
 import { AUTO_HIDE_AFTER, REPORT_REASONS } from "@/lib/safety";
 
@@ -186,6 +188,51 @@ export async function verifyNinAction(_: FormState, fd: FormData): Promise<FormS
   updateTag(CATALOG_TAG);
   refresh();
   return { ok: true, message: "NIN verified. Your profile now shows the ID verified badge." };
+}
+
+/**
+ * Forgot password. Creates a reset link that opens findMe's own /reset-password page and emails it
+ * (branded, from findMe's sender). If no email service is set up, tells the browser to fall back to
+ * Firebase's built-in email. Always answers the same way whether or not the account exists, so
+ * nobody can use this to find out who has an account.
+ */
+export async function requestPasswordResetAction(rawEmail: string): Promise<{ ok?: true; fallback?: true; error?: string }> {
+  const email = String(rawEmail ?? "").trim().toLowerCase().slice(0, 120);
+  if (!EMAIL_RE.test(email)) return { error: "Enter a valid email address." };
+  if (!emailConfigured()) return { fallback: true };
+
+  // At most 3 reset emails per address per hour, so nobody can flood someone's inbox.
+  const limitRef = db().collection("reset_requests").doc(createHash("sha256").update(email).digest("hex"));
+  const now = Date.now();
+  const recent = (((await limitRef.get()).data()?.sentAt as number[] | undefined) ?? []).filter((t) => now - t < 3_600_000);
+  if (recent.length >= 3) return { error: "We've already sent a few links. Please check your inbox and spam, or try again in an hour." };
+
+  let link: string;
+  try {
+    link = await adminAuth().generatePasswordResetLink(email);
+  } catch (e) {
+    if ((e as { code?: string }).code === "auth/user-not-found") return { ok: true };
+    console.error("[findMe] reset link failed:", e);
+    return { error: "We couldn't send a reset link right now. Please try again." };
+  }
+  await limitRef.set({ sentAt: [...recent, now] });
+
+  const code = new URL(link).searchParams.get("oobCode");
+  const url = code ? `${APP_URL}/reset-password?oobCode=${encodeURIComponent(code)}` : link;
+  const user = await adminAuth().getUserByEmail(email).catch(() => null);
+  const sent = await sendEmail({
+    to: email,
+    subject: "Reset your findMe password",
+    html: emailLayout({
+      name: user?.displayName ?? "",
+      title: "Reset your password",
+      body: "We got a request to reset the password for your findMe account. Tap the button to choose a new one. The link works once and expires in 1 hour.",
+      href: url,
+      cta: "Choose a new password",
+      footnote: "Didn't ask for this? Ignore this email. Your password stays the same.",
+    }),
+  });
+  return sent ? { ok: true } : { fallback: true };
 }
 
 export async function logoutAction() {

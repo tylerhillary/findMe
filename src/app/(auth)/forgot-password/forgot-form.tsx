@@ -7,6 +7,7 @@ import { motion } from "motion/react";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { ArrowLeft, Loader2, MailCheck } from "lucide-react";
 import { clientAuth } from "@/lib/firebase-client";
+import { requestPasswordResetAction } from "@/app/actions";
 import { Input, Label, btn } from "@/components/ui";
 import { FadeIn } from "@/components/motion";
 
@@ -20,15 +21,26 @@ export function ForgotForm() {
     e.preventDefault();
     setError(null);
     start(async () => {
+      const res = await requestPasswordResetAction(email).catch(() => ({ error: "Can't reach findMe. Check your connection and try again." }) as const);
+      if ("error" in res && res.error) return setError(res.error);
+      if ("ok" in res && res.ok) return setSent(true);
+      // No email service on our side yet: let Firebase send its standard reset email.
       try {
-        await sendPasswordResetEmail(clientAuth(), email.trim());
+        await sendPasswordResetEmail(clientAuth(), email.trim(), { url: `${window.location.origin}/login` }).catch((err) => {
+          if (/continue-uri|unauthorized-domain/.test((err as { code?: string }).code ?? "")) return sendPasswordResetEmail(clientAuth(), email.trim());
+          throw err;
+        });
         setSent(true);
       } catch (err) {
         const code = (err as { code?: string }).code;
         if (code === "auth/invalid-email") setError("Enter a valid email address.");
         else if (code === "auth/too-many-requests") setError("Too many attempts. Please wait a few minutes.");
-        // For unknown emails we still show "sent", so nobody can probe which emails have accounts.
-        else setSent(true);
+        else if (code === "auth/user-not-found") setSent(true); // same answer whether or not the account exists
+        else if (code === "auth/network-request-failed") setError("Can't reach the server. Check your connection and try again.");
+        else {
+          console.error("[findMe] password reset failed:", code, err);
+          setError("We couldn't send the reset link. Please try again in a moment.");
+        }
       }
     });
   }
@@ -41,8 +53,7 @@ export function ForgotForm() {
         </span>
         <h1 className="mt-6 font-display text-[1.6rem] font-extrabold leading-tight tracking-tight sm:text-3xl">Check your email</h1>
         <p className="mt-2 text-[15px] text-ink-soft sm:mt-3 sm:text-base">
-          If an account exists for <span className="font-semibold text-ink">{email}</span>, we&apos;ve sent a link to reset your password. It may take a minute — check
-          your spam folder too.
+          If an account exists for <span className="font-semibold text-ink">{email}</span>, we&apos;ve sent a reset link. It can take a minute. Check your spam folder too.
         </p>
         <Link href="/login" className={btn("primary", "lg", "mt-8")}>
           Back to sign in
