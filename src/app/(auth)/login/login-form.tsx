@@ -39,7 +39,7 @@ export function LoginForm() {
     <div>
       <FadeIn>
         <h1 className="font-display text-[1.75rem] font-extrabold leading-tight tracking-tight sm:text-4xl">Welcome back</h1>
-        <p className="mt-2 text-[15px] text-ink-soft sm:mt-3 sm:text-base">Sign in to manage your requests, messages and profile.</p>
+        <p className="mt-2 text-[15px] text-ink-soft sm:mt-3 sm:text-base">Sign in to your account.</p>
       </FadeIn>
 
       <FadeIn delay={0.08}>

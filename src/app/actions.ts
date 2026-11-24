@@ -3,15 +3,17 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { refresh, updateTag } from "next/cache";
+import { after } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { adminAuth, db } from "@/lib/firebase-admin";
 import { createSession, destroySession, getCurrentUser, getSessionUid, requireUser } from "@/lib/auth";
 import { markNotificationsRead, notify } from "@/lib/notify";
-import { FINDME_WHATSAPP, VERIFY_TTL_MS, approveVerification, isAdmin, newCode, verifications, waLink } from "@/lib/whatsapp";
+import { FINDME_WHATSAPP, VERIFY_TTL_MS, adminUserIds, approveVerification, autoVerification, isAdmin, newCode, verificationText, verifications, waLink } from "@/lib/whatsapp";
 import { isCategory, SKILL_LEVELS, type RequestStatus } from "@/lib/categories";
 import { normalizeNgPhone } from "@/lib/phone";
 import { CATALOG_TAG } from "@/lib/queries";
 import { MODE_COOKIE, MODE_COOKIE_OPTIONS } from "@/lib/mode";
+import { cleanNin, deleteNinRecords, isNinFormat, verifyNin } from "@/lib/nin";
 import type { BlockDoc, MessageDoc, NotificationDoc, PhoneVerificationDoc, ReportDoc, RequestDoc, ReviewDoc, ServiceDoc, Skill, SupportDoc, UserDoc } from "@/lib/schema";
 import { AUTO_HIDE_AFTER, REPORT_REASONS } from "@/lib/safety";
 
@@ -131,6 +133,9 @@ export async function registerAction(_: FormState, fd: FormData): Promise<FormSt
   } else if (phoneRaw && !phone) {
     fieldErrors.phone = PHONE_ERROR;
   }
+  // NIN is optional. If given, it must look like one.
+  const ninRaw = cleanNin(str(fd, "nin", 30));
+  if (ninRaw && !isNinFormat(ninRaw)) fieldErrors.nin = "Enter the 11 digits on your NIN slip, or leave it blank.";
   if (Object.keys(fieldErrors).length) return { fieldErrors };
 
   let uid: string;
@@ -162,7 +167,27 @@ export async function registerAction(_: FormState, fd: FormData): Promise<FormSt
     return { error: "We couldn't create your account right now. Please try again." };
   }
   if (role === "provider") updateTag(CATALOG_TAG);
+  if (ninRaw) {
+    // Optional ID check. If it fails, the account still exists and they can retry from their profile.
+    const nin = await verifyNin(uid, name, ninRaw).catch((e) => {
+      console.error("[findMe] NIN check at sign-up failed:", e);
+      return { verified: false as const, error: "We couldn't check your NIN just now." };
+    });
+    if (nin.verified && role === "provider") updateTag(CATALOG_TAG);
+  }
   return { ok: true };
+}
+
+/** Optional ID check from the profile page. Verified people get an "ID verified" badge. */
+export async function verifyNinAction(_: FormState, fd: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const nin = cleanNin(str(fd, "nin", 30));
+  if (!isNinFormat(nin)) return { fieldErrors: { nin: "Your NIN is the 11-digit number on your NIN slip or card." } };
+  const res = await verifyNin(user.id, user.name, nin);
+  if (!res.verified) return { error: res.error };
+  updateTag(CATALOG_TAG);
+  refresh();
+  return { ok: true, message: "NIN verified. Your profile now shows the ID verified badge." };
 }
 
 export async function logoutAction() {
@@ -322,10 +347,11 @@ export async function sendRequestAction(_: FormState, fd: FormData): Promise<For
 
   const provider = (await users().doc(providerId).get()).data() as UserDoc | undefined;
   if (!provider || provider.role !== "provider") return { error: "This professional is no longer available." };
+  if (!provider.phoneVerified) return { error: "This professional can't take requests until their number is verified." };
   if (await isBlockedBetween(user.id, providerId)) return { error: "You can't send requests to this person." };
   const authUser = await adminAuth().getUser(user.id);
   if (!authUser.emailVerified) {
-    return { error: `Please confirm your email first — we sent a link to ${authUser.email}. You can resend it from your dashboard.` };
+    return { error: `Please confirm your email first. We sent a link to ${authUser.email}.` };
   }
   const serviceId = str(fd, "serviceId", 128);
   const service = serviceId ? ((await services().doc(serviceId).get()).data() as ServiceDoc | undefined) : undefined;
@@ -466,9 +492,9 @@ export async function updateRequestStatusAction(requestId: string, status: Reque
     const first = user.name.split(" ")[0];
     const toClient = changed.providerId === user.id;
     const text: Partial<Record<RequestStatus, { title: string; body: string; cta: string }>> = {
-      accepted: { title: `${first} accepted your request`, body: `“${changed.title}” is on. Phone numbers are now shared, so you can call or WhatsApp each other.`, cta: "Open conversation" },
-      declined: { title: `${first} can't take your request`, body: `“${changed.title}” was declined. There are other great pros on findMe — try another.`, cta: "Find someone else" },
-      completed: { title: `${first} marked your job as done`, body: `How did “${changed.title}” go? A quick rating helps other clients choose well.`, cta: "Rate the job" },
+      accepted: { title: `${first} accepted your request`, body: `“${changed.title}” was accepted. You can now call or WhatsApp each other.`, cta: "Open conversation" },
+      declined: { title: `${first} can't take your request`, body: `“${changed.title}” was declined. Try another pro on findMe.`, cta: "Find someone else" },
+      completed: { title: `${first} marked your job as done`, body: `How did “${changed.title}” go? Leave a quick rating.`, cta: "Rate the job" },
       cancelled: { title: `${first} cancelled a request`, body: `“${changed.title}” was cancelled by the client.`, cta: "View request" },
     };
     const t = text[status];
@@ -514,7 +540,7 @@ export async function leaveReviewAction(_: FormState, fd: FormData): Promise<For
       kind: "review",
       requestId,
       title: `${user.name.split(" ")[0]} left you a ${rating}★ review`,
-      body: `For “${reviewed.title}”. Great reviews move you up in search.`,
+      body: `For “${reviewed.title}”. Good reviews improve your search ranking.`,
       href: `/pro/${reviewed.providerId}`,
       cta: "See your profile",
     });
@@ -633,6 +659,7 @@ export async function deleteAccountAction(idToken: string): Promise<{ error?: st
   ]);
   writer.delete(users().doc(uid));
   await writer.close();
+  await deleteNinRecords(uid);
   await adminAuth().deleteUser(uid);
   updateTag(CATALOG_TAG);
   await destroySession().catch(() => {});
@@ -658,14 +685,15 @@ export async function contactAction(_: FormState, fd: FormData): Promise<FormSta
 
 /* ───────────────────────── phone verification (free, via WhatsApp) ───────────────────────── */
 
-export type WhatsAppVerification = { code: string; link: string; phone: string; expiresAt: number };
+/** `auto`: approved by the Meta webhook within seconds. Otherwise a findMe admin approves it by hand. */
+export type WhatsAppVerification = { code: string; link: string; phone: string; expiresAt: number; auto: boolean };
 
 /** Starts (or resumes) verification: returns the pro's code and a wa.me link to send it to findMe. */
 export async function startWhatsAppVerificationAction(): Promise<{ ok?: WhatsAppVerification; error?: string }> {
   const user = await requireUser();
-  if (!FINDME_WHATSAPP) return { error: "WhatsApp verification isn't set up yet. Please try again later." };
+  if (!FINDME_WHATSAPP) return { error: "Number verification is not available yet. Please try again later." };
   const me = (await users().doc(user.id).get()).data() as UserDoc | undefined;
-  if (!me?.phone) return { error: "Add your phone number to your profile and save it first." };
+  if (!me?.phone) return { error: "Save a phone number on your profile first." };
   if (me.phoneVerified) return { error: "Your number is already verified." };
 
   const ref = verifications().doc(user.id);
@@ -673,11 +701,24 @@ export async function startWhatsAppVerificationAction(): Promise<{ ok?: WhatsApp
   const prev = (await ref.get()).data() as PhoneVerificationDoc | undefined;
   // Reuse a live request for the same number so the code in their WhatsApp stays valid.
   if (prev && prev.status === "pending" && prev.phone === me.phone && prev.expiresAt > now) {
-    return { ok: { code: prev.code, link: waLink(prev.code), phone: prev.phone, expiresAt: prev.expiresAt } };
+    return { ok: { code: prev.code, link: waLink(prev.code), phone: prev.phone, expiresAt: prev.expiresAt, auto: autoVerification() } };
   }
   const code = newCode();
   await ref.set({ userId: user.id, name: me.name, phone: me.phone, code, status: "pending", createdAt: now, expiresAt: now + VERIFY_TTL_MS } satisfies PhoneVerificationDoc);
-  return { ok: { code, link: waLink(code), phone: me.phone, expiresAt: now + VERIFY_TTL_MS } };
+  if (!autoVerification()) {
+    // Tell the admins there's a WhatsApp message to check (after responding, so the pro never waits).
+    after(() => notifyAdmins(`${me.name} is verifying ${me.phone}`, `Look for "${verificationText(code)}" in findMe's WhatsApp, sent from ${me.phone}. Approve it if it matches.`));
+  }
+  return { ok: { code, link: waLink(code), phone: me.phone, expiresAt: now + VERIFY_TTL_MS, auto: autoVerification() } };
+}
+
+async function notifyAdmins(title: string, body: string) {
+  const ids = await adminUserIds().catch((e) => {
+    console.error("[findMe] couldn't look up admins:", e);
+    return [] as string[];
+  });
+  if (!ids.length) console.warn("[findMe] no admins set (ADMIN_EMAILS) — nobody was told about a new number verification");
+  await Promise.all(ids.map((userId) => notify({ userId, kind: "status", title, body, href: "/admin/verifications", cta: "Review verifications" })));
 }
 
 /** Polled by the pro's screen while they wait: has the message arrived and been approved? */
@@ -697,13 +738,13 @@ export async function decideVerificationAction(userId: string, approve: boolean)
   const id = String(userId ?? "").slice(0, 128);
   if (approve) {
     const res = await approveVerification(id, "admin");
-    if (res === "changed") return { error: "They changed their number since — ask them to verify again." };
+    if (res === "changed") return { error: "They changed their number. Ask them to verify again." };
     if (res === "missing") return { error: "This request no longer exists." };
     await notify({
       userId: id,
       kind: "status",
       title: "Your number is verified",
-      body: "Clients now see the Verified number badge on your profile, and you rank higher in search.",
+      body: "You now appear in search and can receive requests.",
       href: `/pro/${id}`,
       cta: "See your profile",
     });

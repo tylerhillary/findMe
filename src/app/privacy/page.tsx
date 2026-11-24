@@ -11,9 +11,10 @@ export default function PrivacyPage() {
     <LegalPage
       eyebrow="Legal"
       title="Privacy Policy"
-      updated="23 November 2026"
+      updated="24 November 2026"
       intro={
         <p>
+          findMe is brought to you by Radius Technology (&ldquo;we&rdquo;, &ldquo;us&rdquo;), which is responsible for your personal data on findMe.
           findMe connects people who need things done with skilled professionals across Nigeria. This policy explains what personal data we collect, why,
           who can see it, and the rights you have under the Nigeria Data Protection Act 2023 (NDPA).
         </p>
@@ -27,6 +28,8 @@ export default function PrivacyPage() {
               <li><strong>Account details:</strong> your name, email address and password (passwords are handled by Google Firebase Authentication — we never see or store them).</li>
               <li><strong>Contact number:</strong> the phone or business line you add, and whether it&apos;s on WhatsApp.</li>
               <li><strong>Profile:</strong> photo, headline, bio, location, category, skills, rates and services (professionals).</li>
+              <li><strong>NIN (optional):</strong> if you choose to verify your ID, your National Identification Number, used once to confirm it — see <a href="#nin">Identity checks</a>.</li>
+              <li><strong>Number verification:</strong> professionals send a WhatsApp message with a code to findMe from their own number. Our team sees that message, including the WhatsApp profile name, and uses it only to confirm the number belongs to them.</li>
               <li><strong>Activity:</strong> requests, messages, job status, reviews and ratings, reports and blocks.</li>
               <li><strong>Support:</strong> anything you send through our contact form.</li>
             </ul>
@@ -45,6 +48,25 @@ export default function PrivacyPage() {
           ),
         },
         {
+          id: "nin",
+          title: "Identity checks (NIN)",
+          body: (
+            <>
+              <p>
+                Anyone on findMe can choose to verify their identity with their NIN. It&apos;s optional, and it earns an &ldquo;ID verified&rdquo; badge
+                (professionals also rank higher in search). It helps protect people from fake and impersonated accounts.
+              </p>
+              <ul>
+                <li>We send your NIN to our verification provider, <strong>Dojah</strong>, which checks it against the National Identity Management Commission (NIMC) record.</li>
+                <li>We only use the result to confirm the record exists and that its name matches your findMe name. We don&apos;t keep your photo, date of birth or any other NIMC details.</li>
+                <li>We <strong>never store your full NIN</strong>. We keep the last 4 digits and a one-way fingerprint so the same NIN can&apos;t back two accounts.</li>
+                <li>Your NIN is never shown to anyone, including other users. Profiles only show an &ldquo;ID verified&rdquo; badge.</li>
+                <li>Deleting your account deletes these records.</li>
+              </ul>
+            </>
+          ),
+        },
+        {
           id: "sharing",
           title: "Who can see your information",
           body: (
@@ -53,7 +75,7 @@ export default function PrivacyPage() {
                 <li><strong>Everyone:</strong> a professional&apos;s public profile — name, photo, headline, bio, location, skills, services, rates, rating and reviews.</li>
                 <li><strong>Only after a request is accepted:</strong> your phone number, and only to the other person on that job — unless a professional chooses to show their business line publicly.</li>
                 <li><strong>Never public:</strong> your email address, password and private messages.</li>
-                <li><strong>Service providers</strong> who process data for us under contract: Google Firebase (hosting, sign-in and database, stored in the European Union) and our email provider for alerts.</li>
+                <li><strong>Service providers</strong> who process data for us under contract: Google Firebase (hosting, sign-in and database, stored in the European Union), Dojah (optional NIN checks) and our email provider for alerts.</li>
               </ul>
               <p>We don&apos;t sell your personal data. We may disclose information if the law requires it or to protect users from fraud or harm.</p>
             </>

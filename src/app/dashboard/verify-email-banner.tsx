@@ -7,7 +7,7 @@ import { CheckCircle2, Loader2, MailWarning } from "lucide-react";
 import { authErrorMessage, clientAuth, clientUser, sendConfirmationEmail } from "@/lib/firebase-client";
 
 function mailError(code: string) {
-  if (code === "auth/too-many-requests") return "We just sent one — please wait a few minutes before asking again.";
+  if (code === "auth/too-many-requests") return "Link already sent. Please wait a few minutes.";
   if (code === "auth/network-request-failed") return "Can't reach the server. Check your connection and try again.";
   return `Couldn't send the email (${code}). Please try again.`;
 }
@@ -43,7 +43,7 @@ export function VerifyEmailBanner({ email }: { email: string }) {
       if (err) return setMsg({ ok: false, text: mailError(err) });
       setAskPassword(false);
       setPassword("");
-      setMsg({ ok: true, text: `Sent! Check ${email} — and your spam or promotions folder.` });
+      setMsg({ ok: true, text: `Sent. Check ${email}, including spam.` });
     });
   }
 
@@ -52,7 +52,7 @@ export function VerifyEmailBanner({ email }: { email: string }) {
       const user = await clientUser();
       await user?.reload().catch(() => {});
       router.refresh();
-      if (user && !user.emailVerified) setMsg({ ok: false, text: "Not confirmed yet — open the link in the email we sent you." });
+      if (user && !user.emailVerified) setMsg({ ok: false, text: "Not confirmed yet. Open the link in our email." });
     });
   }
 

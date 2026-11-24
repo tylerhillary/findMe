@@ -65,11 +65,11 @@ export async function POST(request: Request) {
       userId: doc.id,
       kind: "status",
       title: "Your number is verified",
-      body: "Clients now see the Verified number badge on your profile, and you rank higher in search.",
+      body: "You now appear in search and can receive requests.",
       href: `/pro/${doc.id}`,
       cta: "See your profile",
     });
-    await replyOnWhatsApp(fromDigits, "✅ Your number is verified on findMe. Clients will now see the Verified badge on your profile.");
+    await replyOnWhatsApp(fromDigits, "✅ Your number is verified on findMe. You now appear in search.");
   }
   return new Response("ok", { status: 200 });
 }

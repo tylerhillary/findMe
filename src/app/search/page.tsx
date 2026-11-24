@@ -127,7 +127,7 @@ async function SearchBody({ searchParams }: { searchParams: Promise<Raw> }) {
                   </span>
                   <h3 className="mt-4 text-lg font-bold">No one matches that yet</h3>
                   <p className="mx-auto mt-1.5 max-w-sm text-sm text-ink-soft">
-                    {filtered ? "Try removing a filter or two — there may be great pros just outside them." : "Try a broader word, or one of these popular searches."}
+                    {filtered ? "Try removing a filter." : "Try a broader term or a popular search."}
                   </p>
                   <div className="mt-5 flex flex-col items-center justify-center gap-2.5 sm:flex-row">
                     {filtered ? <ClearFiltersButton /> : <Link href="/search" className={btn("primary")}>Browse all pros</Link>}
@@ -162,7 +162,7 @@ async function SearchBody({ searchParams }: { searchParams: Promise<Raw> }) {
                   </span>
                   <div>
                     <p className="font-bold">Good at this kind of work?</p>
-                    <p className="text-sm text-ink-soft">List your skills on findMe and get requests from clients near you.</p>
+                    <p className="text-sm text-ink-soft">List your skills and get requests from clients near you.</p>
                   </div>
                 </div>
                 <a href="/mode?to=work" className={btn("dark", "md", "group w-full sm:w-auto")}>

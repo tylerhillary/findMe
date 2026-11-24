@@ -90,7 +90,7 @@ export function ProfileForm({ profile, startListed }: { profile: Profile; startL
           <Toggle name="listed" checked={listed} onChange={setListed} label="Show me in search results" />
           <div>
             <p className="font-semibold">Offer my skills on findMe</p>
-            <p className="text-sm text-muted">Turn this on to appear in search and receive requests from clients.</p>
+            <p className="text-sm text-muted">Turn on to appear in search and receive requests.</p>
           </div>
         </div>
 
@@ -137,7 +137,7 @@ export function ProfileForm({ profile, startListed }: { profile: Profile; startL
           <div className="sm:col-span-2 rounded-2xl border border-line bg-canvas/60 p-4 sm:p-5">
             <p className="flex items-center gap-2 font-semibold"><Phone className="size-4 text-brand-600" /> Contact number</p>
             <p className="mt-1 text-sm text-muted">
-              {listed ? "Clients use this to call or WhatsApp you once you accept their request." : "Shared with a pro only after they accept your request."}
+              {listed ? "Shared with clients after you accept their request." : "Shared with a pro only after they accept your request."}
             </p>
             <div className="mt-4">
               <Label htmlFor="phone" hint={listed ? "Required for pros" : "Optional"}>Phone or business line</Label>
@@ -158,7 +158,7 @@ export function ProfileForm({ profile, startListed }: { profile: Profile; startL
                   <Toggle name="showPhone" checked={showPhone} onChange={setShowPhone} label="Show number publicly" />
                   <div>
                     <p className="text-sm font-semibold">Show on my profile</p>
-                    <p className="text-xs text-muted">Anyone can call you directly. Best for shops and businesses.</p>
+                    <p className="text-xs text-muted">Anyone can call you. Best for businesses.</p>
                   </div>
                 </div>
               )}
@@ -206,7 +206,7 @@ export function SkillsManager({ skills }: { skills: { id: string; name: string; 
   return (
     <div className="card p-5 sm:p-6">
       <h2 className="text-lg font-bold">Skills</h2>
-      <p className="mt-1 text-sm text-muted">What people should find you for. Specific skills rank higher.</p>
+      <p className="mt-1 text-sm text-muted">Specific skills rank higher in search.</p>
       <form ref={formRef} action={action} className="mt-5 space-y-2">
         <Input name="name" placeholder="e.g. Kitchen remodelling" maxLength={40} />
         <div className="flex gap-2">

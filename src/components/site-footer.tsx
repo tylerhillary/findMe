@@ -10,8 +10,7 @@ export function SiteFooter() {
         <div className="col-span-2 md:col-span-1">
           <Logo />
           <p className="mt-3 max-w-xs text-[13px] leading-relaxed text-muted sm:mt-4 sm:text-sm">
-            findMe connects people who need things done with people who are great at doing them. Every request goes
-            through findMe, so your contact details stay private.
+            findMe connects people with skilled professionals across Nigeria. Your contact details stay private until you accept a request.
           </p>
         </div>
         <FooterCol title="Popular categories" links={CATEGORIES.slice(0, 5).map((c) => ({ href: `/search?category=${c.slug}`, label: c.name }))} />
@@ -38,12 +37,12 @@ export function SiteFooter() {
       <div className="border-t border-line">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-1 px-4 py-5 text-center text-xs text-muted sm:flex-row sm:gap-2 sm:py-6 sm:text-sm sm:px-6 lg:px-8">
           <p className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
-            <span>© 2026 findMe. All rights reserved.</span>
+            <span>© 2026 findMe, brought to you by <span className="font-semibold text-ink-soft">Radius Technology</span>. All rights reserved.</span>
             <Link href="/terms" className="hover:text-brand-700">Terms</Link>
             <Link href="/privacy" className="hover:text-brand-700">Privacy</Link>
             <Link href="/contact" className="hover:text-brand-700">Contact</Link>
           </p>
-          <p>Proudly Nigerian 🇳🇬 · Made for people who make things happen.</p>
+          <p>Made in Nigeria 🇳🇬</p>
         </div>
       </div>
     </footer>

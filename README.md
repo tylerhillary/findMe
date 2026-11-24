@@ -73,3 +73,5 @@ Next.js 16 (App Router, Cache Components, Server Actions), React 19, Tailwind CS
 Search reads a cached provider catalog (`use cache` + `cacheTag("catalog")`) that refreshes immediately when profiles, services, reviews or jobs change, which keeps Firestore reads low. Ratings, job counts and starting prices are stored as counters updated in transactions.
 
 > Data access lives in `src/lib/queries.ts` (reads) and `src/app/actions.ts` (writes); document shapes are in `src/lib/schema.ts`. For hosting, set `FIREBASE_SERVICE_ACCOUNT` (the key JSON as one line) instead of a file path, or use Firebase App Hosting, which provides credentials automatically.
+
+> **Optional NIN checks ("ID verified" badge, search boost for pros).** Pros are listed once their WhatsApp number is approved; NIN is extra. Create an account at dojah.io and set `DOJAH_APP_ID`, `DOJAH_SECRET_KEY` and `NIN_HASH_SECRET` (any long random string; never change it once set). For testing, also set `DOJAH_BASE_URL=https://sandbox.dojah.io` with the sandbox keys, and use the test NIN `70123456789`. The full NIN is never stored (see `src/lib/nin.ts`).

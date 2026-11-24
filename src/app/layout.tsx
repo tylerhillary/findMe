@@ -11,7 +11,11 @@ const jakarta = Plus_Jakarta_Sans({
 export const metadata: Metadata = {
   title: { default: "findMe — Find the right person for any job", template: "%s · findMe" },
   description:
-    "findMe connects you with trusted, skilled people across Nigeria — from Lagos to Abuja, Kano to Port Harcourt. Search a skill, compare profiles, and hire through findMe.",
+    "Find and hire verified, skilled professionals across Nigeria. Search a skill, compare profiles and hire with confidence.",
+  applicationName: "findMe",
+  authors: [{ name: "Radius Technology" }],
+  creator: "Radius Technology",
+  publisher: "Radius Technology",
 };
 
 export const viewport: Viewport = {

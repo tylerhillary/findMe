@@ -163,7 +163,7 @@ async function Overview({ searchParams }: { searchParams: Promise<Record<string,
               </p>
               <p className="truncate text-[13px] text-violet-900/70">
                 {toRate.length === 1 ? `“${toRate[0].title}” · ` : `Start with ${toRate[0].other.name} · `}
-                your review helps other clients hire with confidence.
+                your review helps others hire with confidence.
               </p>
             </div>
             <span className="hidden text-sm font-semibold text-violet-800 sm:inline">Rate now</span>
@@ -267,7 +267,7 @@ function RecentRequests({ requests, now, isPro }: { requests: RequestSummary[]; 
         <EmptyState
           icon={Inbox}
           title="No requests yet"
-          body={isPro ? "Complete your profile and publish a service so clients can find you." : "Search for a skill and send your first request — it's free."}
+          body={isPro ? "Complete your profile and add a service so clients can find you." : "Search for a skill and send your first request. It's free."}
           cta={isPro ? { href: "/dashboard/services?new=1", label: "Publish a service" } : { href: "/search", label: "Find talent" }}
         />
       ) : (
@@ -314,7 +314,7 @@ function ServicesPanel({ services }: { services: MyService[] }) {
         <EmptyState
           icon={Briefcase}
           title="No services yet"
-          body="Packages with a clear price get requested far more often than custom quotes."
+          body="Services with a clear price get more requests."
           cta={{ href: "/dashboard/services?new=1", label: "Publish your first service" }}
         />
       ) : (
@@ -485,8 +485,8 @@ function BecomeProPanel({ hasProfile }: { hasProfile: boolean }) {
       <h2 className="mt-3 text-base font-bold">{hasProfile ? "Your pro side" : "Good at something?"}</h2>
       <p className="mt-1 text-[13px] leading-relaxed text-ink-soft">
         {hasProfile
-          ? "Jobs you've received, your services and earnings are on the Working side — same account."
-          : "Offer your skills from this same account — no second sign-up. Set up your pro profile and start getting requests."}
+          ? "Your jobs, services and earnings are on the Working side."
+          : "Offer your skills from this account. No second sign-up needed."}
       </p>
       <a href="/mode?to=work" className={btn("primary", "sm", "mt-4 w-full")}>
         {hasProfile ? "Switch to Working" : "Start offering services"} <ArrowRight className="size-3.5" />

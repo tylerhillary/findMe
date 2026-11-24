@@ -97,7 +97,7 @@ export function RequestList({ requests, isPro, now }: { requests: RequestSummary
             <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-brand-50 text-brand-600"><Inbox className="size-7" /></span>
             <p className="mt-4 font-semibold">Nothing here yet</p>
             <p className="mt-1 text-sm text-muted">
-              {tab === "incoming" ? "When clients request your services, they'll show up here." : "Find someone great and send a request — conversations appear here."}
+              {tab === "incoming" ? "Client requests will appear here." : "Send a request to a pro. Conversations appear here."}
             </p>
             <Link href={tab === "incoming" ? "/dashboard/services" : "/search"} className={btn("secondary", "sm", "mt-5")}>
               {tab === "incoming" ? "Manage services" : "Find talent"}

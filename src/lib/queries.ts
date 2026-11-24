@@ -29,6 +29,8 @@ export type ProviderCard = {
   phoneVerified: boolean;
   /** Email address confirmed by link. */
   emailVerified: boolean;
+  /** NIN confirmed with NIMC (optional). Gives an "ID verified" badge and a boost in search. */
+  ninVerified: boolean;
   score?: number;
 };
 
@@ -56,13 +58,14 @@ function cardFrom(id: string, u: UserDoc): ProviderCard {
     startingPrice: u.startingPrice ?? null,
     phoneVerified: !!u.phoneVerified,
     emailVerified: !!u.emailVerified,
+    ninVerified: !!u.ninVerified,
   };
 }
 
 // Public fields only — phone numbers and emails never enter the cached catalog.
 const PUBLIC_FIELDS = [
   "name", "headline", "bio", "location", "category", "hourlyRate", "available", "avatar",
-  "skills", "ratingSum", "reviewCount", "jobsDone", "startingPrice", "flagged", "phoneVerified", "emailVerified",
+  "skills", "ratingSum", "reviewCount", "jobsDone", "startingPrice", "flagged", "phoneVerified", "emailVerified", "ninVerified",
 ] as const;
 
 /**
@@ -85,7 +88,9 @@ async function loadCatalog(): Promise<CatalogEntry[]> {
     byUser.set(s.userId, [...(byUser.get(s.userId) ?? []), { title: s.title, description: s.description, category: s.category }]);
   }
   return users.docs
-    .filter((d) => !(d.data() as UserDoc).flagged) // reported by several people — hidden until reviewed
+    // Hidden: anyone reported by several people (until reviewed), and anyone whose WhatsApp number
+    // findMe hasn't confirmed yet.
+    .filter((d) => !(d.data() as UserDoc).flagged && !!(d.data() as UserDoc).phoneVerified)
     .map((d) => {
       const u = d.data() as UserDoc;
       return { ...cardFrom(d.id, u), bio: u.bio ?? "", services: byUser.get(d.id) ?? [] };
@@ -211,7 +216,9 @@ export async function searchProviders(params: SearchParams): Promise<SearchResul
       if (sort === "rating") return b.rating - a.rating || b.reviewCount - a.reviewCount;
       if (sort === "price_low") return cardPrice(a) - cardPrice(b);
       if (sort === "price_high") return cardPrice(b) - cardPrice(a);
-      return b.score - a.score || Number(b.phoneVerified) - Number(a.phoneVerified) || b.rating * b.reviewCount - a.rating * a.reviewCount;
+      // ID-verified pros get a small boost, so they rank above equally good matches.
+      const boost = (c: ProviderCard) => (c.score ?? 0) + (c.ninVerified ? 2 : 0);
+      return boost(b) - boost(a) || b.rating * b.reviewCount - a.rating * a.reviewCount;
     });
 
   return { results, categoryCounts, totalPros: catalog.length };
@@ -222,7 +229,7 @@ export async function getFeaturedProviders(limit = 6): Promise<ProviderCard[]> {
   const catalog = await loadCatalog();
   return catalog
     .map(toCard)
-    .sort((a, b) => b.rating * Math.log(1 + b.reviewCount) - a.rating * Math.log(1 + a.reviewCount))
+    .sort((a, b) => Number(b.ninVerified) - Number(a.ninVerified) || b.rating * Math.log(1 + b.reviewCount) - a.rating * Math.log(1 + a.reviewCount))
     .slice(0, limit);
 }
 

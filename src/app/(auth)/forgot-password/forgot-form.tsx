@@ -58,7 +58,7 @@ export function ForgotForm() {
           <ArrowLeft className="size-4" /> Back to sign in
         </Link>
         <h1 className="mt-6 font-display text-[1.75rem] font-extrabold leading-tight tracking-tight sm:text-4xl">Forgot your password?</h1>
-        <p className="mt-2 text-[15px] text-ink-soft sm:mt-3 sm:text-base">Enter the email you signed up with and we&apos;ll send you a reset link.</p>
+        <p className="mt-2 text-[15px] text-ink-soft sm:mt-3 sm:text-base">Enter your account email and we&apos;ll send a reset link.</p>
       </FadeIn>
       <FadeIn delay={0.08}>
         <form onSubmit={onSubmit} className="mt-7 space-y-4 sm:mt-10 sm:space-y-5">

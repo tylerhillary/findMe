@@ -46,7 +46,7 @@ export function WelcomeBanner({ name, isPro }: { name: string; isPro: boolean })
             <div className="flex-1">
               <h2 className="text-xl font-extrabold">Welcome to findMe, {name}! 🎉</h2>
               <p className="mt-1 text-white/70">
-                {isPro ? "Your profile is live. Publish a service so clients know exactly what to hire you for." : "You're all set. Search for any skill and send your first request."}
+                {isPro ? "Your profile is saved. Verify your number and add a service to start getting requests." : "You're all set. Search for a skill and send your first request."}
               </p>
             </div>
             <Link href={isPro ? "/dashboard/services?new=1" : "/search"} className="inline-flex h-11 items-center justify-center rounded-full bg-white px-5 text-sm font-semibold text-ink transition hover:-translate-y-0.5">

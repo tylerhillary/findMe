@@ -40,7 +40,7 @@ type Skill = { name: string; level: string };
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
-export function RegisterForm() {
+export function RegisterForm({ ninEnabled }: { ninEnabled: boolean }) {
   const params = useSearchParams();
   const next = params.get("next") ?? "";
   const [state, setState] = useState<FormState>({});
@@ -55,6 +55,7 @@ export function RegisterForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
+  const [nin, setNin] = useState("");
   const [whatsapp, setWhatsapp] = useState(true);
   const [showPw, setShowPw] = useState(false);
   const [headline, setHeadline] = useState("");
@@ -74,7 +75,7 @@ export function RegisterForm() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setErrors(state.fieldErrors);
     const f = Object.keys(state.fieldErrors);
-    if (f.some((k) => ["name", "email", "password", "phone"].includes(k))) setStep(1);
+    if (f.some((k) => ["name", "email", "password", "phone", "nin"].includes(k))) setStep(1);
     else if (f.some((k) => ["headline", "category"].includes(k))) setStep(2);
     else if (f.includes("skills")) setStep(3);
   }, [state]);
@@ -97,6 +98,7 @@ export function RegisterForm() {
       if (password.length < 8) e.password = "Use at least 8 characters.";
       if (phone.trim() && !normalizeNgPhone(phone)) e.phone = "Enter a valid Nigerian number, e.g. 0803 123 4567.";
       else if (role === "provider" && !phone.trim()) e.phone = "Add a number clients can reach you on.";
+      if (nin.trim() && !/^\d{11}$/.test(nin.replace(/\D/g, ""))) e.nin = "Enter the 11 digits on your NIN slip, or leave it blank.";
     }
     if (s === 2) {
       if (headline.trim().length < 6) e.headline = "Tell people what you do in a few words.";
@@ -119,7 +121,7 @@ export function RegisterForm() {
     if (step < last) return go(step + 1);
     if (!validate(step)) return;
     const fd = new FormData();
-    Object.entries({ name, email, password, phone, whatsapp: whatsapp ? "1" : "0", role: role ?? "client", headline, category, location, rate, next }).forEach(([k, v]) => fd.set(k, v));
+    Object.entries({ name, email, password, phone, nin: ninEnabled ? nin : "", whatsapp: whatsapp ? "1" : "0", role: role ?? "client", headline, category, location, rate, next }).forEach(([k, v]) => fd.set(k, v));
     fd.set("skills", JSON.stringify(skills));
     startTransition(async () => {
       // 1) Server validates and creates the Firebase account + profile.
@@ -184,11 +186,11 @@ export function RegisterForm() {
               {step === 0 && (
                 <div>
                   <h1 className="font-display text-[1.75rem] font-extrabold leading-tight tracking-tight sm:text-4xl">Join findMe</h1>
-                  <p className="mt-2 text-[15px] text-ink-soft sm:mt-3 sm:text-base">How would you like to get started? You can always do both later.</p>
+                  <p className="mt-2 text-[15px] text-ink-soft sm:mt-3 sm:text-base">How will you use findMe? You can do both later.</p>
                   <div className="mt-6 grid gap-3 sm:mt-8 sm:gap-4">
                     {([
                       { v: "client", icon: Search, t: "I want to hire", d: "Find skilled people and get things done." },
-                      { v: "provider", icon: Briefcase, t: "I want to offer my skills", d: "Create a profile, list services and get hired." },
+                      { v: "provider", icon: Briefcase, t: "I want to offer my skills", d: "List your services and get hired." },
                     ] as const).map(({ v, icon: Icon, t, d }) => {
                       const active = role === v;
                       return (
@@ -234,7 +236,7 @@ export function RegisterForm() {
                   <p className="mt-2 text-[15px] text-ink-soft sm:mt-3 sm:text-base">It takes less than a minute.</p>
                   <div className="mt-6 space-y-4 sm:mt-8 sm:space-y-5">
                     <div>
-                      <Label htmlFor="name">Full name</Label>
+                      <Label htmlFor="name" hint={ninEnabled ? "As on your NIN" : undefined}>Full name</Label>
                       <Input id="name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" placeholder="e.g. Amara Okafor" aria-invalid={!!errors.name} autoFocus />
                       <FieldError msg={errors.name} />
                     </div>
@@ -251,8 +253,28 @@ export function RegisterForm() {
                         <input type="checkbox" checked={whatsapp} onChange={(e) => setWhatsapp(e.target.checked)} className="size-4 accent-brand-600" />
                         This number is on WhatsApp
                       </label>
-                      <p className="mt-1 text-xs text-muted">Only shared with people whose request you accept (or who accept yours).</p>
+                      <p className="mt-1 text-xs text-muted">Shared only after a request is accepted.</p>
                     </div>
+                    {ninEnabled && (
+                      <div>
+                        <Label htmlFor="nin" hint="Optional">National Identification Number (NIN)</Label>
+                        <Input
+                          id="nin"
+                          inputMode="numeric"
+                          autoComplete="off"
+                          maxLength={14}
+                          value={nin}
+                          onChange={(e) => setNin(e.target.value.replace(/[^\d ]/g, ""))}
+                          placeholder="e.g. 12345678901"
+                          aria-invalid={!!errors.nin}
+                        />
+                        <FieldError msg={errors.nin} />
+                        <p className="mt-1 text-xs text-muted">
+                          Adds an ID verified badge{role === "provider" ? " and ranks you higher" : ""}. We check it with NIMC and that it matches your
+                          name above, keep only the last 4 digits, and never show it to anyone. <a href="/privacy#nin" target="_blank" className="font-semibold text-brand-700 hover:underline">How we use it</a>
+                        </p>
+                      </div>
+                    )}
                     <div>
                       <Label htmlFor="password" hint="8+ characters">Password</Label>
                       <div className="relative">
@@ -282,7 +304,7 @@ export function RegisterForm() {
               {step === 2 && (
                 <div>
                   <h1 className="font-display text-[1.75rem] font-extrabold leading-tight tracking-tight sm:text-4xl">Your professional profile</h1>
-                  <p className="mt-2 text-[15px] text-ink-soft sm:mt-3 sm:text-base">This is what people see when they search.</p>
+                  <p className="mt-2 text-[15px] text-ink-soft sm:mt-3 sm:text-base">This is what clients see in search.</p>
                   <div className="mt-6 space-y-4 sm:mt-8 sm:space-y-5">
                     <div>
                       <Label htmlFor="headline" hint={`${headline.length}/120`}>Headline</Label>
@@ -329,7 +351,7 @@ export function RegisterForm() {
               {step === 3 && (
                 <div>
                   <h1 className="font-display text-[1.75rem] font-extrabold leading-tight tracking-tight sm:text-4xl">What are you good at?</h1>
-                  <p className="mt-2 text-[15px] text-ink-soft sm:mt-3 sm:text-base">Add the skills people should find you for. Be specific — it helps search.</p>
+                  <p className="mt-2 text-[15px] text-ink-soft sm:mt-3 sm:text-base">Add the skills you want to be found for. Be specific.</p>
                   <div className="mt-6 sm:mt-8">
                     <div className="flex flex-col gap-2 sm:flex-row">
                       <Input
@@ -385,7 +407,7 @@ export function RegisterForm() {
                           </motion.span>
                         ))}
                       </AnimatePresence>
-                      {skills.length === 0 && <p className="self-center text-sm text-muted">No skills yet — add a few or pick from suggestions.</p>}
+                      {skills.length === 0 && <p className="self-center text-sm text-muted">No skills yet. Add one or pick a suggestion.</p>}
                     </div>
 
                     {category && (

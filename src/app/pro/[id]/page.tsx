@@ -39,6 +39,9 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const p = await getProviderProfile(id);
   if (!p) notFound();
+  // Pros whose number findMe hasn't confirmed yet aren't shown to anyone but themselves.
+  const isOwner = !p.phoneVerified && (await getCurrentUser())?.id === p.id;
+  if (!p.phoneVerified && !isOwner) notFound();
   const now = await getNow();
 
   const levelPct = { Beginner: 33, Intermediate: 66, Expert: 100 } as Record<string, number>;
@@ -71,6 +74,11 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="font-display text-[1.45rem] font-extrabold leading-tight tracking-tight sm:text-4xl">{p.name}</h1>
                 {p.emailVerified && <VerifiedAccountBadge />}
+                {p.ninVerified && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700" title="Identity confirmed with their NIN">
+                    <ShieldCheck className="size-3.5" /> ID verified
+                  </span>
+                )}
                 {p.phoneVerified && <VerifiedNumberBadge />}
                 {p.jobsDone >= 3 && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700">
@@ -87,6 +95,16 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
               </div>
             </div>
           </FadeIn>
+
+          {isOwner && (
+            <div className="mt-5 flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+              <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-600" />
+              <p>
+                <span className="font-bold">Only you can see this page.</span> Verify your WhatsApp number from your{" "}
+                <Link href="/dashboard/profile#verify-phone" className="font-semibold underline">profile</Link> to appear in search and receive requests.
+              </p>
+            </div>
+          )}
 
           {p.flagged && (
             <div className="mt-5 flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
@@ -161,7 +179,7 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
                 </StaggerItem>
               ))}
             </Stagger>
-            {p.services.length === 0 && <p className="card mt-3 rounded-2xl p-4 text-sm text-muted sm:mt-5 sm:rounded-[1.25rem] sm:p-6">No fixed services yet — send a custom request instead.</p>}
+            {p.services.length === 0 && <p className="card mt-3 rounded-2xl p-4 text-sm text-muted sm:mt-5 sm:rounded-[1.25rem] sm:p-6">No fixed services yet. Send a custom request instead.</p>}
           </section>
 
           <section className="mt-7 pb-4 sm:mt-10 sm:pb-16">
@@ -251,7 +269,7 @@ async function Panel({ p }: { p: ProviderProfile }) {
             {showPhone || unlocked ? (
               <ContactButtons phone={phone} whatsapp={whatsapp} waMessage={`Hi ${first}, I found you on findMe.`} />
             ) : (
-              <LockedPhone phone={phone} reason={`Revealed with Call and WhatsApp buttons once ${first} accepts your request.`} />
+              <LockedPhone phone={phone} reason={`Shown once ${first} accepts your request.`} />
             )}
           </div>
         </div>

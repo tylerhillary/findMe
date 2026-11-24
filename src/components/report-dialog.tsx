@@ -125,7 +125,7 @@ function ReportDialog({ reportedId, first, requestId, onClose }: { reportedId: s
               <span className="mb-1.5 flex items-baseline justify-between text-sm font-semibold">
                 Details <span className="text-xs font-normal text-muted">{reason === "other" ? "required" : "optional"}</span>
               </span>
-              <Textarea name="details" rows={3} maxLength={1000} placeholder="Dates, amounts, what was said — anything that helps us understand." className="min-h-24" />
+              <Textarea name="details" rows={3} maxLength={1000} placeholder="Dates, amounts and what was said." className="min-h-24" />
               <FieldError msg={state.fieldErrors?.details} />
             </label>
 

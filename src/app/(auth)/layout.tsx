@@ -1,5 +1,5 @@
-import { Quote, Star } from "lucide-react";
-import { Avatar, Logo } from "@/components/ui";
+import { CheckCircle2 } from "lucide-react";
+import { Logo } from "@/components/ui";
 
 export default function AuthLayout({ children }: LayoutProps<"/">) {
   return (
@@ -16,28 +16,25 @@ export default function AuthLayout({ children }: LayoutProps<"/">) {
             Where skills meet <span className="text-gradient">the people who need them.</span>
           </h2>
           <p className="mt-6 text-lg text-white/60">
-            Join professionals and clients across Nigeria getting real work done on findMe.
+            Hire trusted professionals or offer your skills, all from one account.
           </p>
-          <figure className="mt-12 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-            <Quote className="size-7 text-brand-300" />
-            <blockquote className="mt-3 leading-relaxed text-white/85">
-              I listed my plumbing services on a Friday and had three jobs in Kaduna booked by Monday. findMe just works.
-            </blockquote>
-            <figcaption className="mt-5 flex items-center gap-3">
-              <Avatar name="Ibrahim Musa" size={40} />
-              <div>
-                <p className="font-semibold">Ibrahim Musa</p>
-                <p className="flex items-center gap-1 text-sm text-white/50">
-                  {[0, 1, 2, 3, 4].map((i) => (
-                    <Star key={i} className="size-3 fill-amber-400 text-amber-400" />
-                  ))}
-                  <span className="ml-1">Plumber, Kaduna</span>
-                </p>
-              </div>
-            </figcaption>
-          </figure>
+          <ul className="mt-12 space-y-4 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+            {[
+              ["Verified pros", "Every listed pro has confirmed their phone number."],
+              ["Private by default", "Numbers are shared only after a request is accepted."],
+              ["Honest reviews", "Only clients who completed a job can leave one."],
+            ].map(([t, d]) => (
+              <li key={t} className="flex gap-3">
+                <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-400" />
+                <div>
+                  <p className="font-semibold">{t}</p>
+                  <p className="text-sm text-white/60">{d}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
-        <p className="relative text-sm text-white/40">© 2026 findMe</p>
+        <p className="relative text-sm text-white/40">© 2026 findMe · Radius Technology</p>
       </aside>
       <main className="relative flex flex-col px-4 py-4 sm:px-8 sm:py-6 lg:px-16">
         <div className="lg:hidden">

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { BadgeCheck, Check, Copy, Loader2, ShieldCheck } from "lucide-react";
+import { BadgeCheck, Check, Clock, Copy, Loader2, ShieldCheck } from "lucide-react";
 import { checkVerificationAction, startWhatsAppVerificationAction, type WhatsAppVerification } from "@/app/actions";
 import { formatNgPhone } from "@/lib/phone";
 import { cn } from "./ui";
@@ -98,9 +98,10 @@ export function VerifyPhone({ phone, verified, className }: { phone: string; ver
           <ShieldCheck className="size-5" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold">Verify your number — free</p>
+          <p className="text-sm font-semibold">Verify your number</p>
           <p className="text-[13px] text-muted">
-            Send one WhatsApp message to findMe from <span className="font-semibold text-ink">{pretty}</span>. Verified pros get a badge and rank higher.
+            Send one WhatsApp message to findMe from <span className="font-semibold text-ink">{pretty}</span> to confirm it&apos;s yours.
+            Required to be listed for work.
           </p>
         </div>
       </div>
@@ -127,7 +128,7 @@ export function VerifyPhone({ phone, verified, className }: { phone: string; ver
             </li>
             <li className="flex gap-2">
               <span className="grid size-5 shrink-0 place-items-center rounded-full bg-ink text-[11px] font-bold text-white">2</span>
-              <span>Send the message as it is — don&apos;t change the code.</span>
+              <span>Send the message without changing the code.</span>
             </li>
           </ol>
           <div className="flex flex-wrap items-center gap-2 rounded-xl bg-canvas p-2.5">
@@ -147,9 +148,17 @@ export function VerifyPhone({ phone, verified, className }: { phone: string; ver
             </a>
             {FINDME_WA && <span className="text-xs text-muted">or send it to {formatNgPhone(FINDME_WA)}</span>}
           </div>
-          {state === "waiting" ? (
+          {state === "waiting" && req.auto ? (
             <p className="flex items-center gap-2 text-[13px] font-medium text-ink-soft" role="status">
               <Loader2 className="size-4 animate-spin text-brand-600" /> Waiting for your message… this page updates by itself.
+            </p>
+          ) : state === "waiting" ? (
+            <p className="flex items-start gap-2 rounded-xl bg-brand-50/70 p-3 text-[13px] text-ink-soft" role="status">
+              <Clock className="mt-0.5 size-4 shrink-0 text-brand-600" />
+              <span>
+                <span className="font-semibold text-ink">Our team reviews it</span>, usually within a few hours. We&apos;ll notify you when
+                you&apos;re approved. You can close this page.
+              </span>
             </p>
           ) : (
             <p className="text-[13px] font-medium text-red-600" role="alert">

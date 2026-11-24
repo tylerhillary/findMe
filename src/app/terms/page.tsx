@@ -23,7 +23,7 @@ export default function TermsPage() {
           title: "What findMe is",
           body: (
             <p>
-              findMe is a marketplace that helps clients find independent professionals and contact them. Professionals are not employees or agents of findMe.
+              findMe is a marketplace brought to you by Radius Technology (&ldquo;we&rdquo;, &ldquo;us&rdquo;) that helps clients find independent professionals and contact them. Professionals are not employees or agents of findMe.
               Any agreement for work — price, timing, quality and payment — is between the client and the professional. findMe is not a party to that agreement.
             </p>
           ),
@@ -34,6 +34,7 @@ export default function TermsPage() {
           body: (
             <ul>
               <li>You must be 18 or older and give accurate information, including a real email address and phone number.</li>
+              <li>Professionals must prove the phone number on their profile is theirs before they are listed or can receive requests. If you verify your ID, the NIN must be your own. Using someone else&apos;s number or NIN leads to removal.</li>
               <li>Keep your password secret. You&apos;re responsible for activity on your account.</li>
               <li>One person, one account. Don&apos;t impersonate anyone or create accounts for others without permission.</li>
             </ul>

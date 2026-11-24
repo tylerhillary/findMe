@@ -59,7 +59,7 @@ export function HeroVisual({ pro }: { pro: ProviderCard | null }) {
               ))}
             </div>
           ) : (
-            <p className="mt-4 rounded-xl bg-canvas px-3 py-2.5 text-xs text-ink-soft">Ratings and job counts appear here as you complete work through findMe.</p>
+            <p className="mt-4 rounded-xl bg-canvas px-3 py-2.5 text-xs text-ink-soft">Ratings and jobs appear here as you complete work.</p>
           )}
           {pro ? (
             <a href={`/pro/${pro.id}`} className="mt-4 block h-10 rounded-full bg-brand-600 text-center text-sm font-semibold leading-10 text-white transition hover:bg-brand-700">View {pro.name.split(" ")[0]}&apos;s profile</a>
@@ -78,7 +78,7 @@ export function HeroVisual({ pro }: { pro: ProviderCard | null }) {
       >
         <div className="rounded-2xl border border-line bg-white p-3.5 shadow-lift [animation-delay:1.2s] animate-float">
           <p className="flex items-center gap-1.5 text-xs font-bold"><BadgeCheck className="size-4 text-emerald-500" /> Reviews you can trust</p>
-          <p className="mt-1.5 text-xs leading-relaxed text-ink-soft">Only clients who finished a job through findMe can rate the pro they hired.</p>
+          <p className="mt-1.5 text-xs leading-relaxed text-ink-soft">Only clients who completed a job can leave a rating.</p>
         </div>
       </motion.div>
 

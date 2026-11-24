@@ -41,8 +41,8 @@ export default function Home() {
               </FadeIn>
               <FadeIn delay={0.16}>
                 <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-ink-soft sm:mt-6 sm:text-lg">
-                  Search a skill, compare trusted profiles and hire through findMe — from tailors and tutors to electricians,
-                  mechanics and wedding photographers, anywhere in Nigeria.
+                  Search a skill, compare verified profiles and hire with confidence, from tailors and tutors to electricians
+                  and photographers, anywhere in Nigeria.
                 </p>
               </FadeIn>
               <FadeIn delay={0.24} className="mt-6 max-w-2xl sm:mt-9">
@@ -61,7 +61,8 @@ export default function Home() {
                 </div>
               </FadeIn>
               <FadeIn delay={0.32} className="mt-6 flex items-center gap-5 text-xs text-muted sm:mt-10 sm:gap-6 sm:text-sm">
-                <span className="inline-flex items-center gap-1.5 sm:gap-2"><ShieldCheck className="size-4 text-emerald-500 sm:size-4.5" /> Verified reviews</span>
+                <span className="inline-flex items-center gap-1.5 sm:gap-2"><ShieldCheck className="size-4 text-emerald-500 sm:size-4.5" /> Verified pros</span>
+                <span className="inline-flex items-center gap-1.5 sm:gap-2"><BadgeCheck className="size-4 text-emerald-500 sm:size-4.5" /> Verified reviews</span>
                 <span className="inline-flex items-center gap-1.5 sm:gap-2"><Lock className="size-4 text-brand-500 sm:size-4.5" /> Private messaging</span>
               </FadeIn>
             </div>
@@ -86,7 +87,7 @@ export default function Home() {
 
         {/* CATEGORIES */}
         <section id="categories" className="mx-auto max-w-7xl scroll-mt-16 px-4 py-12 sm:scroll-mt-20 sm:px-6 sm:py-20 lg:px-8 lg:py-28">
-          <SectionHeading eyebrow="Explore" title="Every skill you could need" sub="Browse categories or search for exactly what you have in mind." />
+          <SectionHeading eyebrow="Explore" title="Every skill you could need" sub="Browse by category or search for exactly what you need." />
           <Suspense fallback={<CategoryGrid counts={null} />}>
             <CategoriesWithCounts />
           </Suspense>
@@ -99,13 +100,13 @@ export default function Home() {
             <Reveal className="mx-auto max-w-2xl text-center">
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-300 sm:text-sm sm:tracking-[0.2em]">How it works</p>
               <h2 className="mt-2 font-display text-[1.6rem] font-extrabold leading-tight tracking-tight sm:mt-3 sm:text-5xl">Hired in three simple steps</h2>
-              <p className="mt-2 text-[15px] text-white/60 sm:mt-4 sm:text-lg">No cold emails, no phone tag. findMe handles the introductions.</p>
+              <p className="mt-2 text-[15px] text-white/60 sm:mt-4 sm:text-lg">Find, compare and hire in minutes.</p>
             </Reveal>
             <Stagger className="relative mt-8 grid gap-3 sm:mt-16 sm:gap-6 md:grid-cols-3">
               {[
-                { icon: Search, title: "Search a skill", body: "Type what you need in plain words — “fix my sink”, “wedding photos” — and see matching pros instantly." },
-                { icon: UserRoundCheck, title: "Pick your person", body: "Compare ratings, skills, prices and real reviews. Choose the one who feels right." },
-                { icon: MessageSquareText, title: "Request through findMe", body: "Send your job details. They accept, you chat privately, and the work gets done." },
+                { icon: Search, title: "Search a skill", body: "Describe what you need in plain words, like “fix my sink”, and see matching pros." },
+                { icon: UserRoundCheck, title: "Pick your person", body: "Compare ratings, skills, prices and reviews, then choose." },
+                { icon: MessageSquareText, title: "Request through findMe", body: "Send your job details. Once they accept, chat privately and get it done." },
               ].map(({ icon: Icon, title, body }, i) => (
                 <StaggerItem key={title} className="group relative flex gap-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4 transition-colors hover:bg-white/[0.07] sm:block sm:rounded-3xl sm:p-7">
                   <span className="absolute right-4 top-3 font-display text-3xl font-extrabold text-white/[0.06] sm:right-6 sm:top-5 sm:text-6xl">0{i + 1}</span>
@@ -125,7 +126,7 @@ export default function Home() {
         {/* FEATURED */}
         <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-20 lg:px-8 lg:py-28">
           <div className="flex items-end justify-between gap-4">
-            <SectionHeading align="left" eyebrow="On findMe now" title="Pros you can hire today" sub="Real profiles from people who signed up to offer their skills." />
+            <SectionHeading align="left" eyebrow="On findMe now" title="Pros you can hire today" sub="Verified professionals ready for your next job." />
             <Link href="/search" className={btn("outline", "sm", "group mb-8 shrink-0 sm:mb-12 sm:h-11 sm:px-5")}>
               View all <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
             </Link>
@@ -142,9 +143,9 @@ export default function Home() {
           </Suspense>
           <Stagger className="mt-3 grid gap-3 sm:mt-6 sm:gap-6 md:grid-cols-3">
             {[
-              { icon: Lock, title: "Your details stay private", body: "All contact happens on findMe. Share your number only when you're ready." },
-              { icon: BadgeCheck, title: "Reviews you can trust", body: "Only clients who completed a job through findMe can leave a review." },
-              { icon: Zap, title: "Fast, fair matching", body: "Smart search understands everyday words and surfaces the best fit first." },
+              { icon: Lock, title: "Your details stay private", body: "Your number is shared only after a request is accepted." },
+              { icon: BadgeCheck, title: "Reviews you can trust", body: "Only clients who completed a job can leave a review." },
+              { icon: Zap, title: "Fast, fair matching", body: "Search understands everyday words and shows the best fit first." },
             ].map(({ icon: Icon, title, body }) => (
               <StaggerItem key={title} className="card flex gap-4 p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lift sm:p-7 md:block">
                 <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-50 md:size-auto md:place-items-start md:bg-transparent">
@@ -164,32 +165,31 @@ export default function Home() {
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <SectionHeading
               eyebrow="Why people stay"
-              title="Built so working through findMe beats going around it"
-              sub="Clients and pros can swap numbers once a job is accepted. Here's why they keep coming back anyway."
+              title="Why clients and pros stay on findMe"
+              sub="Numbers are shared once a job is accepted. Here is why people keep using findMe."
             />
             <div className="grid gap-3 sm:gap-6 lg:grid-cols-2">
               <WhyCard
                 who="For clients"
                 points={[
-                  { icon: Lock, title: "Numbers stay private", body: "A pro's phone number stays hidden until they accept your request, so nobody cold-calls you and you never have to give out your number first." },
-                  { icon: History, title: "A record of every job", body: "Your requests, agreed details and messages stay in one place, so there's something to point to if the work isn't what was agreed." },
-                  { icon: Flag, title: "Someone to turn to", body: "Report or block anyone in a tap. Off-platform, you're on your own." },
-                  { icon: Search, title: "Next time is faster", body: "Need a different skill next month? Search beats asking around, and you'll see who's free right now." },
+                  { icon: Lock, title: "Numbers stay private", body: "Numbers stay hidden until a request is accepted, so you are never cold-called." },
+                  { icon: History, title: "A record of every job", body: "Requests, agreed terms and messages are kept in one place if anything goes wrong." },
+                  { icon: Flag, title: "Accountable people", body: "Every listed pro has a verified phone number, and you can report or block anyone in one tap." },
+                  { icon: Search, title: "Faster next time", body: "Need someone else next time? Search shows who is available now." },
                 ]}
               />
               <WhyCard
                 who="For pros"
                 points={[
-                  { icon: Star, title: "Reviews only count here", body: "Ratings come only from jobs completed through findMe. Work done off-platform doesn't build the reputation that brings your next client." },
-                  { icon: TrendingUp, title: "Rank comes from findMe work", body: "Completed jobs and good reviews push you up in search. Going around the platform means slipping down it." },
-                  { icon: Wallet, title: "No cut to dodge", body: "findMe takes no commission from your jobs, so there's no saving to be made by taking a client elsewhere." },
-                  { icon: BadgeCheck, title: "Trust that's visible", body: "Your verified badge and job history are what make a stranger pick you over someone they found on a flyer." },
+                  { icon: Star, title: "Reviews count here", body: "Ratings come only from jobs completed on findMe. Off-platform work builds no reputation." },
+                  { icon: TrendingUp, title: "Rank comes from results", body: "Completed jobs and good reviews move you up in search." },
+                  { icon: Wallet, title: "No commission", body: "findMe takes no commission, so there is nothing to save by going elsewhere." },
+                  { icon: BadgeCheck, title: "Visible trust", body: "Your badges and job history are what win new clients." },
                 ]}
               />
             </div>
             <p className="mx-auto mt-6 max-w-3xl text-center text-sm text-ink-soft sm:mt-10 sm:text-base">
-              And if a client and pro do carry on privately, findMe loses nothing: we earn from pros&apos; subscriptions, not a cut of each job, so we
-              don&apos;t need to police anyone. We just need to stay the easiest place to find the next one.
+              If a client and pro continue privately, findMe loses nothing. We earn from optional Pro subscriptions, not a cut of each job.
             </p>
           </div>
         </section>
@@ -199,14 +199,14 @@ export default function Home() {
           <SectionHeading
             eyebrow="Pricing"
             title="Free to hire. Free to list. No commission."
-            sub="findMe makes money from an optional Pro plan for professionals who want to be found first. Everyone keeps 100% of what they earn."
+            sub="findMe earns from an optional Pro plan for professionals. Everyone keeps 100% of what they earn."
           />
           <div className="mx-auto grid max-w-4xl gap-3 sm:gap-6 md:grid-cols-2">
             <PlanCard
               name="Free"
               price="₦0"
               note="Everyone, for good"
-              points={["Hiring is always free for clients", "A public profile, skills and services", "Requests, private chat and reviews", "Verified badge once your email is confirmed", "No commission on any job"]}
+              points={["Hiring is always free for clients", "A public profile, skills and services", "Requests, private chat and reviews", "Verified badge after email confirmation", "No commission on any job"]}
               cta={<a href="/mode?to=work" className={btn("outline", "md", "w-full")}>Create your free profile</a>}
             />
             <PlanCard
@@ -215,38 +215,39 @@ export default function Home() {
               price="₦2,500"
               per="/month"
               note="For pros · launching soon"
-              points={["Everything in Free", "Shown first in searches for your category", "A Pro badge on your profile and card", "Profile insights: views, searches and request rates", "Featured on the home page in rotation"]}
+              points={["Everything in Free", "Top placement in your category", "A Pro badge on your profile and card", "Profile insights: views and requests", "Featured on the home page in rotation"]}
               cta={<span className={btn("primary", "md", "w-full pointer-events-none opacity-80")}>Coming soon. Free while we launch</span>}
             />
           </div>
           <p className="mx-auto mt-6 max-w-2xl text-center text-xs text-muted sm:text-sm">
-            Prices are in Nigerian naira. Pro isn&apos;t on sale yet, and nobody will be charged without choosing to upgrade.
+            Prices in naira. Pro is not on sale yet. Nobody is charged without upgrading.
           </p>
         </section>
 
         {/* TEAM */}
         <section id="team" className="mx-auto max-w-7xl scroll-mt-14 px-4 pb-12 sm:scroll-mt-16 sm:px-6 sm:pb-20 lg:px-8">
-          <SectionHeading eyebrow="The team" title="Who's behind findMe" sub="findMe is built and run in Nigeria, for people in Nigeria." />
+          <SectionHeading eyebrow="The team" title="Who's behind findMe" sub="findMe is brought to you by Radius Technology, built in Nigeria for Nigeria." />
           <Reveal className="card mx-auto flex max-w-4xl flex-col gap-5 p-5 sm:flex-row sm:gap-8 sm:p-8">
             <div className="flex shrink-0 items-center gap-4 sm:w-56 sm:flex-col sm:items-start">
               <Avatar name="Hillary Tyler" size={88} />
               <div>
                 <p className="text-lg font-extrabold">Hillary Tyler</p>
                 <p className="text-sm font-semibold text-brand-700">Founder &amp; CEO</p>
+                <p className="text-xs text-muted">Radius Technology</p>
               </div>
             </div>
             {/* TODO(founder): replace with Hillary's own background, experience and story. */}
             <div className="space-y-3 text-[15px] leading-relaxed text-ink-soft sm:text-base">
               <p>
-                In Nigeria, finding a reliable tailor, electrician, tutor or mechanic still runs on word of mouth: you ask around, get a number,
-                and hope. Skilled people lose work simply because the right client never hears about them.
+                Finding a reliable tailor, electrician or tutor in Nigeria still depends on word of mouth. Skilled people lose work because
+                the right clients never hear about them.
               </p>
               <p>
-                Hillary started findMe to fix that from both sides: one account to hire or to offer your skills, private contact until a job is
-                accepted, and reviews that only come from real completed work. Hillary designs and builds the product end to end.
+                Hillary founded findMe to fix that: one account to hire or offer skills, private contact until a job is accepted, and reviews
+                from real completed work. Hillary leads the product end to end.
               </p>
               <p className="text-sm">
-                Questions, feedback or want to partner? <Link href="/contact" className="font-semibold text-brand-700 hover:underline">Get in touch</Link>.
+                Questions or partnerships? <Link href="/contact" className="font-semibold text-brand-700 hover:underline">Contact us</Link>.
               </p>
             </div>
           </Reveal>
@@ -257,9 +258,9 @@ export default function Home() {
           <Reveal className="relative overflow-hidden rounded-3xl bg-brand-gradient px-5 py-10 text-center text-white shadow-lift sm:rounded-[2rem] sm:px-16 sm:py-20">
             <div className="grid-bg pointer-events-none absolute inset-0 opacity-40 [mask-image:radial-gradient(circle,black,transparent_70%)]" />
             <div className="relative">
-              <h2 className="mx-auto max-w-3xl font-display text-[1.6rem] font-extrabold leading-tight tracking-tight sm:text-5xl">Good at something? Get found for it.</h2>
+              <h2 className="mx-auto max-w-3xl font-display text-[1.6rem] font-extrabold leading-tight tracking-tight sm:text-5xl">Good at something? Get hired for it.</h2>
               <p className="mx-auto mt-3 max-w-xl text-[15px] text-white/80 sm:mt-5 sm:text-lg">
-                Create your free profile, list your skills and services, and start receiving requests from people who need you.
+                Create a free profile, list your services and start receiving requests.
               </p>
               <div className="mt-7 flex flex-col justify-center gap-2.5 sm:mt-9 sm:flex-row sm:gap-3">
                 <a href="/mode?to=work" className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-white px-7 text-[15px] font-semibold text-brand-700 sm:h-13 sm:text-base transition hover:-translate-y-0.5 hover:shadow-xl">
@@ -322,6 +323,15 @@ function CategoryGrid({ counts }: { counts: Map<string, number> | null }) {
 
 async function Featured() {
   const pros = await getFeaturedProviders(6);
+  if (pros.length === 0) {
+    return (
+      <div className="card p-6 text-center sm:p-10">
+        <p className="font-bold">Verified pros are being added.</p>
+        <p className="mt-1 text-sm text-ink-soft">Every pro confirms their phone number before appearing here.</p>
+        <a href="/mode?to=work" className={btn("primary", "md", "mt-4")}>Be one of the first</a>
+      </div>
+    );
+  }
   return (
     <Stagger className="grid gap-3 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
       {pros.map((p) => (
@@ -357,7 +367,7 @@ async function Stats() {
           </div>
         ))}
       </div>
-      <p className="mt-2 text-center text-xs text-muted">Live figures from findMe, updated every few minutes. We&apos;re new, and we show the real numbers.</p>
+      <p className="mt-2 text-center text-xs text-muted">Live figures, updated every few minutes.</p>
     </Reveal>
   );
 }

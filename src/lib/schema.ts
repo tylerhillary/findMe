@@ -22,6 +22,8 @@ export type UserDoc = {
   phoneVerified?: boolean;
   /** Copy of Firebase Auth's "email confirmed" flag, so public pages can show it without extra lookups. */
   emailVerified?: boolean;
+  /** NIN confirmed with NIMC (via Dojah). Pros without it are kept out of search and can't get requests. */
+  ninVerified?: boolean;
   skills?: Skill[];
   // Denormalised counters, kept up to date by server actions.
   ratingSum?: number;
@@ -126,4 +128,18 @@ export type PhoneVerificationDoc = {
   createdAt: number;
   expiresAt: number;
   decidedAt?: number;
+};
+
+/** identity/{uid} — NIN check state. Never holds the full NIN. Server access only. */
+export type IdentityDoc = {
+  status?: "verified" | "failed";
+  /** HMAC-SHA256 of the NIN (see src/lib/nin.ts); also the id of ninIndex/{hash} → { uid }. */
+  ninHash?: string;
+  ninLast4?: string;
+  provider?: "dojah";
+  verifiedAt?: number;
+  lastError?: string | null;
+  attemptsDay?: string;
+  attempts?: number;
+  lastTriedAt?: number;
 };

@@ -1,6 +1,6 @@
 import "server-only";
 import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
-import { db } from "./firebase-admin";
+import { adminAuth, db } from "./firebase-admin";
 import type { PhoneVerificationDoc, UserDoc } from "./schema";
 
 /**
@@ -70,10 +70,37 @@ export async function replyOnWhatsApp(toDigits: string, text: string) {
   }).catch((e) => console.error("[whatsapp] reply failed", e));
 }
 
+/** True when the Meta webhook is configured, so messages are approved automatically. */
+export const autoVerification = () => !!(process.env.WHATSAPP_APP_SECRET && process.env.WHATSAPP_VERIFY_TOKEN);
+
+/** Account ids of everyone allowed to approve verifications. */
+export async function adminUserIds(): Promise<string[]> {
+  const emails = (process.env.ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+  const [byEmail, flagged] = await Promise.all([
+    emails.length ? adminAuth().getUsers(emails.map((email) => ({ email }))) : Promise.resolve({ users: [] }),
+    db().collection("users").where("admin", "==", true).select().get(),
+  ]);
+  return [...new Set([...byEmail.users.map((u) => u.uid), ...flagged.docs.map((d) => d.id)])];
+}
+
 /** Admins: anyone whose email is in ADMIN_EMAILS, or whose profile has admin: true. */
 export async function isAdmin(uid: string, email: string) {
   const list = (process.env.ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
   if (email && list.includes(email.toLowerCase())) return true;
   const u = (await db().collection("users").doc(uid).get()).data() as (UserDoc & { admin?: boolean }) | undefined;
   return u?.admin === true;
+}
+
+/** A pro's number status for the dashboard: verified, waiting for an admin, or not started. */
+export async function getPhoneStatus(uid: string): Promise<"verified" | "pending" | "rejected" | "none"> {
+  const [u, v] = await Promise.all([db().collection("users").doc(uid).get(), verifications().doc(uid).get()]);
+  if ((u.data() as UserDoc | undefined)?.phoneVerified) return "verified";
+  const d = v.data() as PhoneVerificationDoc | undefined;
+  if (d?.status === "pending" && d.expiresAt > Date.now()) return "pending";
+  return d?.status === "rejected" ? "rejected" : "none";
+}
+
+/** How many verifications are waiting for an admin. */
+export async function pendingVerificationCount() {
+  return (await verifications().where("status", "==", "pending").count().get()).data().count;
 }

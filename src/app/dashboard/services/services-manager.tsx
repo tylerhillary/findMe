@@ -28,7 +28,7 @@ export function ServicesManager({ services, defaultCategory, openNew, userId }: 
       <FadeIn className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <h1 className="font-display text-[1.5rem] font-extrabold leading-tight tracking-tight sm:text-4xl">My services</h1>
-          <p className="mt-1 text-sm text-ink-soft sm:mt-2 sm:text-base">Packages clients can request with one click from your profile.</p>
+          <p className="mt-1 text-sm text-ink-soft sm:mt-2 sm:text-base">Fixed-price services clients can request from your profile.</p>
         </div>
         <div className="flex gap-2">
           {services.length > 0 && (
@@ -49,7 +49,7 @@ export function ServicesManager({ services, defaultCategory, openNew, userId }: 
           </span>
           <h2 className="mt-6 text-xl font-bold">Publish your first service</h2>
           <p className="mx-auto mt-2 max-w-md text-ink-soft">
-            Describe something you do, set a price, and clients can request it straight from your profile.
+            Describe a service and set a price. Clients can request it from your profile.
           </p>
           <button onClick={() => setEditing("new")} className={btn("primary", "lg", "mt-6")}>
             <Plus className="size-4.5" /> Create a service

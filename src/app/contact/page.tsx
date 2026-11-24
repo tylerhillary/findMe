@@ -27,10 +27,10 @@ export default function ContactPage() {
           </Suspense>
           <aside className="space-y-3">
             {[
-              { icon: Flag, title: "Report a scam right away", body: "Use Report on the person's profile or in your conversation — it's faster and goes straight to our safety queue." },
+              { icon: Flag, title: "Report a scam right away", body: "Use Report on their profile or in the chat. It goes straight to our safety team." },
               { icon: KeyRound, title: "Can't sign in?", body: <>Reset your password from the <Link href="/forgot-password" className="font-semibold text-brand-700">forgot password</Link> page.</> },
               { icon: ShieldCheck, title: "Your data", body: <>Change or delete your account in <Link href="/dashboard/settings" className="font-semibold text-brand-700">Account settings</Link>. See our <Link href="/privacy" className="font-semibold text-brand-700">Privacy Policy</Link>.</> },
-              { icon: LifeBuoy, title: "Lost money?", body: "Contact your bank immediately, then the police or EFCC. Keep your findMe chat — it's evidence." },
+              { icon: LifeBuoy, title: "Lost money?", body: "Contact your bank immediately, then the police or EFCC. Keep the findMe chat as evidence." },
             ].map(({ icon: Icon, title, body }) => (
               <div key={title} className="flex gap-3 rounded-2xl border border-line bg-white p-4">
                 <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600">

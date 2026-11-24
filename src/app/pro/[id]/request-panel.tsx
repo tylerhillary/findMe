@@ -69,7 +69,7 @@ export function RequestPanel({ provider, services, viewer }: { provider: Provide
               Hire {first} via findMe <ArrowRight className="size-4.5 transition-transform group-hover:translate-x-0.5" />
             </button>
           )}
-          <p className="mt-3 text-center text-xs text-muted">Free to send · No commitment until they accept</p>
+          <p className="mt-3 text-center text-xs text-muted">Free to send · No commitment</p>
         </div>
       </div>
 
@@ -161,7 +161,7 @@ function RequestModal({
             <Lock className="mx-auto size-8 text-brand-600" />
             <h3 className="mt-3 text-lg font-bold">Sign in to send your request</h3>
             <p className="mt-1.5 text-sm text-ink-soft">
-              Requests go through findMe so both sides stay protected. It only takes a minute to join.
+              Requests go through findMe to protect both sides. Joining takes a minute.
             </p>
             <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
               <Link href={`/register?next=${encodeURIComponent(pathname)}`} className={btn("primary")}>Create free account</Link>

@@ -11,7 +11,7 @@ export default function SettingsPage() {
     <div>
       <FadeIn>
         <h1 className="font-display text-[1.5rem] font-extrabold leading-tight tracking-tight sm:text-4xl">Account settings</h1>
-        <p className="mt-1 text-sm text-ink-soft sm:mt-2 sm:text-base">Your sign-in details and account. Your public profile lives under Profile &amp; skills.</p>
+        <p className="mt-1 text-sm text-ink-soft sm:mt-2 sm:text-base">Manage your sign-in details and account.</p>
       </FadeIn>
       <Suspense fallback={<div className="mt-6 space-y-4">{[0, 1, 2].map((i) => <div key={i} className="skeleton h-48 rounded-2xl" />)}</div>}>
         <Settings />
