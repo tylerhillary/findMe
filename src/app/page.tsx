@@ -1,6 +1,6 @@
-import { Suspense } from "react";
+import { Suspense, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowRight, BadgeCheck, Lock, MessageSquareText, Search, ShieldCheck, Sparkles, UserRoundCheck, Zap } from "lucide-react";
+import { ArrowRight, BadgeCheck, Check, Flag, History, Lock, MessageSquareText, Search, ShieldCheck, Sparkles, Star, TrendingUp, UserRoundCheck, Wallet, Zap } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { SearchBar } from "@/components/search-bar";
@@ -8,7 +8,7 @@ import { HeroVisual } from "@/components/hero-visual";
 import { ProviderCard, ProviderCardSkeleton } from "@/components/provider-card";
 import { CategoryIcon } from "@/components/category-icon";
 import { FadeIn, Reveal, Stagger, StaggerItem } from "@/components/motion";
-import { btn, cn } from "@/components/ui";
+import { Avatar, btn, cn } from "@/components/ui";
 import { CATEGORIES } from "@/lib/categories";
 import { getFeaturedProviders, getPlatformStats } from "@/lib/queries";
 
@@ -66,7 +66,9 @@ export default function Home() {
               </FadeIn>
             </div>
             <div className="hidden md:block">
-              <HeroVisual />
+              <Suspense fallback={<HeroVisual pro={null} />}>
+                <HeroPro />
+              </Suspense>
             </div>
           </div>
 
@@ -123,8 +125,8 @@ export default function Home() {
         {/* FEATURED */}
         <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-20 lg:px-8 lg:py-28">
           <div className="flex items-end justify-between gap-4">
-            <SectionHeading align="left" eyebrow="Top rated" title="Pros people love" sub="Highly reviewed professionals ready to help." />
-            <Link href="/search?sort=rating" className={btn("outline", "sm", "group mb-8 shrink-0 sm:mb-12 sm:h-11 sm:px-5")}>
+            <SectionHeading align="left" eyebrow="On findMe now" title="Pros you can hire today" sub="Real profiles from people who signed up to offer their skills." />
+            <Link href="/search" className={btn("outline", "sm", "group mb-8 shrink-0 sm:mb-12 sm:h-11 sm:px-5")}>
               View all <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
             </Link>
           </div>
@@ -155,6 +157,99 @@ export default function Home() {
               </StaggerItem>
             ))}
           </Stagger>
+        </section>
+
+        {/* WHY PEOPLE STAY */}
+        <section id="why-findme" className="scroll-mt-14 border-y border-line bg-white py-12 sm:scroll-mt-16 sm:py-20 lg:py-28">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <SectionHeading
+              eyebrow="Why people stay"
+              title="Built so working through findMe beats going around it"
+              sub="Clients and pros can swap numbers once a job is accepted. Here's why they keep coming back anyway."
+            />
+            <div className="grid gap-3 sm:gap-6 lg:grid-cols-2">
+              <WhyCard
+                who="For clients"
+                points={[
+                  { icon: Lock, title: "Numbers stay private", body: "A pro's phone number stays hidden until they accept your request, so nobody cold-calls you and you never have to give out your number first." },
+                  { icon: History, title: "A record of every job", body: "Your requests, agreed details and messages stay in one place, so there's something to point to if the work isn't what was agreed." },
+                  { icon: Flag, title: "Someone to turn to", body: "Report or block anyone in a tap. Off-platform, you're on your own." },
+                  { icon: Search, title: "Next time is faster", body: "Need a different skill next month? Search beats asking around, and you'll see who's free right now." },
+                ]}
+              />
+              <WhyCard
+                who="For pros"
+                points={[
+                  { icon: Star, title: "Reviews only count here", body: "Ratings come only from jobs completed through findMe. Work done off-platform doesn't build the reputation that brings your next client." },
+                  { icon: TrendingUp, title: "Rank comes from findMe work", body: "Completed jobs and good reviews push you up in search. Going around the platform means slipping down it." },
+                  { icon: Wallet, title: "No cut to dodge", body: "findMe takes no commission from your jobs, so there's no saving to be made by taking a client elsewhere." },
+                  { icon: BadgeCheck, title: "Trust that's visible", body: "Your verified badge and job history are what make a stranger pick you over someone they found on a flyer." },
+                ]}
+              />
+            </div>
+            <p className="mx-auto mt-6 max-w-3xl text-center text-sm text-ink-soft sm:mt-10 sm:text-base">
+              And if a client and pro do carry on privately, findMe loses nothing: we earn from pros&apos; subscriptions, not a cut of each job, so we
+              don&apos;t need to police anyone. We just need to stay the easiest place to find the next one.
+            </p>
+          </div>
+        </section>
+
+        {/* PRICING / BUSINESS MODEL */}
+        <section id="pricing" className="mx-auto max-w-7xl scroll-mt-14 px-4 py-12 sm:scroll-mt-16 sm:px-6 sm:py-20 lg:px-8 lg:py-28">
+          <SectionHeading
+            eyebrow="Pricing"
+            title="Free to hire. Free to list. No commission."
+            sub="findMe makes money from an optional Pro plan for professionals who want to be found first. Everyone keeps 100% of what they earn."
+          />
+          <div className="mx-auto grid max-w-4xl gap-3 sm:gap-6 md:grid-cols-2">
+            <PlanCard
+              name="Free"
+              price="₦0"
+              note="Everyone, for good"
+              points={["Hiring is always free for clients", "A public profile, skills and services", "Requests, private chat and reviews", "Verified badge once your email is confirmed", "No commission on any job"]}
+              cta={<a href="/mode?to=work" className={btn("outline", "md", "w-full")}>Create your free profile</a>}
+            />
+            <PlanCard
+              highlight
+              name="findMe Pro"
+              price="₦2,500"
+              per="/month"
+              note="For pros · launching soon"
+              points={["Everything in Free", "Shown first in searches for your category", "A Pro badge on your profile and card", "Profile insights: views, searches and request rates", "Featured on the home page in rotation"]}
+              cta={<span className={btn("primary", "md", "w-full pointer-events-none opacity-80")}>Coming soon. Free while we launch</span>}
+            />
+          </div>
+          <p className="mx-auto mt-6 max-w-2xl text-center text-xs text-muted sm:text-sm">
+            Prices are in Nigerian naira. Pro isn&apos;t on sale yet, and nobody will be charged without choosing to upgrade.
+          </p>
+        </section>
+
+        {/* TEAM */}
+        <section id="team" className="mx-auto max-w-7xl scroll-mt-14 px-4 pb-12 sm:scroll-mt-16 sm:px-6 sm:pb-20 lg:px-8">
+          <SectionHeading eyebrow="The team" title="Who's behind findMe" sub="findMe is built and run in Nigeria, for people in Nigeria." />
+          <Reveal className="card mx-auto flex max-w-4xl flex-col gap-5 p-5 sm:flex-row sm:gap-8 sm:p-8">
+            <div className="flex shrink-0 items-center gap-4 sm:w-56 sm:flex-col sm:items-start">
+              <Avatar name="Hillary Tyler" size={88} />
+              <div>
+                <p className="text-lg font-extrabold">Hillary Tyler</p>
+                <p className="text-sm font-semibold text-brand-700">Founder &amp; CEO</p>
+              </div>
+            </div>
+            {/* TODO(founder): replace with Hillary's own background, experience and story. */}
+            <div className="space-y-3 text-[15px] leading-relaxed text-ink-soft sm:text-base">
+              <p>
+                In Nigeria, finding a reliable tailor, electrician, tutor or mechanic still runs on word of mouth: you ask around, get a number,
+                and hope. Skilled people lose work simply because the right client never hears about them.
+              </p>
+              <p>
+                Hillary started findMe to fix that from both sides: one account to hire or to offer your skills, private contact until a job is
+                accepted, and reviews that only come from real completed work. Hillary designs and builds the product end to end.
+              </p>
+              <p className="text-sm">
+                Questions, feedback or want to partner? <Link href="/contact" className="font-semibold text-brand-700 hover:underline">Get in touch</Link>.
+              </p>
+            </div>
+          </Reveal>
         </section>
 
         {/* CTA */}
@@ -238,22 +333,71 @@ async function Featured() {
   );
 }
 
+async function HeroPro() {
+  const [pro] = await getFeaturedProviders(1);
+  return <HeroVisual pro={pro ?? null} />;
+}
+
 async function Stats() {
   const s = await getPlatformStats();
+  // Exact live numbers — no "+" padding, and no rating until someone has actually left a review.
   const items = [
-    { v: `${s.providers}+`, l: "Skilled professionals" },
-    { v: `${s.skills}+`, l: "Unique skills listed" },
-    { v: `${s.completed}+`, l: "Jobs completed" },
-    { v: `${s.rating.toFixed(1)}★`, l: "Average rating" },
+    { v: s.providers.toLocaleString("en-NG"), l: s.providers === 1 ? "Professional listed" : "Professionals listed" },
+    { v: s.skills.toLocaleString("en-NG"), l: s.skills === 1 ? "Skill listed" : "Skills listed" },
+    { v: s.completed.toLocaleString("en-NG"), l: s.completed === 1 ? "Job completed" : "Jobs completed" },
+    s.rating > 0 ? { v: `${s.rating.toFixed(1)}★`, l: "Average rating" } : { v: "—", l: "No reviews yet" },
   ];
   return (
-    <Reveal className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line sm:rounded-3xl md:grid-cols-4">
-      {items.map((i) => (
-        <div key={i.l} className="bg-white px-3 py-4 text-center sm:px-6 sm:py-8">
-          <p className="font-display text-2xl font-extrabold tracking-tight text-gradient sm:text-5xl">{i.v}</p>
-          <p className="mt-1 text-xs font-medium text-muted sm:mt-2 sm:text-sm">{i.l}</p>
-        </div>
-      ))}
+    <Reveal>
+      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line sm:rounded-3xl md:grid-cols-4">
+        {items.map((i) => (
+          <div key={i.l} className="bg-white px-3 py-4 text-center sm:px-6 sm:py-8">
+            <p className="font-display text-2xl font-extrabold tracking-tight text-gradient sm:text-5xl">{i.v}</p>
+            <p className="mt-1 text-xs font-medium text-muted sm:mt-2 sm:text-sm">{i.l}</p>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-center text-xs text-muted">Live figures from findMe, updated every few minutes. We&apos;re new, and we show the real numbers.</p>
+    </Reveal>
+  );
+}
+
+function WhyCard({ who, points }: { who: string; points: { icon: typeof Lock; title: string; body: string }[] }) {
+  return (
+    <Reveal className="card p-5 sm:p-8">
+      <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-600">{who}</p>
+      <ul className="mt-4 space-y-5">
+        {points.map(({ icon: Icon, title, body }) => (
+          <li key={title} className="flex gap-3.5">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600"><Icon className="size-5" /></span>
+            <div>
+              <p className="font-bold">{title}</p>
+              <p className="mt-0.5 text-sm leading-relaxed text-ink-soft sm:text-[15px]">{body}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </Reveal>
+  );
+}
+
+function PlanCard({ name, price, per, note, points, cta, highlight }: { name: string; price: string; per?: string; note: string; points: string[]; cta: ReactNode; highlight?: boolean }) {
+  return (
+    <Reveal className={cn("card flex flex-col p-5 sm:p-8", highlight && "border-brand-300 ring-2 ring-brand-200")}>
+      <p className="font-bold">{name}</p>
+      <p className="mt-0.5 text-xs font-semibold text-muted">{note}</p>
+      <p className="mt-4 font-display text-4xl font-extrabold tracking-tight">
+        {price}
+        {per && <span className="text-base font-semibold text-muted">{per}</span>}
+      </p>
+      <ul className="mt-5 flex-1 space-y-2.5">
+        {points.map((pt) => (
+          <li key={pt} className="flex gap-2 text-sm text-ink-soft sm:text-[15px]">
+            <Check className="mt-0.5 size-4 shrink-0 text-emerald-500" /> {pt}
+          </li>
+        ))}
+      </ul>
+      <div className="mt-6">{cta}</div>
     </Reveal>
   );
 }

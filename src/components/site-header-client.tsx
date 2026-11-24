@@ -12,6 +12,7 @@ const LINKS = [
   { href: "/search", label: "Find talent" },
   { href: "/#categories", label: "Categories" },
   { href: "/#how", label: "How it works" },
+  { href: "/#pricing", label: "Pricing" },
   { href: OFFER_SKILLS_HREF, label: "Offer your skills" },
 ];
 

@@ -21,12 +21,15 @@ export function SiteFooter() {
             { href: "/search", label: "Find talent" },
             { href: "/register", label: "Create an account" },
             { href: "/#how", label: "How it works" },
+            { href: "/#why-findme", label: "Why findMe" },
+            { href: "/#team", label: "About us" },
           ]}
         />
         <FooterCol
           title="For professionals"
           links={[
             { href: OFFER_SKILLS_HREF, label: "Offer your skills" },
+            { href: "/#pricing", label: "Pricing" },
             { href: "/dashboard/services", label: "Manage services" },
             { href: "/dashboard/requests", label: "Your requests" },
           ]}
