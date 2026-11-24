@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { requireUser } from "@/lib/auth";
+import { getMode } from "@/lib/mode";
 import { getMyRequests, getNow } from "@/lib/queries";
 import { FadeIn } from "@/components/motion";
 import { RequestList } from "./request-list";
@@ -23,6 +24,6 @@ export default function RequestsPage() {
 
 async function Content() {
   const user = await requireUser();
-  const requests = await getMyRequests(user.id);
-  return <RequestList requests={requests} isPro={user.role === "provider"} now={await getNow()} />;
+  const [requests, mode, now] = await Promise.all([getMyRequests(user.id), getMode(user), getNow()]);
+  return <RequestList requests={requests} isPro={mode === "work"} now={now} />;
 }

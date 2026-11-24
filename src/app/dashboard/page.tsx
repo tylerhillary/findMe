@@ -23,6 +23,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { requireUser } from "@/lib/auth";
+import { getMode } from "@/lib/mode";
 import { CATEGORIES } from "@/lib/categories";
 import { getNow, getMyProfile, getMyRequests, getMyServices, type MyService, type RequestSummary } from "@/lib/queries";
 import { Avatar, StatusPill, btn, cn, formatMoney, timeAgo } from "@/components/ui";
@@ -55,7 +56,8 @@ async function Overview({ searchParams }: { searchParams: Promise<Record<string,
     searchParams,
     getNow(),
   ]);
-  const isPro = user.role === "provider";
+  // One account does both; the Hiring/Working switch decides which side this page shows.
+  const isPro = (await getMode(user)) === "work";
   const first = user.name.split(" ")[0];
 
   const hour = Number(new Intl.DateTimeFormat("en-NG", { timeZone: TZ, hour: "numeric", hourCycle: "h23" }).format(now));
@@ -200,13 +202,13 @@ async function Overview({ searchParams }: { searchParams: Promise<Record<string,
       <div className="grid items-start gap-5 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_320px] [&>*]:min-w-0">
         <div className="space-y-5 sm:space-y-6">
           <FadeIn delay={0.1}>
-            <RecentRequests requests={requests} now={now} isPro={isPro} />
+            <RecentRequests requests={isPro ? incoming : outgoing} now={now} isPro={isPro} />
           </FadeIn>
           <FadeIn delay={0.14}>{isPro ? <ServicesPanel services={services} /> : <ExplorePanel />}</FadeIn>
         </div>
 
         <aside className="space-y-5 sm:space-y-6">
-          <FadeIn delay={0.12}>{isPro ? <ProfilePanel profile={profile} services={services} /> : <BecomeProPanel />}</FadeIn>
+          <FadeIn delay={0.12}>{isPro ? <ProfilePanel profile={profile} services={services} /> : <BecomeProPanel hasProfile={user.role === "provider"} />}</FadeIn>
           <FadeIn delay={0.16}>
             <SafetyPanel />
           </FadeIn>
@@ -474,19 +476,21 @@ function ProfilePanel({ profile, services }: { profile: Profile; services: MySer
   );
 }
 
-function BecomeProPanel() {
+function BecomeProPanel({ hasProfile }: { hasProfile: boolean }) {
   return (
     <section className="card overflow-hidden rounded-2xl p-4 sm:p-5">
       <span className="grid size-10 place-items-center rounded-xl bg-brand-gradient text-white shadow-glow">
         <Briefcase className="size-5" />
       </span>
-      <h2 className="mt-3 text-base font-bold">Good at something?</h2>
+      <h2 className="mt-3 text-base font-bold">{hasProfile ? "Your pro side" : "Good at something?"}</h2>
       <p className="mt-1 text-[13px] leading-relaxed text-ink-soft">
-        Switch on your professional profile, list your services and start getting paid for your skills.
+        {hasProfile
+          ? "Jobs you've received, your services and earnings are on the Working side — same account."
+          : "Offer your skills from this same account — no second sign-up. Set up your pro profile and start getting requests."}
       </p>
-      <Link href="/dashboard/profile" className={btn("primary", "sm", "mt-4 w-full")}>
-        Start offering services <ArrowRight className="size-3.5" />
-      </Link>
+      <a href="/mode?to=work" className={btn("primary", "sm", "mt-4 w-full")}>
+        {hasProfile ? "Switch to Working" : "Start offering services"} <ArrowRight className="size-3.5" />
+      </a>
     </section>
   );
 }

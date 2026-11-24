@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { OFFER_SKILLS_HREF, SmartLink } from "./smart-link";
 import { CATEGORIES } from "@/lib/categories";
 import { Logo } from "./ui";
 
@@ -25,7 +26,7 @@ export function SiteFooter() {
         <FooterCol
           title="For professionals"
           links={[
-            { href: "/register?role=provider", label: "Offer your skills" },
+            { href: OFFER_SKILLS_HREF, label: "Offer your skills" },
             { href: "/dashboard/services", label: "Manage services" },
             { href: "/dashboard/requests", label: "Your requests" },
           ]}
@@ -53,9 +54,9 @@ function FooterCol({ title, links }: { title: string; links: { href: string; lab
       <ul className="mt-3 space-y-2 sm:mt-4 sm:space-y-2.5">
         {links.map((l) => (
           <li key={l.href}>
-            <Link href={l.href} className="text-[13px] text-muted transition-colors hover:text-brand-700 sm:text-sm">
+            <SmartLink href={l.href} className="text-[13px] text-muted transition-colors hover:text-brand-700 sm:text-sm">
               {l.label}
-            </Link>
+            </SmartLink>
           </li>
         ))}
       </ul>

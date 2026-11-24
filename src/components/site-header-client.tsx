@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { OFFER_SKILLS_HREF, SmartLink } from "./smart-link";
 import { AnimatePresence, motion } from "motion/react";
 import { LayoutDashboard, LogOut, Menu, MessageSquareText, Search, Settings, UserRound, X } from "lucide-react";
 import { SignOutForm } from "@/components/sign-out-form";
@@ -11,7 +12,7 @@ const LINKS = [
   { href: "/search", label: "Find talent" },
   { href: "/#categories", label: "Categories" },
   { href: "/#how", label: "How it works" },
-  { href: "/register?role=provider", label: "Offer your skills" },
+  { href: OFFER_SKILLS_HREF, label: "Offer your skills" },
 ];
 
 export function HeaderShell({ auth, transparent }: { auth: ReactNode; transparent?: boolean }) {
@@ -41,12 +42,12 @@ export function HeaderShell({ auth, transparent }: { auth: ReactNode; transparen
             <ul className="hidden items-center gap-1 lg:flex">
               {LINKS.map((l) => (
                 <li key={l.href}>
-                  <Link
+                  <SmartLink
                     href={l.href}
                     className="relative rounded-full px-3.5 py-2 text-sm font-medium text-ink-soft transition-colors hover:text-brand-700"
                   >
                     {l.label}
-                  </Link>
+                  </SmartLink>
                 </li>
               ))}
             </ul>
@@ -80,9 +81,9 @@ export function HeaderShell({ auth, transparent }: { auth: ReactNode; transparen
             <ul className="space-y-1">
               {LINKS.map((l, i) => (
                 <motion.li key={l.href} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.04 * i }}>
-                  <Link href={l.href} onClick={() => setOpen(false)} className="block rounded-xl px-3 py-2.5 text-[15px] font-semibold text-ink hover:bg-brand-50">
+                  <SmartLink href={l.href} onClick={() => setOpen(false)} className="block rounded-xl px-3 py-2.5 text-[15px] font-semibold text-ink hover:bg-brand-50">
                     {l.label}
-                  </Link>
+                  </SmartLink>
                 </motion.li>
               ))}
             </ul>

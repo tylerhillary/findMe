@@ -5,6 +5,8 @@ import { Avatar, Logo } from "@/components/ui";
 import { VerifiedAccountBadge } from "@/components/verify-phone";
 import { getEmailStatus, requireUser } from "@/lib/auth";
 import { getActionCounts, getUnreadCount } from "@/lib/queries";
+import { getMode } from "@/lib/mode";
+import { ModeSwitch } from "./mode-switch";
 import { SignOutForm } from "@/components/sign-out-form";
 import { DashNav, MobileTabs } from "./dash-nav";
 import { NotificationBell } from "./notification-bell";
@@ -20,7 +22,12 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
             <Bell align="left" />
           </Suspense>
         </div>
-        <div className="mt-10 flex-1">
+        <div className="mt-8">
+          <Suspense fallback={<div className="skeleton h-11" />}>
+            <Switch />
+          </Suspense>
+        </div>
+        <div className="mt-6 flex-1">
           <Suspense fallback={<div className="skeleton h-64" />}>
             <SideNav />
           </Suspense>
@@ -39,6 +46,11 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
         </header>
         <main className="flex-1 px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 lg:px-10 lg:pb-12 lg:pt-10">
           <div className="mx-auto max-w-6xl">
+            <div className="mb-4 lg:hidden">
+              <Suspense fallback={<div className="skeleton h-11" />}>
+                <Switch />
+              </Suspense>
+            </div>
             <Suspense fallback={null}>
               <EmailBanner />
             </Suspense>
@@ -70,12 +82,21 @@ async function EmailBanner() {
   return status.verified || !status.email ? null : <VerifyEmailBanner email={status.email} />;
 }
 
+async function Switch() {
+  const user = await requireUser();
+  return <ModeSwitch mode={await getMode(user)} isPro={user.role === "provider"} />;
+}
+
 async function SideNav() {
-  return <DashNav badge={await attentionCount()} />;
+  const user = await requireUser();
+  const [badge, mode] = await Promise.all([attentionCount(), getMode(user)]);
+  return <DashNav badge={badge} mode={mode} />;
 }
 
 async function BottomTabs() {
-  return <MobileTabs badge={await attentionCount()} />;
+  const user = await requireUser();
+  const [badge, mode] = await Promise.all([attentionCount(), getMode(user)]);
+  return <MobileTabs badge={badge} mode={mode} />;
 }
 
 async function SidebarUser() {
@@ -90,7 +111,7 @@ async function SidebarUser() {
             <span className="truncate">{user.name}</span>
             {verified && <VerifiedAccountBadge compact />}
           </p>
-          <p className="truncate text-xs text-muted">{user.role === "provider" ? "Professional" : "Client"}</p>
+          <p className="truncate text-xs text-muted">{user.role === "provider" ? "Hires & offers skills" : "Hiring"}</p>
         </div>
         <Link href="/dashboard/settings" className="grid size-9 place-items-center rounded-lg text-muted transition hover:bg-white hover:text-ink" aria-label="Account settings" title="Account settings">
           <Settings className="size-4" />

@@ -27,12 +27,12 @@ async function resizeImage(file: File, size = 320): Promise<string> {
   return canvas.toDataURL("image/jpeg", 0.85);
 }
 
-export function ProfileForm({ profile }: { profile: Profile }) {
+export function ProfileForm({ profile, startListed }: { profile: Profile; startListed?: boolean }) {
   const [state, action, pending] = useActionState<FormState, FormData>(updateProfileAction, {});
   const [avatar, setAvatar] = useState<string | null>(profile.avatar);
   const [newAvatar, setNewAvatar] = useState("");
   const [removed, setRemoved] = useState(false);
-  const [listed, setListed] = useState(profile.role === "provider");
+  const [listed, setListed] = useState(startListed || profile.role === "provider");
   const [available, setAvailable] = useState(profile.available);
   const [whatsapp, setWhatsapp] = useState(profile.whatsapp);
   const [showPhone, setShowPhone] = useState(profile.show_phone);

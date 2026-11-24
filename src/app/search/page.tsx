@@ -131,7 +131,7 @@ async function SearchBody({ searchParams }: { searchParams: Promise<Raw> }) {
                   </p>
                   <div className="mt-5 flex flex-col items-center justify-center gap-2.5 sm:flex-row">
                     {filtered ? <ClearFiltersButton /> : <Link href="/search" className={btn("primary")}>Browse all pros</Link>}
-                    <Link href="/register?role=provider" className={btn("outline")}>Offer this skill</Link>
+                    <a href="/mode?to=work" className={btn("outline")}>Offer this skill</a>
                   </div>
                   {!filtered && (
                     <div className="mx-auto mt-6 flex max-w-md flex-wrap justify-center gap-1.5">
@@ -165,9 +165,9 @@ async function SearchBody({ searchParams }: { searchParams: Promise<Raw> }) {
                     <p className="text-sm text-ink-soft">List your skills on findMe and get requests from clients near you.</p>
                   </div>
                 </div>
-                <Link href="/register?role=provider" className={btn("dark", "md", "group w-full sm:w-auto")}>
+                <a href="/mode?to=work" className={btn("dark", "md", "group w-full sm:w-auto")}>
                   Offer your skills <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
-                </Link>
+                </a>
               </div>
             )}
           </div>

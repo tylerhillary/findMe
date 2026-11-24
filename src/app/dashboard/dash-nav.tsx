@@ -6,13 +6,16 @@ import { motion } from "motion/react";
 import { Briefcase, LayoutDashboard, MessageSquareText, Search, UserRound } from "lucide-react";
 import { cn } from "@/components/ui";
 
+type Mode = "hire" | "work";
+
 const ITEMS = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/requests", label: "Requests", icon: MessageSquareText },
-  { href: "/dashboard/services", label: "My services", icon: Briefcase },
+  { href: "/dashboard/services", label: "My services", icon: Briefcase, workOnly: true },
   { href: "/dashboard/profile", label: "Profile & skills", icon: UserRound },
   { href: "/search", label: "Find talent", icon: Search },
 ];
+const itemsFor = (mode: Mode) => ITEMS.filter((i) => !i.workOnly || mode === "work");
 
 const isActive = (pathname: string, href: string) => (href === "/dashboard" ? pathname === href : pathname.startsWith(href));
 
@@ -25,11 +28,11 @@ function Badge({ n, className }: { n: number; className?: string }) {
   );
 }
 
-export function DashNav({ badge = 0 }: { badge?: number }) {
+export function DashNav({ badge = 0, mode = "hire" }: { badge?: number; mode?: Mode }) {
   const pathname = usePathname();
   return (
     <nav className="space-y-1">
-      {ITEMS.map(({ href, label, icon: Icon }) => {
+      {itemsFor(mode).map(({ href, label, icon: Icon }) => {
         const active = isActive(pathname, href);
         return (
           <Link
@@ -48,11 +51,11 @@ export function DashNav({ badge = 0 }: { badge?: number }) {
   );
 }
 
-export function MobileTabs({ badge = 0 }: { badge?: number }) {
+export function MobileTabs({ badge = 0, mode = "hire" }: { badge?: number; mode?: Mode }) {
   const pathname = usePathname();
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t border-line bg-white/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden">
-      {ITEMS.map(({ href, label, icon: Icon }) => {
+      {itemsFor(mode).map(({ href, label, icon: Icon }) => {
         const active = isActive(pathname, href);
         return (
           <Link key={href} href={href} aria-current={active ? "page" : undefined} className={cn("relative flex flex-1 flex-col items-center gap-0.5 pb-2 pt-2 text-[10.5px] font-semibold transition-colors", active ? "text-brand-700" : "text-muted")}>

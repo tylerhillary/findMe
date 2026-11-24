@@ -1,5 +1,6 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { refresh, updateTag } from "next/cache";
 import { FieldValue } from "firebase-admin/firestore";
@@ -10,6 +11,7 @@ import { FINDME_WHATSAPP, VERIFY_TTL_MS, approveVerification, isAdmin, newCode, 
 import { isCategory, SKILL_LEVELS, type RequestStatus } from "@/lib/categories";
 import { normalizeNgPhone } from "@/lib/phone";
 import { CATALOG_TAG } from "@/lib/queries";
+import { MODE_COOKIE, MODE_COOKIE_OPTIONS } from "@/lib/mode";
 import type { BlockDoc, MessageDoc, NotificationDoc, PhoneVerificationDoc, ReportDoc, RequestDoc, ReviewDoc, ServiceDoc, Skill, SupportDoc, UserDoc } from "@/lib/schema";
 import { AUTO_HIDE_AFTER, REPORT_REASONS } from "@/lib/safety";
 
@@ -209,6 +211,11 @@ export async function updateProfileAction(_: FormState, fd: FormData): Promise<F
   await users().doc(user.id).update(update);
   await adminAuth().updateUser(user.id, { displayName: name }).catch(() => {});
   updateTag(CATALOG_TAG);
+  if (role === "provider" && before?.role !== "provider") {
+    // Just turned on their pro side (same account): show the Working dashboard.
+    (await cookies()).set(MODE_COOKIE, "work", MODE_COOKIE_OPTIONS);
+    redirect("/dashboard?welcome=1");
+  }
   refresh();
   return { ok: true, message: "Profile saved" };
 }
@@ -275,6 +282,7 @@ export async function saveServiceAction(_: FormState, fd: FormData): Promise<For
     // Publishing a service lists you as a provider.
     const me = (await users().doc(user.id).get()).data() as UserDoc;
     await users().doc(user.id).update({ role: "provider", category: me.category || category });
+    if (me.role !== "provider") (await cookies()).set(MODE_COOKIE, "work", MODE_COOKIE_OPTIONS);
   }
   await refreshStartingPrice(user.id);
   updateTag(CATALOG_TAG);

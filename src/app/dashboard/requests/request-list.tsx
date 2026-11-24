@@ -10,7 +10,7 @@ import { Avatar, StatusPill, btn, cn, formatMoney, timeAgo } from "@/components/
 type Tab = "all" | "incoming" | "outgoing";
 
 export function RequestList({ requests, isPro, now }: { requests: RequestSummary[]; isPro: boolean; now: number }) {
-  const [tab, setTab] = useState<Tab>(isPro ? "incoming" : "all");
+  const [tab, setTab] = useState<Tab>(isPro ? "incoming" : "outgoing");
   const [status, setStatus] = useState<"open" | "closed" | "any">("any");
 
   const tabs: { v: Tab; l: string; n: number }[] = [

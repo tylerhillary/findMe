@@ -167,9 +167,9 @@ export default function Home() {
                 Create your free profile, list your skills and services, and start receiving requests from people who need you.
               </p>
               <div className="mt-7 flex flex-col justify-center gap-2.5 sm:mt-9 sm:flex-row sm:gap-3">
-                <Link href="/register?role=provider" className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-white px-7 text-[15px] font-semibold text-brand-700 sm:h-13 sm:text-base transition hover:-translate-y-0.5 hover:shadow-xl">
+                <a href="/mode?to=work" className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-white px-7 text-[15px] font-semibold text-brand-700 sm:h-13 sm:text-base transition hover:-translate-y-0.5 hover:shadow-xl">
                   Offer your skills <ArrowRight className="size-4.5" />
-                </Link>
+                </a>
                 <Link href="/search" className="inline-flex h-12 items-center justify-center rounded-full border border-white/40 px-7 text-[15px] font-semibold text-white sm:h-13 sm:text-base transition hover:bg-white/10">
                   I want to hire
                 </Link>
