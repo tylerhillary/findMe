@@ -298,9 +298,10 @@ export async function phoneResetAction(idToken: string): Promise<{ code?: string
   }
 }
 
-export async function logoutAction() {
+/** Signs out. With `next`, goes to sign-in and then on to that page (e.g. "switch account"). */
+export async function logoutAction(next?: string) {
   await destroySession();
-  redirect("/");
+  redirect(next ? `/login?next=${encodeURIComponent(safeNext(next))}` : "/");
 }
 
 // ---------------- Profile ----------------

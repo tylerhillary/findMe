@@ -8,7 +8,10 @@ export function proxy(request: NextRequest) {
     url.searchParams.set("next", request.nextUrl.pathname + request.nextUrl.search);
     return NextResponse.redirect(url);
   }
-  return NextResponse.next();
+  // Tell the page where the visitor was headed, so an expired session can send them back here.
+  const headers = new Headers(request.headers);
+  headers.set("x-findme-path", request.nextUrl.pathname + request.nextUrl.search);
+  return NextResponse.next({ request: { headers } });
 }
 
 export const config = {

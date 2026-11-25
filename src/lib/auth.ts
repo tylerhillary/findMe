@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { adminAuth, db } from "./firebase-admin";
@@ -105,8 +105,12 @@ export const getEmailStatus = cache(async (uid: string) => {
   }
 });
 
-export async function requireUser(next = "/dashboard"): Promise<SessionUser> {
+export async function requireUser(next?: string): Promise<SessionUser> {
   const user = await getCurrentUser();
-  if (!user) redirect(`/login?next=${encodeURIComponent(next)}`);
+  if (!user) {
+    // Default: the page they were opening (set by proxy.ts), e.g. a conversation linked from an email.
+    const path = next ?? (await headers()).get("x-findme-path") ?? "/dashboard";
+    redirect(`/login?next=${encodeURIComponent(path.startsWith("/") && !path.startsWith("//") ? path : "/dashboard")}`);
+  }
   return user;
 }

@@ -2,12 +2,14 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Banknote, Briefcase, CalendarDays, Phone, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Banknote, UserRoundX, Briefcase, CalendarDays, Phone, ShieldCheck } from "lucide-react";
 import { requireUser } from "@/lib/auth";
+import { db } from "@/lib/firebase-admin";
+import { SignOutForm } from "@/components/sign-out-form";
 import { getBlockState, getRequestThread, hasReported } from "@/lib/queries";
 import { markNotificationsRead } from "@/lib/notify";
 import { BlockButton, ReportButton } from "@/components/report-dialog";
-import { Avatar, StatusPill, formatMoney } from "@/components/ui";
+import { Avatar, StatusPill, btn, formatMoney } from "@/components/ui";
 import { VerifiedAccountBadge } from "@/components/verify-phone";
 import { ContactButtons } from "@/components/contact-card";
 import { FadeIn } from "@/components/motion";
@@ -24,10 +26,15 @@ export default function ThreadPage({ params, searchParams }: PageProps<"/dashboa
 }
 
 async function Thread({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const user = await requireUser();
   const [{ id }, sp] = await Promise.all([params, searchParams]);
+  // Email buttons link straight here: after signing in, come back to this conversation.
+  const user = await requireUser(`/dashboard/requests/${id}`);
   const t = await getRequestThread(id, user.id);
-  if (!t) notFound();
+  if (!t) {
+    // Opened from an email meant for another account (e.g. someone with two accounts on one phone).
+    if (!(await requestExists(id))) notFound();
+    return <OtherAccount id={id} email={user.email} />;
+  }
 
   const other = t.isProvider
     ? { id: t.client_id, name: t.client_name, avatar: t.client_avatar, role: "Client", verified: t.client_email_verified }
@@ -152,5 +159,31 @@ async function Thread({ params, searchParams }: { params: Promise<{ id: string }
         </div>
       </div>
     </div>
+  );
+}
+
+async function requestExists(id: string) {
+  return id.length <= 128 && !id.includes("/") && (await db().collection("requests").doc(id).get()).exists;
+}
+
+function OtherAccount({ id, email }: { id: string; email: string }) {
+  return (
+    <FadeIn className="card mx-auto max-w-lg p-6 text-center sm:p-8">
+      <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-amber-50 text-amber-600">
+        <UserRoundX className="size-7" />
+      </span>
+      <h1 className="mt-5 font-display text-2xl font-extrabold tracking-tight">This conversation is on another account</h1>
+      <p className="mt-2 text-[15px] text-ink-soft">
+        You&apos;re signed in as <span className="font-semibold text-ink">{email}</span>. Sign in with the account the email was sent to, and we&apos;ll bring you straight back here.
+      </p>
+      <div className="mt-6 flex flex-col items-center gap-3">
+        <SignOutForm next={`/dashboard/requests/${id}`}>
+          <button className={btn("primary", "lg")}>Switch account</button>
+        </SignOutForm>
+        <Link href="/dashboard" className="text-sm font-semibold text-muted hover:text-brand-700">
+          Stay on this account
+        </Link>
+      </div>
+    </FadeIn>
   );
 }
