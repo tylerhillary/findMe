@@ -9,7 +9,7 @@ import { btn } from "@/components/ui";
  * Shows search results a page at a time, with a "See more" button, so a long list never floods
  * the screen. Give it a `key` that changes with the search, so a new search starts at page one.
  */
-export function ShowMore({ items, pageSize = 9, className }: { items: ReactNode[]; pageSize?: number; className?: string }) {
+export function ShowMore({ items, pageSize = 3, className }: { items: ReactNode[]; pageSize?: number; className?: string }) {
   const [shown, setShown] = useState(pageSize);
   const left = items.length - shown;
 
