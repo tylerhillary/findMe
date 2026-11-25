@@ -2,7 +2,7 @@
 
 import { useActionState, useRef, useState, useTransition } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Camera, CheckCircle2, Loader2, Phone, PhoneIncoming, Plus, Save, Trash2, X } from "lucide-react";
+import { Camera, CheckCircle2, ImagePlus, Loader2, Phone, PhoneIncoming, Plus, Save, Trash2, X } from "lucide-react";
 import { PhoneInput } from "@/components/phone-input";
 import { RateUnitPicker } from "@/components/rate-unit-picker";
 import type { RateUnit } from "@/lib/price";
@@ -15,8 +15,27 @@ import { Toast } from "@/components/toast";
 type Profile = {
   name: string; business_name: string; email: string; role: string; headline: string; bio: string; location: string;
   category: string; hourly_rate: number; rate_unit: RateUnit; available: boolean; avatar: string | null;
-  phone: string; whatsapp: boolean; show_phone: boolean; phone_verified: boolean;
+  phone: string; whatsapp: boolean; show_phone: boolean; phone_verified: boolean; cover: string | null;
 };
+
+/** Crops a picture to a wide 3:1 banner and shrinks it so it stays small to store and load. */
+async function resizeCover(file: File, width = 1500, height = 500): Promise<string> {
+  const img = await createImageBitmap(file);
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d")!;
+  const scale = Math.max(width / img.width, height / img.height);
+  const w = width / scale;
+  const h = height / scale;
+  ctx.drawImage(img, (img.width - w) / 2, (img.height - h) / 2, w, h, 0, 0, width, height);
+  // Step the quality down until it fits comfortably under the server's limit.
+  for (const q of [0.82, 0.72, 0.6, 0.5]) {
+    const url = canvas.toDataURL("image/jpeg", q);
+    if (url.length < 600_000) return url;
+  }
+  return canvas.toDataURL("image/jpeg", 0.4);
+}
 
 async function resizeImage(file: File, size = 320): Promise<string> {
   const img = await createImageBitmap(file);
@@ -40,6 +59,20 @@ export function ProfileForm({ profile, startListed }: { profile: Profile; startL
   const [name, setName] = useState(profile.name);
   const [bio, setBio] = useState(profile.bio);
   const fileRef = useRef<HTMLInputElement>(null);
+  const coverRef = useRef<HTMLInputElement>(null);
+  const [cover, setCover] = useState<string | null>(profile.cover);
+  const [newCover, setNewCover] = useState("");
+  const [coverRemoved, setCoverRemoved] = useState(false);
+
+  async function onCover(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    const url = await resizeCover(f);
+    setCover(url);
+    setNewCover(url);
+    setCoverRemoved(false);
+  }
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -55,9 +88,27 @@ export function ProfileForm({ profile, startListed }: { profile: Profile; startL
       <Toast message={state.message} trigger={state} />
       <input type="hidden" name="avatar" value={newAvatar} />
       <input type="hidden" name="removeAvatar" value={removed ? "1" : ""} />
+      <input type="hidden" name="cover" value={newCover} />
+      <input type="hidden" name="removeCover" value={coverRemoved ? "1" : ""} />
 
-      <div className="relative h-20 bg-brand-gradient sm:h-28">
-        <div className="grid-bg absolute inset-0 opacity-40" />
+      <div className="relative h-28 overflow-hidden bg-brand-gradient sm:h-44">
+        {cover ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={cover} alt="" className="absolute inset-0 size-full object-cover" />
+        ) : (
+          <div className="grid-bg absolute inset-0 opacity-40" />
+        )}
+        <div className="absolute right-3 top-3 flex gap-2">
+          <button type="button" onClick={() => coverRef.current?.click()} className="inline-flex items-center gap-1.5 rounded-full bg-ink/55 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur transition hover:bg-ink/70 sm:text-sm">
+            <ImagePlus className="size-4" /> {cover ? "Change cover" : "Add cover photo or logo"}
+          </button>
+          {cover && (
+            <button type="button" onClick={() => { setCover(null); setNewCover(""); setCoverRemoved(true); }} className="grid size-8 place-items-center rounded-full bg-ink/55 text-white backdrop-blur hover:bg-ink/70" aria-label="Remove cover">
+              <Trash2 className="size-4" />
+            </button>
+          )}
+        </div>
+        <input ref={coverRef} type="file" accept="image/*" className="hidden" onChange={onCover} />
       </div>
       <div className="px-4 pb-5 sm:px-8 sm:pb-8">
         <div className="-mt-10 flex flex-wrap items-end gap-3 sm:-mt-12 sm:gap-4">

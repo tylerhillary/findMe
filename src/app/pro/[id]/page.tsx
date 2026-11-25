@@ -49,8 +49,19 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
     <>
       {/* cover */}
       <div className="relative h-28 overflow-hidden bg-brand-gradient sm:h-56">
-        <div className="grid-bg absolute inset-0 opacity-40" />
-        <div className="absolute -bottom-24 left-1/3 size-80 rounded-full bg-white/20 blur-3xl" />
+        {p.cover ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={p.cover} alt={`${publicName(p)} cover`} className="absolute inset-0 size-full object-cover" />
+            {/* Keeps "Back to search" readable on any photo. */}
+            <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/35 to-transparent" />
+          </>
+        ) : (
+          <>
+            <div className="grid-bg absolute inset-0 opacity-40" />
+            <div className="absolute -bottom-24 left-1/3 size-80 rounded-full bg-white/20 blur-3xl" />
+          </>
+        )}
         <div className="relative mx-auto max-w-7xl px-4 pt-3 sm:px-6 sm:pt-6 lg:px-8">
           <Link href="/search" className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur transition hover:bg-white/25 sm:px-3 sm:py-1.5 sm:text-sm">
             <ArrowLeft className="size-3.5 sm:size-4" /> Back to search

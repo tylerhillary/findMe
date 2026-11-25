@@ -270,6 +270,8 @@ export type ProviderProfile = ProviderCard & {
   skillList: { id: string; name: string; level: string }[];
   services: { id: string; title: string; description: string; category: string; price: number; priceUnit: string; deliveryDays: number }[];
   reviews: { id: string; rating: number; comment: string; createdAt: number; clientName: string; clientAvatar: string | null }[];
+  /** Cover image (data URL) shown across the top of the profile, if they added one. */
+  cover: string | null;
   /** Raw contact details — the page decides what is safe to reveal. */
   contact: { phone: string; whatsapp: boolean; showPhone: boolean };
   /** Reported by several people and under review. */
@@ -282,9 +284,10 @@ export async function getProviderProfile(id: string): Promise<ProviderProfile | 
   const u = snap.data() as UserDoc | undefined;
   if (!u || u.role !== "provider") return null;
 
-  const [servicesSnap, reviewsSnap] = await Promise.all([
+  const [servicesSnap, reviewsSnap, coverSnap] = await Promise.all([
     db().collection("services").where("userId", "==", id).get(),
     db().collection("reviews").where("providerId", "==", id).get(),
+    db().collection("covers").doc(id).get(),
   ]);
   const reviewDocs = reviewsSnap.docs.map((d) => ({ id: d.id, ...(d.data() as ReviewDoc) })).sort((a, b) => b.createdAt - a.createdAt);
   const clients = await getUsersById(reviewDocs.map((r) => r.clientId));
@@ -292,6 +295,7 @@ export async function getProviderProfile(id: string): Promise<ProviderProfile | 
   return {
     ...cardFrom(id, u),
     bio: u.bio ?? "",
+    cover: (coverSnap.get("image") as string | undefined) ?? null,
     flagged: !!u.flagged,
     memberSince: u.createdAt,
     skillList: u.skills ?? [],
@@ -325,9 +329,11 @@ async function getUsersById(ids: string[]) {
 
 export async function getMyProfile(userId: string) {
   await connection();
-  const u = (await db().collection("users").doc(userId).get()).data() as UserDoc;
+  const [snap, coverSnap] = await Promise.all([db().collection("users").doc(userId).get(), db().collection("covers").doc(userId).get()]);
+  const u = snap.data() as UserDoc;
   return {
     id: userId,
+    cover: (coverSnap.get("image") as string | undefined) ?? null,
     name: u.name,
     business_name: u.businessName ?? "",
     email: u.email,

@@ -144,3 +144,9 @@ export type IdentityDoc = {
   attempts?: number;
   lastTriedAt?: number;
 };
+
+/**
+ * covers/{uid}: a pro's cover image (wide banner photo or logo) as a JPEG data URL. Kept out of
+ * users/{uid} so search and lists never load it; only the profile pages read it.
+ */
+export type CoverDoc = { image: string; updatedAt: number };

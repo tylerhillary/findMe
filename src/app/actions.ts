@@ -18,7 +18,7 @@ import { publicName } from "@/lib/names";
 import { emailAdminsNumberToVerify, isAdmin } from "@/lib/admin";
 import { asRateUnit } from "@/lib/price";
 import { createHash } from "node:crypto";
-import type { BlockDoc, MessageDoc, NotificationDoc, ReportDoc, RequestDoc, ReviewDoc, ServiceDoc, Skill, SupportDoc, UserDoc } from "@/lib/schema";
+import type { BlockDoc, CoverDoc, MessageDoc, NotificationDoc, ReportDoc, RequestDoc, ReviewDoc, ServiceDoc, Skill, SupportDoc, UserDoc } from "@/lib/schema";
 import { AUTO_HIDE_AFTER, REPORT_REASONS } from "@/lib/safety";
 
 const PHONE_ERROR = "Enter a valid Nigerian number, e.g. 0803 123 4567.";
@@ -288,6 +288,13 @@ export async function updateProfileAction(_: FormState, fd: FormData): Promise<F
   };
   if (avatar) update.avatar = avatar;
   if (fd.get("removeAvatar") === "1") update.avatar = null;
+  const cover = String(fd.get("cover") ?? "");
+  if (cover && (!cover.startsWith("data:image/") || cover.length > 700_000)) {
+    return { error: "That cover image is too large. Try a smaller picture." };
+  }
+  const coverRef = db().collection("covers").doc(user.id);
+  if (cover) await coverRef.set({ image: cover, updatedAt: Date.now() } satisfies CoverDoc);
+  else if (fd.get("removeCover") === "1") await coverRef.delete();
   const before = (await users().doc(user.id).get()).data() as UserDoc | undefined;
   // A new number needs a new verification call before it shows as verified again.
   update.phoneConfirmed = !!phone && before?.verifiedPhone === phone;
@@ -750,6 +757,7 @@ export async function deleteAccountAction(idToken: string): Promise<{ error?: st
     me?.role === "provider" ? del(reviews().where("providerId", "==", uid)) : Promise.resolve(),
   ]);
   writer.delete(users().doc(uid));
+  writer.delete(db().collection("covers").doc(uid));
   await writer.close();
   await deleteNinRecords(uid);
   await adminAuth().deleteUser(uid);
