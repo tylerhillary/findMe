@@ -30,8 +30,8 @@ import { Avatar, StatusPill, btn, cn, formatMoney, timeAgo } from "@/components/
 import { CategoryIcon } from "@/components/category-icon";
 import { FadeIn } from "@/components/motion";
 import { WelcomeBanner } from "./welcome-banner";
-import { ConfirmPhoneCard } from "./confirm-phone-card";
-import { isMobile } from "@/lib/phone";
+import { ExpectCallCard } from "./expect-call-card";
+import { getCallCode, isAdmin } from "@/lib/admin";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -60,6 +60,8 @@ async function Overview({ searchParams }: { searchParams: Promise<Record<string,
   ]);
   // One account does both; the Hiring/Working switch decides which side this page shows.
   const isPro = (await getMode(user)) === "work";
+  const needsCall = !!profile.phone && !profile.phone_verified;
+  const [callCode, admin] = await Promise.all([needsCall ? getCallCode(user.id) : null, isAdmin(user.id, user.email)]);
   const first = user.name.split(" ")[0];
 
   const hour = Number(new Intl.DateTimeFormat("en-NG", { timeZone: TZ, hour: "numeric", hourCycle: "h23" }).format(now));
@@ -100,7 +102,13 @@ async function Overview({ searchParams }: { searchParams: Promise<Record<string,
   return (
     <div className="space-y-5 sm:space-y-6">
       {sp.welcome === "1" && <WelcomeBanner name={first} isPro={isPro} />}
-      {profile.phone && isMobile(profile.phone) && !profile.phone_verified && <ConfirmPhoneCard phone={profile.phone} isPro={isPro} />}
+      {admin && (
+        <Link href="/admin/verifications" className="card flex items-center justify-between gap-3 p-4 text-sm font-semibold hover:border-brand-300 sm:px-6">
+          <span>Admin: phone numbers to verify by call</span>
+          <ArrowRight className="size-4 text-brand-600" />
+        </Link>
+      )}
+      {callCode && <ExpectCallCard phone={profile.phone} code={callCode} isPro={isPro} />}
 
       {/* Page header */}
       <FadeIn className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">

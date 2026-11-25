@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { rateSuffix } from "@/lib/price";
 import { ArrowUpRight, BadgeCheck, MapPin } from "lucide-react";
 import type { ProviderCard as Card } from "@/lib/queries";
 import { categoryName } from "@/lib/categories";
@@ -75,7 +76,7 @@ export function ProviderCard({ p, highlight }: { p: Card; highlight?: string[] }
         <span className="text-sm text-muted">
           {p.hourlyRate > 0 ? (
             <>
-              <span className="text-[15px] font-extrabold text-ink sm:text-base">{formatMoney(p.hourlyRate)}</span>/hr
+              <span className="text-[15px] font-extrabold text-ink sm:text-base">{formatMoney(p.hourlyRate)}</span>{rateSuffix(p.rateUnit)}
             </>
           ) : p.startingPrice ? (
             <>

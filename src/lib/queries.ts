@@ -1,4 +1,5 @@
 import "server-only";
+import { asRateUnit, type RateUnit } from "./price";
 import { cache } from "react";
 import { connection } from "next/server";
 import { cacheLife, cacheTag } from "next/cache";
@@ -21,6 +22,7 @@ export type ProviderCard = {
   location: string;
   category: string;
   hourlyRate: number;
+  rateUnit: RateUnit;
   available: boolean;
   avatar: string | null;
   rating: number;
@@ -28,7 +30,7 @@ export type ProviderCard = {
   jobsDone: number;
   skills: string[];
   startingPrice: number | null;
-  /** Phone number confirmed with an SMS code. */
+  /** Phone number verified by a findMe call. */
   phoneVerified: boolean;
   /** Email address confirmed by link. */
   emailVerified: boolean;
@@ -53,6 +55,7 @@ function cardFrom(id: string, u: UserDoc): ProviderCard {
     location: u.location ?? "",
     category: u.category ?? "",
     hourlyRate: u.hourlyRate ?? 0,
+    rateUnit: asRateUnit(u.rateUnit),
     available: u.available !== false,
     avatar: u.avatar ?? null,
     rating: u.reviewCount ? round1((u.ratingSum ?? 0) / u.reviewCount) : 0,
@@ -68,7 +71,7 @@ function cardFrom(id: string, u: UserDoc): ProviderCard {
 
 // Public fields only — phone numbers and emails never enter the cached catalog.
 const PUBLIC_FIELDS = [
-  "name", "businessName", "headline", "bio", "location", "category", "hourlyRate", "available", "avatar",
+  "name", "businessName", "headline", "bio", "location", "category", "hourlyRate", "rateUnit", "available", "avatar",
   "skills", "ratingSum", "reviewCount", "jobsDone", "startingPrice", "flagged", "phoneConfirmed", "emailVerified", "ninVerified",
 ] as const;
 
@@ -333,12 +336,13 @@ export async function getMyProfile(userId: string) {
     location: u.location ?? "",
     category: u.category ?? "",
     hourly_rate: u.hourlyRate ?? 0,
+    rate_unit: asRateUnit(u.rateUnit),
     available: u.available !== false,
     avatar: u.avatar ?? null,
     phone: u.phone ?? "",
     whatsapp: u.whatsapp !== false,
     show_phone: !!u.showPhone,
-    phone_verified: !!u.phone && u.smsVerifiedPhone === u.phone,
+    phone_verified: !!u.phone && u.verifiedPhone === u.phone,
     skills: u.skills ?? [],
     review_count: u.reviewCount ?? 0,
     rating: u.reviewCount ? round1((u.ratingSum ?? 0) / u.reviewCount) : 0,
@@ -437,8 +441,10 @@ export async function getRequestThread(requestId: string, userId: string) {
     provider_headline: p?.headline ?? "",
     service_title: (serviceSnap?.data() as ServiceDoc | undefined)?.title ?? null,
     client_phone: c?.phone ?? "",
+    client_phone_verified: !!c?.phone && c.verifiedPhone === c.phone,
     client_whatsapp: c?.whatsapp === false ? 0 : 1,
     provider_phone: p?.phone ?? "",
+    provider_phone_verified: !!p?.phone && p.verifiedPhone === p.phone,
     provider_whatsapp: p?.whatsapp === false ? 0 : 1,
     messages: messagesSnap.docs.map((d) => {
       const m = d.data() as { senderId: string; body: string; createdAt: number };

@@ -2,16 +2,13 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { motion } from "motion/react";
 import { sendPasswordResetEmail } from "firebase/auth";
-import { ArrowLeft, Loader2, Mail, MailCheck, MessageSquareText, Smartphone } from "lucide-react";
+import { ArrowLeft, Loader2, MailCheck } from "lucide-react";
 import { clientAuth } from "@/lib/firebase-client";
-import { phoneResetAction, requestPasswordResetAction } from "@/app/actions";
-import { isMobile, normalizeNgPhone } from "@/lib/phone";
-import { PhoneInput } from "@/components/phone-input";
-import { SmsCode } from "@/components/sms-code";
-import { Input, Label, btn, cn } from "@/components/ui";
+import { requestPasswordResetAction } from "@/app/actions";
+import { Input, Label, btn } from "@/components/ui";
 import { FadeIn } from "@/components/motion";
 
 export function ForgotForm() {
@@ -19,7 +16,6 @@ export function ForgotForm() {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const [method, setMethod] = useState<"email" | "phone">("email");
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -73,26 +69,10 @@ export function ForgotForm() {
           <ArrowLeft className="size-4" /> Back to sign in
         </Link>
         <h1 className="mt-6 font-display text-[1.75rem] font-extrabold leading-tight tracking-tight sm:text-4xl">Forgot your password?</h1>
-        <p className="mt-2 text-[15px] text-ink-soft sm:mt-3 sm:text-base">
-          {method === "email" ? "Enter your account email and we'll send a reset link." : "Enter the phone number you confirmed on your profile and we'll text you a code."}
-        </p>
+        <p className="mt-2 text-[15px] text-ink-soft sm:mt-3 sm:text-base">Enter your account email and we&apos;ll send a reset link.</p>
       </FadeIn>
       <FadeIn delay={0.08}>
-        <div role="tablist" aria-label="Reset with" className="mt-7 grid grid-cols-2 gap-1 rounded-full border border-line bg-canvas p-1 sm:mt-10">
-          {([["email", "Email", Mail], ["phone", "Phone", Smartphone]] as const).map(([key, label, Icon]) => (
-            <button
-              key={key}
-              type="button"
-              role="tab"
-              aria-selected={method === key}
-              onClick={() => setMethod(key)}
-              className={cn("flex items-center justify-center gap-2 rounded-full py-2 text-sm font-semibold transition", method === key ? "bg-white text-ink shadow-sm" : "text-muted hover:text-ink")}
-            >
-              <Icon className="size-4" /> {label}
-            </button>
-          ))}
-        </div>
-        {method === "phone" ? <PhoneReset /> : <form onSubmit={onSubmit} className="mt-5 space-y-4 sm:space-y-5">
+        <form onSubmit={onSubmit} className="mt-7 space-y-4 sm:mt-10 sm:space-y-5">
           <div>
             <Label htmlFor="email">Email</Label>
             <Input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
@@ -101,40 +81,8 @@ export function ForgotForm() {
           <button disabled={pending} className={btn("primary", "lg", "w-full")}>
             {pending ? <Loader2 className="size-5 animate-spin" /> : "Send reset link"}
           </button>
-        </form>}
+        </form>
       </FadeIn>
-    </div>
-  );
-}
-
-/** Reset by text message: prove the number with an SMS code, then choose a new password. */
-function PhoneReset() {
-  const router = useRouter();
-  const [raw, setRaw] = useState("");
-  const phone = normalizeNgPhone(raw);
-  const ready = !!phone && isMobile(phone);
-  return (
-    <div className="mt-5 space-y-4 sm:space-y-5">
-      <div>
-        <Label htmlFor="reset-phone">Phone number</Label>
-        <PhoneInput id="reset-phone" autoComplete="tel-national" value={raw} onChange={(e) => setRaw(e.target.value)} />
-        {raw.trim() && !ready && <p className="mt-1.5 text-sm text-muted">Enter a Nigerian mobile number, e.g. 0803 123 4567.</p>}
-      </div>
-      {ready ? (
-        <SmsCode
-          key={phone}
-          phone={phone}
-          onVerified={async (token) => {
-            const res = await phoneResetAction(token).catch(() => ({ error: "Can't reach findMe. Check your connection and try again." }) as { code?: string; error?: string });
-            if (res.error || !res.code) return res.error ?? "Something went wrong. Please try again.";
-            router.push(`/reset-password?oobCode=${encodeURIComponent(res.code)}`);
-          }}
-        />
-      ) : (
-        <button type="button" disabled className={btn("primary", "lg", "w-full")}>
-          <MessageSquareText className="size-5" /> Text me a code
-        </button>
-      )}
     </div>
   );
 }

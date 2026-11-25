@@ -2,18 +2,19 @@
 
 import { useActionState, useRef, useState, useTransition } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Camera, CheckCircle2, Loader2, Phone, Plus, Save, ShieldCheck, Trash2, X } from "lucide-react";
+import { Camera, CheckCircle2, Loader2, Phone, PhoneIncoming, Plus, Save, Trash2, X } from "lucide-react";
 import { PhoneInput } from "@/components/phone-input";
-import { formatNgPhone, isMobile } from "@/lib/phone";
-import { SmsCode } from "@/components/sms-code";
-import { addSkillAction, confirmPhoneAction, removeSkillAction, updateProfileAction, type FormState } from "@/app/actions";
+import { RateUnitPicker } from "@/components/rate-unit-picker";
+import type { RateUnit } from "@/lib/price";
+import { formatNgPhone } from "@/lib/phone";
+import { addSkillAction, removeSkillAction, updateProfileAction, type FormState } from "@/app/actions";
 import { CATEGORIES, SKILL_LEVELS } from "@/lib/categories";
 import { Avatar, FieldError, Input, Label, LocationInput, Select, Textarea, btn, cn } from "@/components/ui";
 import { Toast } from "@/components/toast";
 
 type Profile = {
   name: string; business_name: string; email: string; role: string; headline: string; bio: string; location: string;
-  category: string; hourly_rate: number; available: boolean; avatar: string | null;
+  category: string; hourly_rate: number; rate_unit: RateUnit; available: boolean; avatar: string | null;
   phone: string; whatsapp: boolean; show_phone: boolean; phone_verified: boolean;
 };
 
@@ -126,11 +127,12 @@ export function ProfileForm({ profile, startListed }: { profile: Profile; startL
             <LocationInput id="location" name="location" defaultValue={profile.location} />
           </div>
           <div>
-            <Label htmlFor="rate">Hourly rate (₦)</Label>
+            <Label htmlFor="rate" hint="optional">Your rate (₦)</Label>
             <div className="relative">
               <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-semibold text-muted">₦</span>
               <Input id="rate" name="rate" type="number" min={0} defaultValue={profile.hourly_rate || ""} placeholder="0" className="pl-8" />
             </div>
+            <RateUnitPicker name="rateUnit" defaultValue={profile.rate_unit} />
           </div>
           <div>
             <Label>Availability</Label>
@@ -256,41 +258,16 @@ export function SkillsManager({ skills }: { skills: { id: string; name: string; 
   );
 }
 
-/** Confirm the saved number by SMS, so it can be used to reset the password. */
+/** Whether findMe has verified the saved number by phone call yet. */
 function PhoneConfirm({ phone, verified }: { phone: string; verified: boolean }) {
-  const [open, setOpen] = useState(false);
-  const [done, setDone] = useState(false);
   if (!phone) return null;
-  if (verified || done) {
-    return (
-      <p className="mt-2 flex items-center gap-1.5 text-sm font-medium text-emerald-700">
-        <CheckCircle2 className="size-4" /> Confirmed. You can use it to reset your password.
-      </p>
-    );
-  }
-  if (!isMobile(phone)) {
-    return <p className="mt-2 text-xs text-muted">Add a mobile number to be able to reset your password by text message.</p>;
-  }
-  return (
-    <div className="mt-3 rounded-xl border border-line bg-white p-3 sm:p-4">
-      <p className="flex items-center gap-2 text-sm font-semibold"><ShieldCheck className="size-4 text-brand-600" /> Confirm this number</p>
-      <p className="mt-1 text-xs text-muted">We&apos;ll text a code to {formatNgPhone(phone)}. Once confirmed, you can reset your password with it if you forget it.</p>
-      <div className="mt-3">
-        {open ? (
-          <SmsCode
-            phone={phone}
-            onVerified={async (token) => {
-              const res = await confirmPhoneAction(token).catch(() => ({ error: "Can't reach findMe. Check your connection and try again." }));
-              if (res.error) return res.error;
-              setDone(true);
-            }}
-          />
-        ) : (
-          <button type="button" onClick={() => setOpen(true)} className={btn("secondary", "md")}>
-            Confirm by SMS
-          </button>
-        )}
-      </div>
-    </div>
+  return verified ? (
+    <p className="mt-2 flex items-center gap-1.5 text-sm font-medium text-emerald-700">
+      <CheckCircle2 className="size-4" /> Verified by findMe
+    </p>
+  ) : (
+    <p className="mt-2 flex items-center gap-1.5 text-sm text-muted">
+      <PhoneIncoming className="size-4" /> Not verified yet. Expect a call from findMe to verify it.
+    </p>
   );
 }

@@ -1,4 +1,4 @@
-import { Lock, Phone } from "lucide-react";
+import { CircleAlert, Lock, Phone } from "lucide-react";
 import { formatNgPhone, isMobile, maskNgPhone, telLink, whatsappLink } from "@/lib/phone";
 import { cn } from "./ui";
 
@@ -10,10 +10,19 @@ function WhatsAppIcon({ className }: { className?: string }) {
   );
 }
 
+/** Shown under a number findMe hasn't verified by call yet. Informational only; nothing is blocked. */
+export function UnverifiedNote({ name }: { name: string }) {
+  return (
+    <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-700">
+      <CircleAlert className="mt-px size-3.5 shrink-0" /> findMe hasn&apos;t verified {name}&apos;s number yet. We&apos;ll call to confirm it soon.
+    </p>
+  );
+}
+
 /** Call / WhatsApp buttons for a revealed number. */
 export function ContactButtons({
-  phone, whatsapp, waMessage, compact,
-}: { phone: string; whatsapp: boolean; waMessage?: string; compact?: boolean }) {
+  phone, whatsapp, waMessage, compact, unverifiedName,
+}: { phone: string; whatsapp: boolean; waMessage?: string; compact?: boolean; unverifiedName?: string }) {
   const canWhatsApp = whatsapp && isMobile(phone);
   return (
     <div>
@@ -35,18 +44,20 @@ export function ContactButtons({
           </a>
         )}
       </div>
+      {unverifiedName && <UnverifiedNote name={unverifiedName} />}
     </div>
   );
 }
 
 /** Masked number with an explanation of when it unlocks. */
-export function LockedPhone({ phone, reason }: { phone: string; reason: string }) {
+export function LockedPhone({ phone, reason, unverifiedName }: { phone: string; reason: string; unverifiedName?: string }) {
   return (
     <div>
       <p className="flex items-center gap-2 text-lg font-extrabold tracking-tight text-ink-soft">
         <Lock className="size-4 text-muted" /> {maskNgPhone(phone)}
       </p>
       <p className="mt-1.5 text-sm text-muted">{reason}</p>
+      {unverifiedName && <UnverifiedNote name={unverifiedName} />}
     </div>
   );
 }

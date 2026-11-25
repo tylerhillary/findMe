@@ -246,7 +246,7 @@ async function Panel({ p }: { p: ProviderProfile }) {
   return (
     <>
       <RequestPanel
-        provider={{ id: p.id, name: p.name, hourlyRate: p.hourlyRate, available: p.available, avatar: p.avatar, headline: p.headline }}
+        provider={{ id: p.id, name: p.name, hourlyRate: p.hourlyRate, rateUnit: p.rateUnit, available: p.available, avatar: p.avatar, headline: p.headline }}
         services={p.services.map((s) => ({ id: s.id, title: s.title, price: s.price, priceUnit: s.priceUnit }))}
         viewer={viewer ? { id: viewer.id, hasPhone: !!viewerPhone } : null}
       />
@@ -256,9 +256,9 @@ async function Panel({ p }: { p: ProviderProfile }) {
           <div className="mt-2">
             {/* The full number only reaches the browser when it may be shown. */}
             {showPhone || unlocked ? (
-              <ContactButtons phone={phone} whatsapp={whatsapp} waMessage={`Hi ${first}, I found you on findMe.`} />
+              <ContactButtons phone={phone} whatsapp={whatsapp} waMessage={`Hi ${first}, I found you on findMe.`} unverifiedName={p.phoneVerified ? undefined : first} />
             ) : (
-              <LockedPhone phone={phone} reason={`Shown once ${first} accepts your request.`} />
+              <LockedPhone phone={phone} reason={`Shown once ${first} accepts your request.`} unverifiedName={p.phoneVerified ? undefined : first} />
             )}
           </div>
         </div>

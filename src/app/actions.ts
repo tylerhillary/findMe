@@ -14,6 +14,8 @@ import { MODE_COOKIE, MODE_COOKIE_OPTIONS } from "@/lib/mode";
 import { cleanNin, deleteNinRecords, isNinFormat, verifyNin } from "@/lib/nin";
 import { APP_URL, emailConfigured, emailLayout, sendEmail } from "@/lib/email";
 import { publicName } from "@/lib/names";
+import { isAdmin } from "@/lib/admin";
+import { asRateUnit } from "@/lib/price";
 import { createHash } from "node:crypto";
 import type { BlockDoc, MessageDoc, NotificationDoc, ReportDoc, RequestDoc, ReviewDoc, ServiceDoc, Skill, SupportDoc, UserDoc } from "@/lib/schema";
 import { AUTO_HIDE_AFTER, REPORT_REASONS } from "@/lib/safety";
@@ -159,7 +161,7 @@ export async function registerAction(_: FormState, fd: FormData): Promise<FormSt
       name, email, role, headline, location,
       ...(role === "provider" && businessName ? { businessName } : {}),
       category: isCategory(category) ? category : "",
-      hourlyRate: rate, available: true, avatar: null,
+      hourlyRate: rate, rateUnit: asRateUnit(fd.get("rateUnit")), available: true, avatar: null,
       phone: phone ?? "", whatsapp, showPhone: false,
       skills, ratingSum: 0, reviewCount: 0, jobsDone: 0, startingPrice: null,
       createdAt: Date.now(),
@@ -238,67 +240,6 @@ export async function requestPasswordResetAction(rawEmail: string): Promise<{ ok
   return sent ? { ok: true } : { fallback: true };
 }
 
-/**
- * Checks an ID token from the browser's SMS-code sign-in and returns the phone number it proves.
- * That sign-in creates a throwaway phone-only Firebase user, which is deleted here.
- */
-async function provenPhone(idToken: string): Promise<string | null> {
-  let decoded;
-  try {
-    decoded = await adminAuth().verifyIdToken(String(idToken ?? ""));
-  } catch {
-    return null;
-  }
-  const phone = decoded.phone_number;
-  // Only a fresh SMS sign-in counts (not an old token).
-  if (!phone || Date.now() / 1000 - decoded.auth_time > 600) return null;
-  const temp = await adminAuth().getUser(decoded.uid).catch(() => null);
-  if (temp && !temp.email && temp.providerData.every((p) => p.providerId === "phone")) {
-    await adminAuth().deleteUser(temp.uid).catch(() => {});
-  }
-  return phone;
-}
-
-/** Profile page: marks the saved phone number as confirmed by SMS, so it can be used to reset the password. */
-export async function confirmPhoneAction(idToken: string): Promise<{ ok?: true; error?: string }> {
-  const user = await requireUser();
-  const phone = await provenPhone(idToken);
-  if (!phone) return { error: "We couldn't confirm that code. Please try again." };
-  const me = (await users().doc(user.id).get()).data() as UserDoc | undefined;
-  if (!me?.phone || me.phone !== phone) return { error: "That code was for a different number. Save your number first, then confirm it." };
-  await users().doc(user.id).update({ smsVerifiedPhone: phone, phoneConfirmed: true });
-  updateTag(CATALOG_TAG);
-  refresh();
-  return { ok: true };
-}
-
-/**
- * Forgot password by phone: after an SMS code proves the number, finds the one account that has it
- * confirmed and returns a one-time reset code for the /reset-password page.
- */
-export async function phoneResetAction(idToken: string): Promise<{ code?: string; error?: string }> {
-  const phone = await provenPhone(idToken);
-  if (!phone) return { error: "We couldn't confirm that code. Please try again." };
-  const snap = await users().where("smsVerifiedPhone", "==", phone).limit(3).get();
-  const matches = snap.docs.filter((d) => (d.data() as UserDoc).phone === phone);
-  if (matches.length !== 1) {
-    return {
-      error: matches.length
-        ? "More than one account uses this number. Please reset with your email instead."
-        : "No account has this number confirmed. Please reset with your email instead. (You can confirm your number on your profile page.)",
-    };
-  }
-  const email = (matches[0].data() as UserDoc).email;
-  try {
-    const code = new URL(await adminAuth().generatePasswordResetLink(email)).searchParams.get("oobCode");
-    if (!code) throw new Error("no oobCode in reset link");
-    return { code };
-  } catch (e) {
-    console.error("[findMe] phone reset failed:", e);
-    return { error: "Something went wrong on our side. Please try again." };
-  }
-}
-
 /** Signs out. With `next`, goes to sign-in and then on to that page (e.g. "switch account"). */
 export async function logoutAction(next?: string) {
   await destroySession();
@@ -333,6 +274,7 @@ export async function updateProfileAction(_: FormState, fd: FormData): Promise<F
     location: str(fd, "location", 80),
     category: isCategory(category) ? category : "",
     hourlyRate: int(fd, "rate"),
+    rateUnit: asRateUnit(fd.get("rateUnit")),
     available: fd.get("available") === "on",
     role,
     phone: phone ?? "",
@@ -342,8 +284,8 @@ export async function updateProfileAction(_: FormState, fd: FormData): Promise<F
   if (avatar) update.avatar = avatar;
   if (fd.get("removeAvatar") === "1") update.avatar = null;
   const before = (await users().doc(user.id).get()).data() as UserDoc | undefined;
-  // A new number needs confirming again before it earns the badge (or works for password reset).
-  update.phoneConfirmed = !!phone && before?.smsVerifiedPhone === phone;
+  // A new number needs a new verification call before it shows as verified again.
+  update.phoneConfirmed = !!phone && before?.verifiedPhone === phone;
 
   await users().doc(user.id).update(update);
   await adminAuth().updateUser(user.id, { displayName: name }).catch(() => {});
@@ -528,6 +470,7 @@ export async function sendMessageAction(requestId: string, rawBody: string): Pro
   const r = (await ref.get()).data() as RequestDoc | undefined;
   if (!r || !r.participants.includes(uid)) return { error: "Conversation not found." };
   if (r.status === "declined" || r.status === "cancelled") return { error: "This request is closed." };
+  if (r.status === "completed") return { error: "This job is complete, so the chat is closed. Send a new request to work together again." };
   const otherId = r.clientId === uid ? r.providerId : r.clientId;
   if (await isBlockedBetween(uid, otherId)) return { error: "Messaging is turned off because one of you blocked the other." };
   const now = Date.now();
@@ -620,14 +563,19 @@ export async function updateRequestStatusAction(requestId: string, status: Reque
     if (status === "completed") t.update(users().doc(r.providerId), { jobsDone: FieldValue.increment(1) });
     return r;
   });
-  if (changed && status === "completed") updateTag(CATALOG_TAG);
+  if (changed && status === "completed") {
+    updateTag(CATALOG_TAG);
+    // Job done: delete the chat for both people's privacy. Numbers are hidden again by the page.
+    await db().recursiveDelete(ref.collection("messages")).catch((e) => console.error("[findMe] couldn't clear chat:", e));
+    await ref.update({ messageCount: 0, chatClearedAt: Date.now() }).catch(() => {});
+  }
   if (changed) {
     const first = user.name.split(" ")[0];
     const toClient = changed.providerId === user.id;
     const text: Partial<Record<RequestStatus, { title: string; body: string; cta: string }>> = {
       accepted: { title: `${first} accepted your request`, body: `“${changed.title}” was accepted. You can now call or WhatsApp each other.`, cta: "Open conversation" },
       declined: { title: `${first} can't take your request`, body: `“${changed.title}” was declined. Try another pro on findMe.`, cta: "Find someone else" },
-      completed: { title: `${first} marked your job as done`, body: `How did “${changed.title}” go? Leave a quick rating.`, cta: "Rate the job" },
+      completed: { title: `${first} marked your job as done`, body: `How did “${changed.title}” go? Rate ${first} and leave a short comment to help others hire with confidence.`, cta: "Rate & review" },
       cancelled: { title: `${first} cancelled a request`, body: `“${changed.title}” was cancelled by the client.`, cta: "View request" },
     };
     const t = text[status];
@@ -650,6 +598,7 @@ export async function leaveReviewAction(_: FormState, fd: FormData): Promise<For
   const user = await requireUser();
   const requestId = str(fd, "requestId", 128);
   const rating = Math.min(5, Math.max(1, int(fd, "rating")));
+  if (str(fd, "comment", 1000).length < 10) return { error: "Add a short comment (at least a few words) about how the job went." };
   const reqRef = requests().doc(requestId);
   const reviewRef = reviews().doc(requestId);
 
@@ -814,4 +763,41 @@ export async function contactAction(_: FormState, fd: FormData): Promise<FormSta
   if (Object.keys(fieldErrors).length) return { fieldErrors };
   await db().collection("support").add({ name, email, topic, message, userId: user?.id ?? null, status: "open", createdAt: Date.now() } satisfies SupportDoc);
   return { ok: true, message: "Message sent" };
+}
+
+// ---------------- Admin: phone verification by call ----------------
+
+/**
+ * Admin: after calling the person and hearing the right code, mark their current number verified
+ * (or take it back). Nothing is blocked while unverified; others just see "not verified yet".
+ */
+export async function setPhoneVerifiedAction(userId: string, verified: boolean): Promise<{ ok?: true; error?: string }> {
+  const admin = await requireUser("/admin/verifications");
+  if (!(await isAdmin(admin.id, admin.email))) return { error: "Only admins can do this." };
+  const ref = users().doc(String(userId ?? "").slice(0, 128));
+  const u = (await ref.get()).data() as UserDoc | undefined;
+  if (!u?.phone) return { error: "This person has no phone number on file." };
+  await ref.update(verified ? { verifiedPhone: u.phone, phoneConfirmed: true, lastCallAt: Date.now() } : { verifiedPhone: FieldValue.delete(), phoneConfirmed: false });
+  if (verified) {
+    await notify({
+      userId: ref.id,
+      kind: "status",
+      title: "Your phone number is verified",
+      body: "Thanks for taking our call. Your profile now shows the Phone verified badge.",
+      href: "/dashboard/profile",
+      cta: "See your profile",
+    });
+  }
+  updateTag(CATALOG_TAG);
+  refresh();
+  return { ok: true };
+}
+
+/** Admin: note that a call didn't get through, so the list shows when it was last tried. */
+export async function markCallAttemptAction(userId: string): Promise<{ ok?: true; error?: string }> {
+  const admin = await requireUser("/admin/verifications");
+  if (!(await isAdmin(admin.id, admin.email))) return { error: "Only admins can do this." };
+  await users().doc(String(userId ?? "").slice(0, 128)).update({ lastCallAt: Date.now() });
+  refresh();
+  return { ok: true };
 }

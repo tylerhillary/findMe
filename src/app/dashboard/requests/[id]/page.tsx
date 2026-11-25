@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Banknote, UserRoundX, Briefcase, CalendarDays, Phone, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Banknote, CheckCircle2, UserRoundX, Briefcase, CalendarDays, Phone, ShieldCheck } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/firebase-admin";
 import { SignOutForm } from "@/components/sign-out-form";
@@ -41,9 +41,13 @@ async function Thread({ params, searchParams }: { params: Promise<{ id: string }
     : { id: t.provider_id, name: t.provider_name, avatar: t.provider_avatar, role: t.provider_headline, verified: t.provider_email_verified };
   const me = t.isProvider ? { name: t.provider_name, avatar: t.provider_avatar } : { name: t.client_name, avatar: t.client_avatar };
   const closed = t.status === "declined" || t.status === "cancelled";
-  // Numbers are exchanged only after the pro accepts, and never sent to the browser before that.
-  const unlocked = t.status === "accepted" || t.status === "completed";
-  const otherPhone = t.isProvider ? { phone: t.client_phone, whatsapp: !!t.client_whatsapp } : { phone: t.provider_phone, whatsapp: !!t.provider_whatsapp };
+  // Numbers are exchanged only while the job is on (accepted). Once it's completed they're hidden
+  // again and the chat is deleted (see updateRequestStatusAction).
+  const unlocked = t.status === "accepted";
+  const finished = t.status === "completed";
+  const otherPhone = t.isProvider
+    ? { phone: t.client_phone, whatsapp: !!t.client_whatsapp, verified: t.client_phone_verified }
+    : { phone: t.provider_phone, whatsapp: !!t.provider_whatsapp, verified: t.provider_phone_verified };
   const otherFirst = other.name.split(" ")[0];
   const [block, reported] = await Promise.all([getBlockState(user.id, other.id), hasReported(user.id, other.id), markNotificationsRead(user.id, t.id)]);
   const blocked = block.iBlocked || block.blockedMe;
@@ -77,6 +81,32 @@ async function Thread({ params, searchParams }: { params: Promise<{ id: string }
             <StatusPill status={t.status} />
           </div>
 
+          {finished ? (
+            <div className="flex-1 overflow-y-auto px-4 py-8 sm:px-8 sm:py-10">
+              <div className="mx-auto max-w-md text-center">
+                <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-emerald-50 text-emerald-600">
+                  <CheckCircle2 className="size-7" />
+                </span>
+                <h2 className="mt-4 font-display text-xl font-extrabold tracking-tight sm:text-2xl">Job completed</h2>
+                <p className="mt-2 text-sm text-ink-soft">
+                  To protect you both, this chat has been cleared and phone numbers are hidden again. Need {otherFirst} again? Send a new request.
+                </p>
+              </div>
+              <div id="review" className="mx-auto mt-8 max-w-md scroll-mt-20">
+                {!t.isProvider ? (
+                  <ReviewForm requestId={t.id} existing={t.review} name={otherFirst} />
+                ) : t.review ? (
+                  <div className="card p-5">
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted">{otherFirst}&apos;s review</p>
+                    <p className="mt-2 text-2xl text-amber-400">{"★".repeat(t.review.rating)}<span className="text-line">{"★".repeat(5 - t.review.rating)}</span></p>
+                    {t.review.comment && <p className="mt-2 text-sm leading-relaxed text-ink-soft">{t.review.comment}</p>}
+                  </div>
+                ) : (
+                  <p className="rounded-2xl bg-canvas px-4 py-3 text-center text-sm text-muted">We&apos;ve asked {otherFirst} to rate the job. Their review will show here and on your profile.</p>
+                )}
+              </div>
+            </div>
+          ) : (
           <ThreadChat
             requestId={t.id}
             userId={user.id}
@@ -89,10 +119,11 @@ async function Thread({ params, searchParams }: { params: Promise<{ id: string }
             closed={closed || blocked}
             notice={notice}
           />
+          )}
         </FadeIn>
 
         <div className="space-y-4 lg:sticky lg:top-10">
-          {!closed && (
+          {!closed && !finished && (
             <FadeIn delay={0.04} className="card rounded-2xl p-4 sm:rounded-[1.25rem] sm:p-5">
               <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted"><Phone className="size-3.5" /> Contact {otherFirst}</p>
               <div className="mt-3">
@@ -107,6 +138,7 @@ async function Thread({ params, searchParams }: { params: Promise<{ id: string }
                     phone={otherPhone.phone}
                     whatsapp={otherPhone.whatsapp}
                     compact
+                    unverifiedName={otherPhone.verified ? undefined : otherFirst}
                     waMessage={`Hi ${otherFirst}, it's ${me.name.split(" ")[0]} from findMe about "${t.title}".`}
                   />
                 ) : (
@@ -128,18 +160,6 @@ async function Thread({ params, searchParams }: { params: Promise<{ id: string }
             <StatusActions requestId={t.id} status={t.status} isProvider={t.isProvider} otherName={other.name.split(" ")[0]} />
           </FadeIn>
 
-          {!t.isProvider && t.status === "completed" && (
-            <FadeIn delay={0.12} id="review" className="scroll-mt-20">
-              <ReviewForm requestId={t.id} existing={t.review} name={other.name.split(" ")[0]} />
-            </FadeIn>
-          )}
-          {t.isProvider && t.review && (
-            <FadeIn delay={0.12} className="card rounded-2xl p-4 sm:rounded-[1.25rem] sm:p-5">
-              <p className="text-xs font-bold uppercase tracking-wider text-muted">Client review</p>
-              <p className="mt-2 text-2xl text-amber-400">{"★".repeat(t.review.rating)}<span className="text-line">{"★".repeat(5 - t.review.rating)}</span></p>
-              {t.review.comment && <p className="mt-2 text-sm leading-relaxed text-ink-soft">{t.review.comment}</p>}
-            </FadeIn>
-          )}
 
           <div className="rounded-2xl border border-line bg-white p-4">
             <p className="text-xs font-bold uppercase tracking-wider text-muted">Safety</p>

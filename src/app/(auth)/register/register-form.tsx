@@ -11,6 +11,8 @@ import { registerAction, startSessionAction, type FormState } from "@/app/action
 import { CATEGORIES, SKILL_LEVELS } from "@/lib/categories";
 import { normalizeNgPhone } from "@/lib/phone";
 import { PhoneInput } from "@/components/phone-input";
+import { RateUnitPicker } from "@/components/rate-unit-picker";
+import type { RateUnit } from "@/lib/price";
 import { CategoryIcon } from "@/components/category-icon";
 import { FieldError, Input, Label, LocationInput, btn, cn } from "@/components/ui";
 
@@ -63,6 +65,7 @@ export function RegisterForm({ ninEnabled }: { ninEnabled: boolean }) {
   const [category, setCategory] = useState("");
   const [location, setLocation] = useState("");
   const [rate, setRate] = useState("");
+  const [rateUnit, setRateUnit] = useState<RateUnit>("hour");
   const [skills, setSkills] = useState<Skill[]>([]);
   const [skillInput, setSkillInput] = useState("");
   const [skillLevel, setSkillLevel] = useState("Intermediate");
@@ -122,7 +125,7 @@ export function RegisterForm({ ninEnabled }: { ninEnabled: boolean }) {
     if (step < last) return go(step + 1);
     if (!validate(step)) return;
     const fd = new FormData();
-    Object.entries({ name, businessName: role === "provider" ? businessName : "", email, password, phone, nin: ninEnabled ? nin : "", whatsapp: whatsapp ? "1" : "0", role: role ?? "client", headline, category, location, rate, next }).forEach(([k, v]) => fd.set(k, v));
+    Object.entries({ name, businessName: role === "provider" ? businessName : "", email, password, phone, nin: ninEnabled ? nin : "", whatsapp: whatsapp ? "1" : "0", role: role ?? "client", headline, category, location, rate, rateUnit, next }).forEach(([k, v]) => fd.set(k, v));
     fd.set("skills", JSON.stringify(skills));
     startTransition(async () => {
       // 1) Server validates and creates the Firebase account + profile.
@@ -343,11 +346,12 @@ export function RegisterForm({ ninEnabled }: { ninEnabled: boolean }) {
                         <LocationInput id="location" value={location} onChange={(e) => setLocation(e.target.value)} />
                       </div>
                       <div>
-                        <Label htmlFor="rate" hint="optional">Hourly rate (₦)</Label>
+                        <Label htmlFor="rate" hint="optional">Your rate (₦)</Label>
                         <div className="relative">
                           <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-semibold text-muted">₦</span>
                           <Input id="rate" type="number" min={0} value={rate} onChange={(e) => setRate(e.target.value)} placeholder="10000" className="pl-8" />
                         </div>
+                        <RateUnitPicker value={rateUnit} onChange={setRateUnit} />
                       </div>
                     </div>
                   </div>

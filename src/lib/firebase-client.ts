@@ -5,7 +5,7 @@ import { browserLocalPersistence, getAuth, initializeAuth, sendEmailVerification
 
 // Public web config — safe to ship to the browser. Access is controlled by Firebase Auth,
 // Firestore security rules (deny-all for clients) and the server.
-export const firebaseConfig = {
+const config = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
@@ -21,8 +21,8 @@ let auth: Auth | null = null;
  */
 export function clientAuth(): Auth {
   if (auth) return auth;
-  const existing = getApps().find((a) => a.name === "[DEFAULT]");
-  const app = existing ?? initializeApp(firebaseConfig);
+  const existing = getApps()[0];
+  const app = existing ?? initializeApp(config);
   auth = existing ? getAuth(app) : initializeAuth(app, { persistence: browserLocalPersistence });
   return auth;
 }

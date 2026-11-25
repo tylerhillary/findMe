@@ -15,6 +15,8 @@ export type UserDoc = {
   location?: string;
   category?: string;
   hourlyRate?: number;
+  /** How hourlyRate is charged: per hour (default) or one price per job, paid when it's done. */
+  rateUnit?: "hour" | "job";
   available?: boolean;
   avatar?: string | null; // small JPEG data URL
   phone?: string; // E.164 (+234…)
@@ -22,10 +24,14 @@ export type UserDoc = {
   showPhone?: boolean;
   /** Legacy: from the old WhatsApp number check (no longer used). */
   phoneVerified?: boolean;
-  /** The number (E.164) the person proved they own with an SMS code. Only counts while it equals `phone`. */
-  smsVerifiedPhone?: string;
-  /** Public copy of "the current number is SMS-confirmed" (no number in it), for the Phone verified badge. */
+  /** The number (E.164) a findMe admin confirmed by phone call. Only counts while it equals `phone`. */
+  verifiedPhone?: string;
+  /** Public copy of "the current number is verified" (no number in it), for the Phone verified badge. */
   phoneConfirmed?: boolean;
+  /** 4-digit code the person reads out when findMe calls, proving the right person answered. */
+  callCode?: string;
+  /** When an admin last called (or tried to). */
+  lastCallAt?: number;
   /** Copy of Firebase Auth's "email confirmed" flag, so public pages can show it without extra lookups. */
   emailVerified?: boolean;
   /** NIN confirmed with NIMC (via Dojah). Pros without it are kept out of search and can't get requests. */
@@ -82,6 +88,8 @@ export type RequestDoc = {
   messageCount?: number;
   /** True once the client has left a review (false until then). */
   reviewed?: boolean;
+  /** Set when the job was completed and its chat deleted. */
+  chatClearedAt?: number;
   createdAt: number;
   updatedAt: number;
 };

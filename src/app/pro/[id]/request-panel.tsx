@@ -1,5 +1,6 @@
 "use client";
 
+import { rateSuffix, type RateUnit } from "@/lib/price";
 import { useActionState, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -20,7 +21,7 @@ export function HireButton({ serviceId }: { serviceId: string }) {
 }
 
 type Viewer = { id: string; hasPhone: boolean } | null;
-type Provider = { id: string; name: string; hourlyRate: number; available: boolean; avatar: string | null; headline: string };
+type Provider = { id: string; name: string; hourlyRate: number; rateUnit: RateUnit; available: boolean; avatar: string | null; headline: string };
 type Service = { id: string; title: string; price: number; priceUnit: string };
 
 export function RequestPanel({ provider, services, viewer }: { provider: Provider; services: Service[]; viewer: Viewer }) {
@@ -48,7 +49,7 @@ export function RequestPanel({ provider, services, viewer }: { provider: Provide
             {provider.hourlyRate > 0 ? (
               <>
                 {formatMoney(provider.hourlyRate)}
-                <span className="text-base font-semibold text-muted">/hr</span>
+                <span className="text-base font-semibold text-muted">{rateSuffix(provider.rateUnit)}</span>
               </>
             ) : services[0] ? (
               formatMoney(Math.min(...services.map((s) => s.price)))
@@ -56,6 +57,7 @@ export function RequestPanel({ provider, services, viewer }: { provider: Provide
               <span className="text-2xl">Custom quote</span>
             )}
           </p>
+          {provider.hourlyRate > 0 && provider.rateUnit === "job" && <p className="mt-1 text-[13px] text-muted">One price for the job, paid after the work is done.</p>}
           <div className="mt-3 flex items-center gap-2 text-[13px] sm:mt-4 sm:text-sm">
             <span className={provider.available ? "size-2.5 animate-pulse rounded-full bg-emerald-500" : "size-2.5 rounded-full bg-zinc-300"} />
             <span className="font-medium text-ink-soft">{provider.available ? `${first} is available for new work` : `${first} is busy but accepts requests`}</span>
@@ -83,7 +85,7 @@ export function RequestPanel({ provider, services, viewer }: { provider: Provide
                 {provider.hourlyRate > 0 ? (
                   <>
                     {formatMoney(provider.hourlyRate)}
-                    <span className="text-xs font-semibold text-muted">/hr</span>
+                    <span className="text-xs font-semibold text-muted">{rateSuffix(provider.rateUnit)}</span>
                   </>
                 ) : services[0] ? (
                   <>

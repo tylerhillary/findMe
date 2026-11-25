@@ -297,7 +297,7 @@ export function ReviewForm({ requestId, existing, name }: { requestId: string; e
           </motion.button>
         ))}
       </div>
-      <Textarea name="comment" rows={3} placeholder="Share a few words about your experience (optional)" className="mt-4 min-h-20" />
+      <Textarea name="comment" rows={3} required minLength={10} maxLength={1000} placeholder="How was the work? Was it on time and as agreed?" className="mt-4 min-h-20" />
       {state.error && <p className="mt-2 text-sm text-red-600">{state.error}</p>}
       <button disabled={pending || !rating} className={btn("primary", "md", "mt-4 w-full")}>
         {pending ? <Loader2 className="size-4 animate-spin" /> : "Submit review"}

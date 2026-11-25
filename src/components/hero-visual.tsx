@@ -17,7 +17,7 @@ export function HeroVisual({ pro }: { pro: ProviderCard | null }) {
     ? [
         [pro.reviewCount > 0 ? pro.rating.toFixed(1) : "New", pro.reviewCount > 0 ? `${pro.reviewCount} review${pro.reviewCount === 1 ? "" : "s"}` : "No reviews yet"],
         [String(pro.jobsDone), pro.jobsDone === 1 ? "Job done" : "Jobs done"],
-        pro.hourlyRate > 0 ? [formatMoney(pro.hourlyRate), "/hour"] : pro.startingPrice ? [formatMoney(pro.startingPrice), "from"] : ["—", "Rate on request"],
+        pro.hourlyRate > 0 ? [formatMoney(pro.hourlyRate), pro.rateUnit === "job" ? "per job" : "/hour"] : pro.startingPrice ? [formatMoney(pro.startingPrice), "from"] : ["—", "Rate on request"],
       ]
     : [];
   return (
