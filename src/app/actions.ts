@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { refresh, updateTag } from "next/cache";
+import { after } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { adminAuth, db } from "@/lib/firebase-admin";
 import { createSession, destroySession, getCurrentUser, getSessionUid, requireUser } from "@/lib/auth";
@@ -14,7 +15,7 @@ import { MODE_COOKIE, MODE_COOKIE_OPTIONS } from "@/lib/mode";
 import { cleanNin, deleteNinRecords, isNinFormat, verifyNin } from "@/lib/nin";
 import { APP_URL, emailConfigured, emailLayout, sendEmail } from "@/lib/email";
 import { publicName } from "@/lib/names";
-import { isAdmin } from "@/lib/admin";
+import { emailAdminsNumberToVerify, isAdmin } from "@/lib/admin";
 import { asRateUnit } from "@/lib/price";
 import { createHash } from "node:crypto";
 import type { BlockDoc, MessageDoc, NotificationDoc, ReportDoc, RequestDoc, ReviewDoc, ServiceDoc, Skill, SupportDoc, UserDoc } from "@/lib/schema";
@@ -172,6 +173,10 @@ export async function registerAction(_: FormState, fd: FormData): Promise<FormSt
     return { error: "We couldn't create your account right now. Please try again." };
   }
   if (role === "provider") updateTag(CATALOG_TAG);
+  // Let the admins know there's a new number to verify by call (after responding, so sign-up never waits).
+  if (phone) {
+    after(() => emailAdminsNumberToVerify({ uid, name, email, role, phone }).catch((e) => console.error("[findMe] admin verify email failed:", e)));
+  }
   if (ninRaw) {
     // Optional ID check. If it fails, the account still exists and they can retry from their profile.
     const nin = await verifyNin(uid, name, ninRaw).catch((e) => {
@@ -289,6 +294,11 @@ export async function updateProfileAction(_: FormState, fd: FormData): Promise<F
 
   await users().doc(user.id).update(update);
   await adminAuth().updateUser(user.id, { displayName: name }).catch(() => {});
+  if (phone && phone !== before?.phone && !update.phoneConfirmed) {
+    after(() =>
+      emailAdminsNumberToVerify({ uid: user.id, name, email: user.email, role, phone, changed: !!before?.phone }).catch((e) => console.error("[findMe] admin verify email failed:", e)),
+    );
+  }
   updateTag(CATALOG_TAG);
   if (role === "provider" && before?.role !== "provider") {
     // Just turned on their pro side (same account): show the Working dashboard.
