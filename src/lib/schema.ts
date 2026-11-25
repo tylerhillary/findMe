@@ -24,6 +24,8 @@ export type UserDoc = {
   phoneVerified?: boolean;
   /** The number (E.164) the person proved they own with an SMS code. Only counts while it equals `phone`. */
   smsVerifiedPhone?: string;
+  /** Public copy of "the current number is SMS-confirmed" (no number in it), for the Phone verified badge. */
+  phoneConfirmed?: boolean;
   /** Copy of Firebase Auth's "email confirmed" flag, so public pages can show it without extra lookups. */
   emailVerified?: boolean;
   /** NIN confirmed with NIMC (via Dojah). Pros without it are kept out of search and can't get requests. */

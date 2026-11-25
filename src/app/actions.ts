@@ -266,7 +266,8 @@ export async function confirmPhoneAction(idToken: string): Promise<{ ok?: true; 
   if (!phone) return { error: "We couldn't confirm that code. Please try again." };
   const me = (await users().doc(user.id).get()).data() as UserDoc | undefined;
   if (!me?.phone || me.phone !== phone) return { error: "That code was for a different number. Save your number first, then confirm it." };
-  await users().doc(user.id).update({ smsVerifiedPhone: phone });
+  await users().doc(user.id).update({ smsVerifiedPhone: phone, phoneConfirmed: true });
+  updateTag(CATALOG_TAG);
   refresh();
   return { ok: true };
 }
@@ -341,6 +342,8 @@ export async function updateProfileAction(_: FormState, fd: FormData): Promise<F
   if (avatar) update.avatar = avatar;
   if (fd.get("removeAvatar") === "1") update.avatar = null;
   const before = (await users().doc(user.id).get()).data() as UserDoc | undefined;
+  // A new number needs confirming again before it earns the badge (or works for password reset).
+  update.phoneConfirmed = !!phone && before?.smsVerifiedPhone === phone;
 
   await users().doc(user.id).update(update);
   await adminAuth().updateUser(user.id, { displayName: name }).catch(() => {});

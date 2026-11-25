@@ -30,6 +30,8 @@ import { Avatar, StatusPill, btn, cn, formatMoney, timeAgo } from "@/components/
 import { CategoryIcon } from "@/components/category-icon";
 import { FadeIn } from "@/components/motion";
 import { WelcomeBanner } from "./welcome-banner";
+import { ConfirmPhoneCard } from "./confirm-phone-card";
+import { isMobile } from "@/lib/phone";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -98,6 +100,7 @@ async function Overview({ searchParams }: { searchParams: Promise<Record<string,
   return (
     <div className="space-y-5 sm:space-y-6">
       {sp.welcome === "1" && <WelcomeBanner name={first} isPro={isPro} />}
+      {profile.phone && isMobile(profile.phone) && !profile.phone_verified && <ConfirmPhoneCard phone={profile.phone} isPro={isPro} />}
 
       {/* Page header */}
       <FadeIn className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">

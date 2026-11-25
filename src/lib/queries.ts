@@ -28,7 +28,7 @@ export type ProviderCard = {
   jobsDone: number;
   skills: string[];
   startingPrice: number | null;
-  /** Phone/WhatsApp number confirmed with a code. */
+  /** Phone number confirmed with an SMS code. */
   phoneVerified: boolean;
   /** Email address confirmed by link. */
   emailVerified: boolean;
@@ -60,7 +60,7 @@ function cardFrom(id: string, u: UserDoc): ProviderCard {
     jobsDone: u.jobsDone ?? 0,
     skills: (u.skills ?? []).map((s) => s.name),
     startingPrice: u.startingPrice ?? null,
-    phoneVerified: !!u.phoneVerified,
+    phoneVerified: !!u.phoneConfirmed,
     emailVerified: !!u.emailVerified,
     ninVerified: !!u.ninVerified,
   };
@@ -69,7 +69,7 @@ function cardFrom(id: string, u: UserDoc): ProviderCard {
 // Public fields only — phone numbers and emails never enter the cached catalog.
 const PUBLIC_FIELDS = [
   "name", "businessName", "headline", "bio", "location", "category", "hourlyRate", "available", "avatar",
-  "skills", "ratingSum", "reviewCount", "jobsDone", "startingPrice", "flagged", "phoneVerified", "emailVerified", "ninVerified",
+  "skills", "ratingSum", "reviewCount", "jobsDone", "startingPrice", "flagged", "phoneConfirmed", "emailVerified", "ninVerified",
 ] as const;
 
 /**
