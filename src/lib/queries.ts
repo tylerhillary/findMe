@@ -222,7 +222,7 @@ export async function searchProviders(params: SearchParams): Promise<SearchResul
       if (sort === "price_low") return cardPrice(a) - cardPrice(b);
       if (sort === "price_high") return cardPrice(b) - cardPrice(a);
       // ID-verified pros get a small boost, so they rank above equally good matches.
-      const boost = (c: ProviderCard) => (c.score ?? 0) + (c.ninVerified ? 2 : 0);
+      const boost = (c: ProviderCard) => (c.score ?? 0) + (c.ninVerified ? 2 : 0) + (c.phoneVerified ? 1 : 0);
       return boost(b) - boost(a) || b.rating * b.reviewCount - a.rating * a.reviewCount;
     });
 
@@ -234,7 +234,8 @@ export async function getFeaturedProviders(limit = 6): Promise<ProviderCard[]> {
   const catalog = await loadCatalog();
   return catalog
     .map(toCard)
-    .sort((a, b) => Number(b.ninVerified) - Number(a.ninVerified) || b.rating * Math.log(1 + b.reviewCount) - a.rating * Math.log(1 + a.reviewCount))
+    // Verified pros first (ID, then phone), then the best rated.
+    .sort((a, b) => Number(b.ninVerified) - Number(a.ninVerified) || Number(b.phoneVerified) - Number(a.phoneVerified) || b.rating * Math.log(1 + b.reviewCount) - a.rating * Math.log(1 + a.reviewCount))
     .slice(0, limit);
 }
 

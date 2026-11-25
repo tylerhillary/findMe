@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { PhoneIncoming, X } from "lucide-react";
+import { CheckCircle2, PhoneIncoming, X } from "lucide-react";
 import { formatNgPhone } from "@/lib/phone";
 
 const DISMISS_KEY = "findme:expect-call-dismissed";
@@ -49,6 +49,50 @@ export function ExpectCallCard({ phone, code, isPro }: { phone: string; code: st
               <p className="text-[11px] font-bold uppercase tracking-wider text-muted">Tell us this code</p>
               <p className="font-display text-2xl font-extrabold tracking-[0.2em] text-ink">{code}</p>
             </div>
+          </div>
+        </motion.section>
+      )}
+    </AnimatePresence>
+  );
+}
+
+const SEEN_KEY = "findme:phone-verified-seen";
+
+/** Shown once after findMe verifies the number, then remembered as seen on this device. */
+export function PhoneVerifiedCard({ phone, isPro }: { phone: string; isPro: boolean }) {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    let seen = false;
+    try {
+      seen = localStorage.getItem(SEEN_KEY) === phone;
+    } catch {}
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!seen) setOpen(true);
+  }, [phone]);
+
+  function dismiss() {
+    setOpen(false);
+    try {
+      localStorage.setItem(SEEN_KEY, phone);
+    } catch {}
+  }
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.section initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }} className="card relative flex items-center gap-4 overflow-hidden border-emerald-200 bg-emerald-50/60 p-4 pr-12 sm:p-5 sm:pr-14">
+          <button onClick={dismiss} className="absolute right-3 top-3 grid size-8 place-items-center rounded-full text-muted hover:bg-white hover:text-ink" aria-label="Hide">
+            <X className="size-4" />
+          </button>
+          <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-emerald-500 text-white">
+            <CheckCircle2 className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="font-display text-lg font-bold tracking-tight">Your number is verified</h2>
+            <p className="mt-0.5 text-sm text-ink-soft">
+              findMe confirmed {formatNgPhone(phone)}.{isPro ? " Your profile and search card now show the Phone verified badge." : ""}
+            </p>
           </div>
         </motion.section>
       )}

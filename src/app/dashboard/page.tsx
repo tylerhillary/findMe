@@ -30,7 +30,7 @@ import { Avatar, StatusPill, btn, cn, formatMoney, timeAgo } from "@/components/
 import { CategoryIcon } from "@/components/category-icon";
 import { FadeIn } from "@/components/motion";
 import { WelcomeBanner } from "./welcome-banner";
-import { ExpectCallCard } from "./expect-call-card";
+import { ExpectCallCard, PhoneVerifiedCard } from "./expect-call-card";
 import { getCallCode, isAdmin } from "@/lib/admin";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -109,6 +109,7 @@ async function Overview({ searchParams }: { searchParams: Promise<Record<string,
         </Link>
       )}
       {callCode && <ExpectCallCard phone={profile.phone} code={callCode} isPro={isPro} />}
+      {profile.phone_verified && <PhoneVerifiedCard phone={profile.phone} isPro={isPro} />}
 
       {/* Page header */}
       <FadeIn className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
