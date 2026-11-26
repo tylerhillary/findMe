@@ -13,6 +13,8 @@ import { formatNgPhone, normalizeNgPhone } from "@/lib/phone";
 import { FINDME_FEE_LABEL, proPayoutFor } from "@/lib/fees";
 import { CATALOG_TAG } from "@/lib/queries";
 import { completeBrokerJob } from "@/lib/broker";
+import { paystackReady, startPayment } from "@/lib/paystack";
+import { APP_URL } from "@/lib/email";
 import type { JobDoc, UserDoc } from "@/lib/schema";
 import type { FormState } from "@/app/actions";
 
@@ -148,6 +150,28 @@ export async function claimPaidAction(jobId: string): Promise<{ ok?: true; error
   return ok();
 }
 
+/** Client: pay findMe's price on Paystack. Returns the checkout link to send them to. */
+export async function payWithPaystackAction(jobId: string): Promise<{ url?: string; error?: string }> {
+  const user = await requireUser();
+  if (!paystackReady()) return { error: "Card payments aren't switched on yet. Please pay by bank transfer." };
+  const { ref, job } = await loadJob(jobId);
+  if (!job || job.clientId !== user.id || job.status !== "quoted" || job.price <= 0) return { error: "This job isn't waiting for payment." };
+  if (!user.email) return { error: "Add an email to your account to pay online." };
+  try {
+    const tx = await startPayment({
+      email: user.email,
+      naira: job.price,
+      reference: `fm-${ref.id}-${Date.now().toString(36)}`,
+      callbackUrl: `${APP_URL}${jobHref(ref.id)}`,
+      metadata: { jobId: ref.id, title: job.title, custom_fields: [{ display_name: "Job", variable_name: "job", value: job.title }] },
+    });
+    return { url: tx.authorization_url };
+  } catch (e) {
+    console.error("[findMe] Paystack start failed:", e);
+    return { error: "We couldn't open Paystack just now. Try again in a minute, or pay by bank transfer." };
+  }
+}
+
 /** Client cancels before paying. (After payment, findMe cancels and refunds.) */
 export async function cancelJobAction(jobId: string): Promise<{ ok?: true; error?: string }> {
   const user = await requireUser();
@@ -237,7 +261,7 @@ export async function markJobPaidAction(jobId: string): Promise<{ ok?: true; err
   }
   const { ref, job } = await loadJob(jobId);
   if (!job || job.status !== "quoted") return { error: "Send a price before marking it paid." };
-  await ref.update({ status: job.proId ? "assigned" : "paid", paidAt: Date.now(), updatedAt: Date.now() });
+  await ref.update({ status: job.proId ? "assigned" : "paid", paidAt: Date.now(), paidVia: "transfer", updatedAt: Date.now() });
   await notify({
     userId: job.clientId,
     kind: "status",

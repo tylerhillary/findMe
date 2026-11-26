@@ -5,6 +5,7 @@ import { notify } from "./notify";
 import { emailAdmins } from "./admin";
 import { AUTO_CONFIRM_MS } from "./jobs";
 import type { JobDoc } from "./schema";
+import type { PaystackTx } from "./paystack";
 
 const naira = (n: number) => new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", currencyDisplay: "narrowSymbol", maximumFractionDigits: 0 }).format(n);
 
@@ -58,4 +59,38 @@ export async function settleOverdueBrokerJobs(js: { id: string; status: string; 
   const due = js.filter((j) => j.status === "assigned" && j.doneRequestedAt && Date.now() - j.doneRequestedAt >= AUTO_CONFIRM_MS);
   const done = await Promise.all(due.map((j) => completeBrokerJob(j.id, "auto").catch(() => false)));
   return done.filter(Boolean).length;
+}
+
+/**
+ * Marks a job paid after Paystack confirms the money (called from the return page and the
+ * webhook, so it must be safe to run twice). Checks the amount and currency match the price.
+ */
+export async function recordPaystackPayment(jobId: string, tx: PaystackTx): Promise<boolean> {
+  if (tx.status !== "success" || tx.currency !== "NGN" || !jobId) return false;
+  const ref = db().collection("jobs").doc(jobId.slice(0, 128));
+  const job = await db().runTransaction(async (t) => {
+    const j = (await t.get(ref)).data() as JobDoc | undefined;
+    if (!j || j.status !== "quoted" || tx.amount < Math.round(j.price * 100)) return null;
+    const now = Date.now();
+    t.update(ref, { status: j.proId ? "assigned" : "paid", paidAt: now, paidVia: "paystack", paystackRef: tx.reference, updatedAt: now });
+    return j;
+  });
+  if (!job) return false;
+
+  await notify({
+    userId: job.clientId,
+    kind: "status",
+    title: "Payment received",
+    body: `Thanks! We got ${naira(job.price)} for "${job.title}". ${job.proId ? "Your pro will call you soon." : "We're assigning a pro and they'll call you soon."}`,
+    href: `/dashboard/jobs/${ref.id}`,
+    cta: "View job",
+  });
+  await emailAdmins({
+    subject: `Paid on Paystack: ${naira(job.price)} for "${job.title}"`,
+    title: `${job.clientName} paid ${naira(job.price)}`,
+    body: `Paystack confirmed the payment (ref ${tx.reference}). ${job.proId ? "The pro is already assigned." : "Assign a pro next."}`,
+    href: `/admin/jobs#${ref.id}`,
+    cta: "Open job",
+  }).catch(() => {});
+  return true;
 }

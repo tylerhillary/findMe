@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, CheckCircle2, HandCoins, Loader2, X } from "lucide-react";
-import { cancelJobAction, claimPaidAction, confirmJobDoneAction, counterOfferAction, proMarkDoneAction } from "@/app/job-actions";
+import { Check, CheckCircle2, CreditCard, HandCoins, Loader2, X } from "lucide-react";
+import { cancelJobAction, claimPaidAction, payWithPaystackAction, confirmJobDoneAction, counterOfferAction, proMarkDoneAction } from "@/app/job-actions";
 import { Input, btn } from "@/components/ui";
 
 type Result = { ok?: true; error?: string };
@@ -25,6 +25,32 @@ function useRun() {
 }
 
 const Err = ({ msg }: { msg: string | null }) => (msg ? <p className="mt-2 text-sm font-medium text-red-600">{msg}</p> : null);
+
+/** Client: opens Paystack's checkout for findMe's price. */
+export function PaystackButton({ jobId, price }: { jobId: string; price: number }) {
+  const [pending, start] = useTransition();
+  const [going, setGoing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const pay = () => {
+    setError(null);
+    start(async () => {
+      const res = await payWithPaystackAction(jobId).catch(() => ({ error: "Couldn't reach findMe. Check your connection and try again." }) as { url?: string; error?: string });
+      if (res.url) {
+        setGoing(true);
+        window.location.assign(res.url);
+      } else setError(res.error ?? "Something went wrong. Try again.");
+    });
+  };
+  const naira = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", currencyDisplay: "narrowSymbol", maximumFractionDigits: 0 }).format(price);
+  return (
+    <div>
+      <button disabled={pending || going} onClick={pay} className={btn("primary", "lg", "w-full")}>
+        {pending || going ? <Loader2 className="size-5 animate-spin" /> : <CreditCard className="size-5" />} Pay {naira} now
+      </button>
+      <Err msg={error} />
+    </div>
+  );
+}
 
 /** Client, after seeing the price: "I've paid" and "can you do it for less?". */
 export function PayButtons({ jobId, price, claimed }: { jobId: string; price: number; claimed: boolean }) {

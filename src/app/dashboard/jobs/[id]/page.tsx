@@ -16,7 +16,9 @@ import { FadeIn } from "@/components/motion";
 import { ContactButtons } from "@/components/contact-card";
 import { TeamBadge } from "@/components/verify-phone";
 import { ReviewForm } from "../../requests/[id]/thread-client";
-import { CancelJobButton, ConfirmDoneButtons, PayButtons, ProDoneButton } from "../job-buttons";
+import { CancelJobButton, ConfirmDoneButtons, PayButtons, PaystackButton, ProDoneButton } from "../job-buttons";
+import { checkPayment, jobIdOf, paystackReady, paystackTestMode } from "@/lib/paystack";
+import { recordPaystackPayment } from "@/lib/broker";
 
 export const metadata: Metadata = { title: "Job" };
 
@@ -33,8 +35,19 @@ const day = (ts: number) => new Date(ts).toLocaleDateString("en-NG", { timeZone:
 async function Job({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const user = await requireUser(`/dashboard/jobs/${id}`);
-  const data = await getJob(id, user.id, await isAdmin(user.id, user.email));
+  const admin = await isAdmin(user.id, user.email);
+  let data = await getJob(id, user.id, admin);
   if (!data) notFound();
+  // Back from Paystack: ask Paystack whether the payment went through (the webhook may beat us to it).
+  const reference = typeof sp.reference === "string" ? sp.reference.slice(0, 100) : "";
+  let payment: "ok" | "failed" | null = null;
+  if (reference && data.role === "client") {
+    if (data.job.status === "quoted") {
+      const tx = await checkPayment(reference).catch(() => null);
+      if (tx && jobIdOf(tx) === data.job.id && (await recordPaystackPayment(data.job.id, tx).catch(() => false))) data = (await getJob(id, user.id, admin))!;
+    }
+    payment = data.job.status === "quoted" ? "failed" : "ok";
+  }
   const { job, role, pro, review, clientTeam } = data;
   const side = role === "pro" ? "pro" : "client";
   const st = jobStatusLabel(job, side);
@@ -49,6 +62,18 @@ async function Job({ params, searchParams }: { params: Promise<{ id: string }>; 
         <FadeIn className="mt-4 flex items-start gap-3 rounded-2xl bg-emerald-50 p-4 text-emerald-900">
           <CheckCircle2 className="mt-0.5 size-5 shrink-0" />
           <p className="text-sm"><span className="font-semibold">Request sent to findMe.</span> We&apos;ll send you a price soon. You&apos;ll get an email and a notification here.</p>
+        </FadeIn>
+      )}
+
+      {payment === "ok" && (
+        <FadeIn className="mt-4 flex items-start gap-3 rounded-2xl bg-emerald-50 p-4 text-emerald-900">
+          <CheckCircle2 className="mt-0.5 size-5 shrink-0" />
+          <p className="text-sm"><span className="font-semibold">Payment received. Thank you!</span> findMe holds your money and only pays the pro once you confirm the job is done.</p>
+        </FadeIn>
+      )}
+      {payment === "failed" && (
+        <FadeIn className="mt-4 rounded-2xl bg-amber-50 p-4 text-sm text-amber-900">
+          <span className="font-semibold">We couldn&apos;t confirm your payment yet.</span> If money left your account, it will show here within a few minutes. Otherwise, try again below.
         </FadeIn>
       )}
 
@@ -76,6 +101,7 @@ type Data = NonNullable<Awaited<ReturnType<typeof getJob>>>;
 
 function ClientView({ job, pro, review }: { job: Data["job"]; pro: Data["pro"]; review: Data["review"] }) {
   const bank = bankDetails();
+  const online = paystackReady();
   const first = pro?.name.split(" ")[0] ?? "the pro";
   return (
     <>
@@ -95,8 +121,14 @@ function ClientView({ job, pro, review }: { job: Data["job"]; pro: Data["pro"]; 
           <p className="mt-1 font-display text-4xl font-extrabold tracking-tight">{formatMoney(job.price)}</p>
           {job.clientOffer > 0 && job.price <= job.clientOffer && <p className="mt-1 text-sm font-semibold text-emerald-700">We matched your offer.</p>}
           {job.adminNote && <p className="mt-2 text-sm text-ink-soft">{job.adminNote}</p>}
-          <div className="mt-4 rounded-2xl border border-line bg-canvas/60 p-4">
-            <p className="flex items-center gap-2 font-semibold"><Landmark className="size-4 text-brand-600" /> Pay findMe by bank transfer</p>
+          {online && (
+            <div className="mt-4">
+              <PaystackButton jobId={job.id} price={job.price} />
+              <p className="mt-2 text-center text-xs text-muted">Card, bank transfer or USSD, on Paystack&apos;s secure page.{paystackTestMode() ? " (Test mode: no real money)" : ""}</p>
+            </div>
+          )}
+          <details className="mt-4 rounded-2xl border border-line bg-canvas/60 p-4" open={!online}>
+            <summary className="flex cursor-pointer items-center gap-2 font-semibold"><Landmark className="size-4 text-brand-600" /> {online ? "Or pay findMe by bank transfer yourself" : "Pay findMe by bank transfer"}</summary>
             {bank ? (
               <dl className="mt-2 grid gap-1 text-sm">
                 <div className="flex justify-between gap-3"><dt className="text-muted">Bank</dt><dd className="font-semibold">{bank.bank}</dd></div>
@@ -107,8 +139,9 @@ function ClientView({ job, pro, review }: { job: Data["job"]; pro: Data["pro"]; 
             ) : (
               <p className="mt-1 text-sm text-ink-soft">We&apos;ll send you our account details shortly.</p>
             )}
-            <p className="mt-2 text-xs text-muted">Pay findMe only. Never pay a pro directly. We hold your money and only pay them once you confirm the job is done properly.</p>
-          </div>
+            <p className="mt-2 text-xs text-muted">Then tap &quot;I&apos;ve paid&quot; below so we can check for it.</p>
+          </details>
+          <p className="mt-3 text-xs text-muted">Pay findMe only. Never pay a pro directly. We hold your money and only pay them once you confirm the job is done properly.</p>
           <div className="mt-4"><PayButtons jobId={job.id} price={job.price} claimed={!!job.paymentClaimedAt} /></div>
           {!job.paymentClaimedAt && <div className="mt-4 border-t border-line pt-3"><CancelJobButton jobId={job.id} /></div>}
         </FadeIn>

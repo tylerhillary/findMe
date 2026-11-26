@@ -189,7 +189,9 @@ export type JobDoc = {
   proId: string | null;
   quotedAt?: number;
   paymentClaimedAt?: number; // client tapped "I've paid"
-  paidAt?: number; // admin confirmed the money arrived
+  paidAt?: number; // money arrived (admin confirmed, or Paystack did)
+  paidVia?: "paystack" | "transfer";
+  paystackRef?: string;
   assignedAt?: number;
   doneRequestedAt?: number; // pro said it's done; client confirms or it auto-confirms
   completedAt?: number;
