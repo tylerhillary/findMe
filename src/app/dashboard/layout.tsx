@@ -9,7 +9,7 @@ import { getMode } from "@/lib/mode";
 import { ModeSwitch } from "./mode-switch";
 import { SignOutForm } from "@/components/sign-out-form";
 import { DashNav, MobileTabs } from "./dash-nav";
-import { NotificationBell } from "./notification-bell";
+import { NotificationBell } from "@/components/notification-bell";
 import { VerifyEmailBanner } from "./verify-email-banner";
 
 export default function DashboardLayout({ children }: LayoutProps<"/dashboard">) {

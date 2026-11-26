@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
+import { getUnreadCount } from "@/lib/queries";
+import { NotificationBell } from "./notification-bell";
 import { btn } from "./ui";
 import { HeaderShell, UserMenu } from "./site-header-client";
 
@@ -19,7 +21,16 @@ export function SiteHeader({ transparent = false }: { transparent?: boolean }) {
 
 async function HeaderAuth() {
   const user = await getCurrentUser();
-  if (user) return <UserMenu user={{ name: user.name, email: user.email, avatar: user.avatar }} />;
+  if (user) {
+    // Bell on every page, so people see new jobs and messages without opening their dashboard.
+    const unread = await getUnreadCount(user.id).catch(() => 0);
+    return (
+      <div className="flex items-center gap-1 sm:gap-2">
+        <NotificationBell unread={unread} />
+        <UserMenu user={{ name: user.name, email: user.email, avatar: user.avatar }} />
+      </div>
+    );
+  }
   return (
     <div className="flex items-center gap-1 sm:gap-1.5">
       <Link href="/login" className={btn("ghost", "sm", "px-3 sm:px-4")}>
