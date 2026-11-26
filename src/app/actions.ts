@@ -19,7 +19,7 @@ import { emailAdminsNumberToVerify, emailAdminsReport, isAdmin } from "@/lib/adm
 import { clearChat, completeJob } from "@/lib/jobs";
 import { asRateUnit } from "@/lib/price";
 import { createHash } from "node:crypto";
-import type { BlockDoc, CoverDoc, MessageDoc, NotificationDoc, ReportDoc, RequestDoc, ReviewDoc, ServiceDoc, Skill, SupportDoc, UserDoc } from "@/lib/schema";
+import type { BlockDoc, CoverDoc, JobDoc, MessageDoc, NotificationDoc, ReportDoc, RequestDoc, ReviewDoc, ServiceDoc, Skill, SupportDoc, UserDoc } from "@/lib/schema";
 import { AUTO_HIDE_AFTER, REPORT_REASONS } from "@/lib/safety";
 
 const PHONE_ERROR = "Enter a valid Nigerian number, e.g. 0803 123 4567.";
@@ -401,79 +401,8 @@ export async function deleteServiceAction(serviceId: string) {
 // ---------------- Requests & messages ----------------
 
 export async function sendRequestAction(_: FormState, fd: FormData): Promise<FormState> {
-  const providerId = str(fd, "providerId", 128);
-  const user = await getCurrentUser();
-  if (!user) redirect(`/login?next=${encodeURIComponent(`/pro/${providerId}`)}`);
-  if (user.id === providerId) return { error: "You can't send a request to yourself." };
-
-  const title = str(fd, "title", 120);
-  const message = str(fd, "message", 3000);
-  const fieldErrors: Record<string, string> = {};
-  if (title.length < 4) fieldErrors.title = "Summarise the job in a few words.";
-  if (message.length < 15) fieldErrors.message = "Describe what you need (at least 15 characters).";
-  // Clients without a number on file can add one here; it is only shared if the pro accepts.
-  const phoneRaw = str(fd, "phone", 30);
-  const phone = normalizeNgPhone(phoneRaw);
-  if (phoneRaw && !phone) fieldErrors.phone = PHONE_ERROR;
-  if (Object.keys(fieldErrors).length) return { fieldErrors };
-
-  const provider = (await users().doc(providerId).get()).data() as UserDoc | undefined;
-  if (!provider || provider.role !== "provider") return { error: "This professional is no longer available." };
-  if (await isBlockedBetween(user.id, providerId)) return { error: "You can't send requests to this person." };
-  const authUser = await adminAuth().getUser(user.id);
-  if (!authUser.emailVerified) {
-    return { error: `Please confirm your email first. We sent a link to ${authUser.email}.` };
-  }
-  const serviceId = str(fd, "serviceId", 128);
-  const service = serviceId ? ((await services().doc(serviceId).get()).data() as ServiceDoc | undefined) : undefined;
-
-  const now = Date.now();
-  const reqRef = requests().doc();
-  const batch = db().batch();
-  if (phone) {
-    const me = (await users().doc(user.id).get()).data() as UserDoc;
-    if (!me.phone) batch.update(users().doc(user.id), { phone });
-  }
-  batch.set(reqRef, {
-    clientId: user.id,
-    providerId,
-    participants: [user.id, providerId],
-    serviceId: service && service.userId === providerId ? serviceId : null,
-    title,
-    budget: int(fd, "budget"),
-    status: "pending",
-    lastMessage: message,
-    messageCount: 1,
-    reviewed: false,
-    createdAt: now,
-    updatedAt: now,
-  } satisfies RequestDoc);
-  batch.set(reqRef.collection("messages").doc(), { senderId: user.id, body: message, createdAt: now } satisfies MessageDoc);
-  await batch.commit();
-  const budget = int(fd, "budget");
-  const naira = (n: number) => new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", currencyDisplay: "narrowSymbol", maximumFractionDigits: 0 }).format(n);
-  const clientFirst = user.name.split(" ")[0];
-  await notify({
-    userId: providerId,
-    kind: "request",
-    requestId: reqRef.id,
-    title: `New request from ${user.name}`,
-    body: `“${title}”${budget > 0 ? ` · budget ${naira(budget)}` : ""}. Reply quickly to win the job.`,
-    href: `/dashboard/requests/${reqRef.id}`,
-    cta: "View & reply",
-    // The email a professional gets when someone reaches out for their help.
-    email: {
-      subject: `${clientFirst} needs your help: ${title}`,
-      quote: { from: user.name, text: message.length > 600 ? `${message.slice(0, 600)}…` : message },
-      details: [
-        ["Job", title],
-        ...(service && service.userId === providerId ? [["Service", service.title] as [string, string]] : []),
-        ["Budget", budget > 0 ? naira(budget) : "Not stated"],
-      ],
-      footnote: "Accept to share phone numbers and agree the details in chat. Fast replies win more jobs.",
-    },
-  });
-  redirect(`/dashboard/requests/${reqRef.id}?sent=1`);
+  // Clients no longer contact pros directly: every job goes through findMe.
+  redirect(`/request?pro=${encodeURIComponent(str(fd, "providerId", 128))}`);
 }
 
 export type ChatMessage = { id: string; body: string; at: number; senderId: string };
@@ -667,11 +596,25 @@ export async function leaveReviewAction(_: FormState, fd: FormData): Promise<For
   const reqRef = requests().doc(requestId);
   const reviewRef = reviews().doc(requestId);
 
+  // Reviews work for findMe jobs (jobs/{id}) and older direct requests (requests/{id}).
+  const jobRef = db().collection("jobs").doc(requestId);
+  let proId = "";
+  let jobTitle = "";
   const error = await db().runTransaction(async (t) => {
-    const [reqSnap, reviewSnap] = await Promise.all([t.get(reqRef), t.get(reviewRef)]);
+    const [reqSnap, reviewSnap, jobSnap] = await Promise.all([t.get(reqRef), t.get(reviewRef), t.get(jobRef)]);
+    if (reviewSnap.exists) return "You already reviewed this job.";
+    if (!reqSnap.exists && jobSnap.exists) {
+      const j = jobSnap.data() as JobDoc;
+      if (j.clientId !== user.id || j.status !== "completed" || !j.proId) return "You can review a job once it's completed.";
+      t.create(reviewRef, { requestId, providerId: j.proId, clientId: user.id, rating, comment: str(fd, "comment", 1000), createdAt: Date.now() } satisfies ReviewDoc);
+      t.update(users().doc(j.proId), { ratingSum: FieldValue.increment(rating), reviewCount: FieldValue.increment(1) });
+      t.update(jobRef, { reviewed: true });
+      proId = j.proId;
+      jobTitle = j.title;
+      return null;
+    }
     const r = reqSnap.data() as RequestDoc | undefined;
     if (!r || r.clientId !== user.id || r.status !== "completed") return "You can review a job once it's completed.";
-    if (reviewSnap.exists) return "You already reviewed this job.";
     t.create(reviewRef, {
       requestId, providerId: r.providerId, clientId: user.id, rating, comment: str(fd, "comment", 1000), createdAt: Date.now(),
     } satisfies ReviewDoc);
@@ -680,6 +623,19 @@ export async function leaveReviewAction(_: FormState, fd: FormData): Promise<For
     return null;
   });
   if (error) return { error };
+  if (proId) {
+    await notify({
+      userId: proId,
+      kind: "review",
+      title: `You got a ${rating}★ review`,
+      body: `For "${jobTitle}". Good reviews mean findMe sends you more jobs.`,
+      href: `/pro/${proId}`,
+      cta: "See your profile",
+    });
+    updateTag(CATALOG_TAG);
+    refresh();
+    return { ok: true, message: "Thanks for your review!" };
+  }
   const reviewed = (await reqRef.get()).data() as RequestDoc | undefined;
   if (reviewed) {
     await notify({

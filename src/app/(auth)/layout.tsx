@@ -21,7 +21,7 @@ export default function AuthLayout({ children }: LayoutProps<"/">) {
           <ul className="mt-12 space-y-4 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
             {[
               ["Confirmed accounts", "Requests can only be sent from a confirmed email."],
-              ["Private by default", "Numbers are shared only after a request is accepted."],
+              ["Private by default", "Only the pro findMe sends sees your number."],
               ["Honest reviews", "Only clients who completed a job can leave one."],
             ].map(([t, d]) => (
               <li key={t} className="flex gap-3">

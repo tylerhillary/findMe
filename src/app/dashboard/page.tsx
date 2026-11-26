@@ -103,7 +103,11 @@ async function Overview({ searchParams }: { searchParams: Promise<Record<string,
     <div className="space-y-5 sm:space-y-6">
       {sp.welcome === "1" && <WelcomeBanner name={first} isPro={isPro} />}
       {admin && (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Link href="/admin/jobs" className="card flex items-center justify-between gap-3 p-4 text-sm font-semibold hover:border-brand-300 sm:px-6">
+            <span>Admin: jobs</span>
+            <ArrowRight className="size-4 text-brand-600" />
+          </Link>
           <Link href="/admin/reports" className="card flex items-center justify-between gap-3 p-4 text-sm font-semibold hover:border-brand-300 sm:px-6">
             <span>Admin: reports</span>
             <ArrowRight className="size-4 text-brand-600" />

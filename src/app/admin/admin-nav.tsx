@@ -2,6 +2,7 @@ import Link from "next/link";
 import { cn } from "@/components/ui";
 
 const TABS = [
+  { href: "/admin/jobs", label: "Jobs" },
   { href: "/admin/reports", label: "Reports" },
   { href: "/admin/verifications", label: "Phone verifications" },
 ];

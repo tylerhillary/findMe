@@ -10,7 +10,7 @@ type Mode = "hire" | "work";
 
 const ITEMS = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-  { href: "/dashboard/requests", label: "Requests", icon: MessageSquareText },
+  { href: "/dashboard/jobs", label: "Jobs", icon: MessageSquareText },
   { href: "/dashboard/services", label: "My services", icon: Briefcase, workOnly: true },
   { href: "/dashboard/profile", label: "Profile & skills", icon: UserRound },
   { href: "/search", label: "Find talent", icon: Search },
@@ -43,7 +43,7 @@ export function DashNav({ badge = 0, mode = "hire" }: { badge?: number; mode?: M
             {active && <motion.span layoutId="dash-active" className="absolute inset-0 rounded-xl bg-ink shadow-lift" transition={{ type: "spring", stiffness: 380, damping: 32 }} />}
             <Icon className="relative size-[18px]" />
             <span className="relative flex-1">{label}</span>
-            {href === "/dashboard/requests" && <Badge n={badge} className="relative" />}
+            {href === "/dashboard/jobs" && <Badge n={badge} className="relative" />}
           </Link>
         );
       })}
@@ -62,7 +62,7 @@ export function MobileTabs({ badge = 0, mode = "hire" }: { badge?: number; mode?
             <span className="relative grid h-7 w-12 place-items-center">
               {active && <motion.span layoutId="tab-active" className="absolute inset-0 rounded-full bg-brand-50" transition={{ type: "spring", stiffness: 380, damping: 32 }} />}
               <Icon className="relative size-[19px]" strokeWidth={active ? 2.3 : 2} />
-              {href === "/dashboard/requests" && <Badge n={badge} className="absolute -right-0.5 -top-1 ring-2 ring-white" />}
+              {href === "/dashboard/jobs" && <Badge n={badge} className="absolute -right-0.5 -top-1 ring-2 ring-white" />}
             </span>
             <span className="relative">{label.split(" ")[0] === "My" ? "Services" : label.split(" ")[0] === "Find" ? "Search" : label.split(" ")[0]}</span>
           </Link>

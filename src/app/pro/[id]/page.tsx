@@ -9,17 +9,16 @@ import { CategoryIcon } from "@/components/category-icon";
 import { FadeIn, Reveal, Stagger, StaggerItem } from "@/components/motion";
 import { Avatar, Rating, Stars, cn, formatMoney, timeAgo } from "@/components/ui";
 import { getCurrentUser } from "@/lib/auth";
-import { publicName } from "@/lib/names";
+import { shownName } from "@/lib/names";
 import { categoryName } from "@/lib/categories";
-import { getNow, getProviderProfile, getUserPhone, hasAcceptedRequest, hasReported, type ProviderProfile } from "@/lib/queries";
+import { getNow, getProviderProfile, hasReported, type ProviderProfile } from "@/lib/queries";
 import { ReportButton } from "@/components/report-dialog";
 import { PhoneVerifiedBadge, VerifiedAccountBadge } from "@/components/verify-phone";
-import { ContactButtons, LockedPhone } from "@/components/contact-card";
 import { HireButton, RequestPanel } from "./request-panel";
 
 export async function generateMetadata({ params }: PageProps<"/pro/[id]">): Promise<Metadata> {
   const p = await getProviderProfile((await params).id);
-  return { title: p ? `${publicName(p)} — ${p.headline}` : "Profile not found" };
+  return { title: p ? `${shownName(p)} — ${p.headline}` : "Profile not found" };
 }
 
 export default function ProfilePage({ params }: PageProps<"/pro/[id]">) {
@@ -52,7 +51,7 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
         {p.cover ? (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={p.cover} alt={`${publicName(p)} cover`} className="absolute inset-0 size-full object-cover" />
+            <img src={p.cover} alt={`${shownName(p)} cover`} className="absolute inset-0 size-full object-cover" />
             {/* Keeps "Back to search" readable on any photo. */}
             <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/35 to-transparent" />
           </>
@@ -74,14 +73,14 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
           {/* identity */}
           <FadeIn className="-mt-11 flex flex-col gap-3 sm:-mt-20 sm:flex-row sm:items-start sm:gap-6">
             <div className="relative w-fit">
-              <Avatar name={publicName(p)} src={p.avatar} size={88} ring className="shadow-lift sm:hidden" />
-              <Avatar name={publicName(p)} src={p.avatar} size={136} ring className="shadow-lift max-sm:hidden" />
+              <Avatar name={shownName(p)} src={p.avatar} size={88} ring className="shadow-lift sm:hidden" />
+              <Avatar name={shownName(p)} src={p.avatar} size={136} ring className="shadow-lift max-sm:hidden" />
               <span className={cn("absolute bottom-1.5 right-1.5 size-4 rounded-full ring-[3px] ring-white sm:bottom-3 sm:right-3 sm:size-5 sm:ring-4", p.available ? "bg-emerald-500" : "bg-zinc-300")} />
             </div>
             {/* On wider screens the photo overlaps the cover by 5rem; start the text just below it so the name never sits on the purple. */}
             <div className="min-w-0 sm:pt-[6.25rem]">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="font-display text-[1.45rem] font-extrabold leading-tight tracking-tight sm:text-4xl">{publicName(p)}</h1>
+                <h1 className="font-display text-[1.45rem] font-extrabold leading-tight tracking-tight sm:text-4xl">{shownName(p)}</h1>
                 {p.emailVerified && <VerifiedAccountBadge />}
                 {p.phoneVerified && <PhoneVerifiedBadge />}
                 {p.ninVerified && (
@@ -95,7 +94,7 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
                   </span>
                 )}
               </div>
-              {p.businessName && <p className="mt-0.5 text-sm font-medium text-muted">Run by {p.name}</p>}
+              {p.businessName && <p className="mt-0.5 text-sm font-medium text-muted">Run by {p.name.split(" ")[0]}</p>}
               <p className="mt-1 text-[15px] leading-snug text-ink-soft sm:mt-1.5 sm:text-lg">{p.headline}</p>
               <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13px] text-muted sm:mt-3 sm:gap-x-5 sm:gap-y-2 sm:text-sm">
                 <Rating rating={p.rating} count={p.reviewCount} />
@@ -174,7 +173,7 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
                       </p>
                       <p className="mt-0.5 flex items-center gap-1 text-xs text-muted"><Clock className="size-3.5" /> {s.deliveryDays} day{s.deliveryDays > 1 ? "s" : ""} delivery</p>
                     </div>
-                    <HireButton serviceId={s.id} />
+                    <HireButton proId={p.id} serviceId={s.id} />
                   </div>
                 </StaggerItem>
               ))}
@@ -230,12 +229,6 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
             <Suspense fallback={<div className="skeleton h-80 rounded-3xl" />}>
               <Panel p={p} />
             </Suspense>
-            <div className="mt-3 flex items-start gap-3 rounded-2xl border border-line bg-white p-4 text-[13px] text-ink-soft sm:mt-4 sm:text-sm">
-              <ShieldCheck className="mt-0.5 size-5 shrink-0 text-emerald-500" />
-              <p>
-                <span className="font-semibold text-ink">Protected by findMe.</span> Your request goes through findMe first. Phone numbers are only exchanged once the pro accepts, so nobody gets spam calls.
-              </p>
-            </div>
             <Suspense fallback={null}>
               <ReportLink p={p} />
             </Suspense>
@@ -248,33 +241,12 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
 
 async function Panel({ p }: { p: ProviderProfile }) {
   const viewer = await getCurrentUser();
-  const first = p.name.split(" ")[0];
-  const [viewerPhone, unlocked] = viewer
-    ? await Promise.all([getUserPhone(viewer.id), viewer.id === p.id || hasAcceptedRequest(viewer.id, p.id)])
-    : ["", false];
-  const { phone, whatsapp, showPhone } = p.contact;
-
   return (
-    <>
-      <RequestPanel
-        provider={{ id: p.id, name: p.name, hourlyRate: p.hourlyRate, rateUnit: p.rateUnit, available: p.available, avatar: p.avatar, headline: p.headline }}
-        services={p.services.map((s) => ({ id: s.id, title: s.title, price: s.price, priceUnit: s.priceUnit }))}
-        viewer={viewer ? { id: viewer.id, hasPhone: !!viewerPhone } : null}
-      />
-      {phone && (
-        <div className="mt-3 rounded-2xl border border-line bg-white p-4 shadow-soft sm:mt-4 sm:rounded-3xl sm:p-5">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-muted sm:text-xs">{showPhone ? "Business line" : "Phone"}</p>
-          <div className="mt-2">
-            {/* The full number only reaches the browser when it may be shown. */}
-            {showPhone || unlocked ? (
-              <ContactButtons phone={phone} whatsapp={whatsapp} waMessage={`Hi ${first}, I found you on findMe.`} unverifiedName={p.phoneVerified ? undefined : first} />
-            ) : (
-              <LockedPhone phone={phone} reason={`Shown once ${first} accepts your request.`} unverifiedName={p.phoneVerified ? undefined : first} />
-            )}
-          </div>
-        </div>
-      )}
-    </>
+    <RequestPanel
+      provider={{ id: p.id, name: shownName(p), hourlyRate: p.hourlyRate, rateUnit: p.rateUnit, available: p.available }}
+      services={p.services.map((s) => ({ price: s.price }))}
+      isSelf={viewer?.id === p.id}
+    />
   );
 }
 
@@ -285,7 +257,7 @@ async function ReportLink({ p }: { p: ProviderProfile }) {
     <div className="mt-3 flex items-center justify-between gap-3 px-1 text-[13px] text-muted">
       <span>Something not right?</span>
       {viewer ? (
-        <ReportButton reportedId={p.id} name={p.name} alreadyReported={await hasReported(viewer.id, p.id)} />
+        <ReportButton reportedId={p.id} name={shownName(p)} alreadyReported={await hasReported(viewer.id, p.id)} />
       ) : (
         <Link href={`/login?next=${encodeURIComponent(`/pro/${p.id}`)}`} className="inline-flex items-center gap-1.5 font-semibold text-red-600 hover:text-red-700">
           <Flag className="size-3.5" /> Sign in to report

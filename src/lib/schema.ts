@@ -159,3 +159,42 @@ export type IdentityDoc = {
  * users/{uid} so search and lists never load it; only the profile pages read it.
  */
 export type CoverDoc = { image: string; updatedAt: number };
+
+/**
+ * jobs/{id}: a client's request to findMe. findMe quotes a price (the client can bargain), takes
+ * payment, assigns a pro, and pays the pro once the client confirms the work. Client and pro never
+ * get each other's contact through the site; only the assigned pro sees the client's number.
+ */
+export type JobStatus = "new" | "quoted" | "paid" | "assigned" | "completed" | "cancelled";
+export type JobDoc = {
+  clientId: string;
+  clientName: string;
+  clientPhone: string; // E.164; shown only to the assigned pro and admins
+  title: string;
+  details: string;
+  category: string;
+  location: string; // area / address for the pro
+  when: string; // e.g. "This weekend", "ASAP"
+  /** Pro the client picked on findMe, if any (findMe may still assign someone else). */
+  preferredProId: string | null;
+  /** What the client would like to pay (their bargain), if they made an offer. */
+  clientOffer: number;
+  status: JobStatus;
+  /** The price findMe quoted / agreed with the client. */
+  price: number;
+  /** What the pro receives: price minus findMe's fee. */
+  proPayout: number;
+  proId: string | null;
+  quotedAt?: number;
+  paymentClaimedAt?: number; // client tapped "I've paid"
+  paidAt?: number; // admin confirmed the money arrived
+  assignedAt?: number;
+  doneRequestedAt?: number; // pro said it's done; client confirms or it auto-confirms
+  completedAt?: number;
+  proPaidAt?: number; // admin paid the pro
+  cancelledAt?: number;
+  reviewed?: boolean;
+  adminNote?: string;
+  createdAt: number;
+  updatedAt: number;
+};

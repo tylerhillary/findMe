@@ -104,9 +104,9 @@ export default function Home() {
             </Reveal>
             <Stagger className="relative mt-8 grid gap-3 sm:mt-16 sm:gap-6 md:grid-cols-3">
               {[
-                { icon: Search, title: "Search a skill", body: "Describe what you need in plain words, like “fix my sink”, and see matching pros." },
-                { icon: UserRoundCheck, title: "Pick your person", body: "Compare ratings, skills, prices and reviews, then choose." },
-                { icon: MessageSquareText, title: "Request through findMe", body: "Send your job details. Once they accept, chat privately and get it done." },
+                { icon: Search, title: "Tell us what you need", body: "Browse pros and their prices, or just describe the job, like “fix my sink”." },
+                { icon: UserRoundCheck, title: "Get a findMe price", body: "We send you a price. Want it cheaper? Make an offer and we ask the pro." },
+                { icon: MessageSquareText, title: "We send the pro", body: "Pay findMe and we send a trusted pro. We only pay them once you confirm the job is done." },
               ].map(({ icon: Icon, title, body }, i) => (
                 <StaggerItem key={title} className="group relative flex gap-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4 transition-colors hover:bg-white/[0.07] sm:block sm:rounded-3xl sm:p-7">
                   <span className="absolute right-4 top-3 font-display text-3xl font-extrabold text-white/[0.06] sm:right-6 sm:top-5 sm:text-6xl">0{i + 1}</span>
@@ -143,7 +143,7 @@ export default function Home() {
           </Suspense>
           <Stagger className="mt-3 grid gap-3 sm:mt-6 sm:gap-6 md:grid-cols-3">
             {[
-              { icon: Lock, title: "Your details stay private", body: "Your number is shared only after a request is accepted." },
+              { icon: Lock, title: "Your details stay private", body: "Only the pro findMe sends sees your number." },
               { icon: BadgeCheck, title: "Reviews you can trust", body: "Only clients who completed a job can leave a review." },
               { icon: Zap, title: "Fast, fair matching", body: "Search understands everyday words and shows the best fit first." },
             ].map(({ icon: Icon, title, body }) => (
@@ -166,16 +166,16 @@ export default function Home() {
             <SectionHeading
               eyebrow="Why people stay"
               title="Why clients and pros stay on findMe"
-              sub="Numbers are shared once a job is accepted. Here is why people keep using findMe."
+              sub="findMe arranges every job and holds your payment until it is done. Here is why people keep using findMe."
             />
             <div className="grid gap-3 sm:gap-6 lg:grid-cols-2">
               <WhyCard
                 who="For clients"
                 points={[
-                  { icon: Lock, title: "Numbers stay private", body: "Numbers stay hidden until a request is accepted, so you are never cold-called." },
-                  { icon: History, title: "A record of every job", body: "Requests, agreed terms and messages are kept in one place if anything goes wrong." },
+                  { icon: Lock, title: "Numbers stay private", body: "Only the pro findMe sends gets your number, so you are never cold-called." },
+                  { icon: History, title: "Your money is protected", body: "You pay findMe. The pro is paid only after you confirm the job was done properly." },
                   { icon: Flag, title: "Accountable people", body: "Report or block anyone in one tap. Every review comes from a real completed job." },
-                  { icon: Search, title: "Faster next time", body: "Need someone else next time? Search shows who is available now." },
+                  { icon: Search, title: "Faster next time", body: "Need help again? Ask findMe and we send someone right away." },
                 ]}
               />
               <WhyCard
@@ -183,7 +183,7 @@ export default function Home() {
                 points={[
                   { icon: Star, title: "Reviews count here", body: "Ratings come only from jobs completed on findMe. Off-platform work builds no reputation." },
                   { icon: TrendingUp, title: "Rank comes from results", body: "Completed jobs and good reviews move you up in search." },
-                  { icon: Wallet, title: "No commission", body: "findMe takes no commission, so there is nothing to save by going elsewhere." },
+                  { icon: Wallet, title: "Just 3%", body: "findMe keeps 3% of what the client pays and pays you the rest once they confirm the job." },
                   { icon: BadgeCheck, title: "Visible trust", body: "Your badges and job history are what win new clients." },
                 ]}
               />

@@ -76,3 +76,9 @@ export async function emailAdminsReport(r: { reportedName: string; reportedRole:
   const subject = r.hidden ? `Hidden after ${r.count} reports: ${r.reportedName}` : `Report: ${r.reportedName} (${r.reason})`;
   await Promise.all(adminInbox().map((to) => sendEmail({ to, subject, html })));
 }
+
+/** A general email to the admins, e.g. a new job request or a payment to check. */
+export async function emailAdmins(m: { subject: string; title: string; body: string; href: string; cta: string; details?: [string, string][]; quote?: { from: string; text: string } }) {
+  const html = emailLayout({ name: "", title: m.title, body: m.body, href: m.href, cta: m.cta, details: m.details, quote: m.quote });
+  await Promise.all(adminInbox().map((to) => sendEmail({ to, subject: m.subject, html })));
+}

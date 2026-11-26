@@ -5,7 +5,7 @@ import { motion } from "motion/react";
 import { BadgeCheck, CheckCircle2, MessageCircle } from "lucide-react";
 import type { ProviderCard } from "@/lib/queries";
 import { Avatar, formatMoney } from "./ui";
-import { publicName } from "@/lib/names";
+import { shownName } from "@/lib/names";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -36,10 +36,10 @@ export function HeroVisual({ pro }: { pro: ProviderCard | null }) {
         <div className="animate-float rounded-3xl border border-white/70 bg-white/90 p-5 shadow-lift backdrop-blur">
           {!pro && <p className="mb-3 text-[11px] font-bold uppercase tracking-wider text-muted">Example profile</p>}
           <div className="flex items-center gap-3">
-            <Avatar name={pro ? publicName(pro) : "Your name"} src={pro?.avatar ?? null} size={52} />
+            <Avatar name={pro ? shownName(pro) : "Your name"} src={pro?.avatar ?? null} size={52} />
             <div className="min-w-0">
               <p className="flex items-center gap-1 font-bold">
-                <span className="truncate">{pro ? publicName(pro) : "Your name here"}</span>
+                <span className="truncate">{pro ? shownName(pro) : "Your name here"}</span>
                 {pro?.emailVerified && <BadgeCheck className="size-4 shrink-0 fill-sky-500 text-white" aria-label="Verified account" />}
                 {pro?.phoneVerified && <PhoneVerifiedBadge compact />}
               </p>

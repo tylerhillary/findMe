@@ -1,0 +1,321 @@
+"use server";
+
+import { redirect } from "next/navigation";
+import { after } from "next/server";
+import { refresh, updateTag } from "next/cache";
+import { FieldValue } from "firebase-admin/firestore";
+import { db } from "@/lib/firebase-admin";
+import { requireUser } from "@/lib/auth";
+import { notify } from "@/lib/notify";
+import { emailAdmins, isAdmin } from "@/lib/admin";
+import { isCategory, categoryName } from "@/lib/categories";
+import { formatNgPhone, normalizeNgPhone } from "@/lib/phone";
+import { FINDME_FEE_LABEL, proPayoutFor } from "@/lib/fees";
+import { CATALOG_TAG } from "@/lib/queries";
+import { completeBrokerJob } from "@/lib/broker";
+import type { JobDoc, UserDoc } from "@/lib/schema";
+import type { FormState } from "@/app/actions";
+
+const jobs = () => db().collection("jobs");
+const users = () => db().collection("users");
+const str = (fd: FormData, k: string, max = 2000) => String(fd.get(k) ?? "").trim().slice(0, max);
+const money = (v: unknown) => {
+  const n = Math.round(Number(String(v ?? "").replace(/[^\d.]/g, "")));
+  return Number.isFinite(n) && n > 0 ? Math.min(n, 100_000_000) : 0;
+};
+const naira = (n: number) => new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", currencyDisplay: "narrowSymbol", maximumFractionDigits: 0 }).format(n);
+const jobHref = (id: string) => `/dashboard/jobs/${id}`;
+const adminHref = (id: string) => `/admin/jobs#${id}`;
+const safeId = (id: unknown) => String(id ?? "").slice(0, 128);
+
+async function loadJob(id: string) {
+  const ref = jobs().doc(safeId(id));
+  const job = (await ref.get()).data() as JobDoc | undefined;
+  return { ref, job };
+}
+
+async function requireAdmin() {
+  const user = await requireUser("/admin/jobs");
+  if (!(await isAdmin(user.id, user.email))) throw new Error("Only admins can do this.");
+  return user;
+}
+
+const ok = () => {
+  refresh();
+  return { ok: true as const };
+};
+
+// ---------------- Client ----------------
+
+/** Client asks findMe for help. findMe replies with a price (they can make an offer). */
+export async function createJobAction(_: FormState, fd: FormData): Promise<FormState> {
+  const user = await requireUser("/request");
+  const title = str(fd, "title", 120);
+  const details = str(fd, "details", 3000);
+  const category = str(fd, "category", 40);
+  const location = str(fd, "location", 160);
+  const when = str(fd, "when", 80);
+  const phoneRaw = str(fd, "phone", 30);
+  const phone = normalizeNgPhone(phoneRaw);
+  const clientOffer = money(fd.get("offer"));
+  const preferred = safeId(fd.get("proId"));
+
+  const fieldErrors: Record<string, string> = {};
+  if (title.length < 4) fieldErrors.title = "Say in a few words what you need.";
+  if (details.length < 15) fieldErrors.details = "Describe the job a little more (at least 15 characters).";
+  if (!isCategory(category)) fieldErrors.category = "Pick the closest category.";
+  if (location.length < 3) fieldErrors.location = "Where should the pro come to? Area and state is enough for now.";
+  if (!phone) fieldErrors.phone = phoneRaw ? "Enter a valid Nigerian number, e.g. 0803 123 4567." : "Add a number so the pro we send can reach you.";
+  if (Object.keys(fieldErrors).length) return { fieldErrors };
+
+  let preferredProId: string | null = null;
+  let preferredName = "";
+  if (preferred) {
+    const p = (await users().doc(preferred).get()).data() as UserDoc | undefined;
+    if (p?.role === "provider" && !p.banned) {
+      preferredProId = preferred;
+      preferredName = p.name;
+    }
+  }
+
+  const now = Date.now();
+  const ref = jobs().doc();
+  await ref.set({
+    clientId: user.id, clientName: user.name, clientPhone: phone!, title, details, category, location, when,
+    preferredProId, clientOffer, status: "new", price: 0, proPayout: 0, proId: null, createdAt: now, updatedAt: now,
+  } satisfies JobDoc);
+  // Remember their number for next time.
+  const me = (await users().doc(user.id).get()).data() as UserDoc | undefined;
+  if (!me?.phone) await users().doc(user.id).update({ phone: phone! });
+
+  after(() =>
+    emailAdmins({
+      subject: `New job request: ${title}`,
+      title: `New job request from ${user.name}`,
+      body: `Send ${user.name.split(" ")[0]} a price, then assign a pro once they've paid.`,
+      href: adminHref(ref.id),
+      cta: "Open job",
+      details: [
+        ["Category", categoryName(category)],
+        ["Where", location],
+        ["When", when || "Not given"],
+        ["Their offer", clientOffer ? naira(clientOffer) : "No offer"],
+        ["Pro they picked", preferredName || "Any"],
+        ["Phone", formatNgPhone(phone!)],
+      ],
+      quote: { from: user.name, text: details },
+    }).catch((e) => console.error("[findMe] job email failed:", e)),
+  );
+  redirect(`${jobHref(ref.id)}?new=1`);
+}
+
+/** Client: "can you do it for less?" Sends the job back to findMe with their new offer. */
+export async function counterOfferAction(jobId: string, offer: number): Promise<{ ok?: true; error?: string }> {
+  const user = await requireUser();
+  const { ref, job } = await loadJob(jobId);
+  if (!job || job.clientId !== user.id || job.status !== "quoted") return { error: "You can't change the offer on this job now." };
+  const amount = money(offer);
+  if (!amount) return { error: "Enter the amount you'd like to pay." };
+  if (amount >= job.price) return { error: "Your offer should be lower than the quote." };
+  await ref.update({ status: "new", clientOffer: amount, updatedAt: Date.now() });
+  after(() =>
+    emailAdmins({
+      subject: `Offer: ${naira(amount)} for "${job.title}"`,
+      title: `${user.name} made an offer`,
+      body: `You quoted ${naira(job.price)}. ${user.name.split(" ")[0]} would like to pay ${naira(amount)}. Check with the pro and send a new price.`,
+      href: adminHref(ref.id),
+      cta: "Open job",
+    }).catch(() => {}),
+  );
+  return ok();
+}
+
+/** Client: "I've sent the money". findMe checks the account and confirms. */
+export async function claimPaidAction(jobId: string): Promise<{ ok?: true; error?: string }> {
+  const user = await requireUser();
+  const { ref, job } = await loadJob(jobId);
+  if (!job || job.clientId !== user.id || job.status !== "quoted") return { error: "This job isn't waiting for payment." };
+  await ref.update({ paymentClaimedAt: Date.now(), updatedAt: Date.now() });
+  after(() =>
+    emailAdmins({
+      subject: `Payment to check: ${naira(job.price)} from ${user.name}`,
+      title: `${user.name} says they've paid`,
+      body: `Check your account for ${naira(job.price)} for "${job.title}", then mark it paid and assign a pro.`,
+      href: adminHref(ref.id),
+      cta: "Open job",
+    }).catch(() => {}),
+  );
+  return ok();
+}
+
+/** Client cancels before paying. (After payment, findMe cancels and refunds.) */
+export async function cancelJobAction(jobId: string): Promise<{ ok?: true; error?: string }> {
+  const user = await requireUser();
+  const { ref, job } = await loadJob(jobId);
+  if (!job || job.clientId !== user.id) return { error: "Job not found." };
+  if (job.status !== "new" && job.status !== "quoted") return { error: "This job is already paid. Contact findMe to cancel it." };
+  await ref.update({ status: "cancelled", cancelledAt: Date.now(), updatedAt: Date.now() });
+  after(() => emailAdmins({ subject: `Cancelled: ${job.title}`, title: `${user.name} cancelled a job request`, body: `"${job.title}" was cancelled before payment.`, href: adminHref(ref.id), cta: "Open job" }).catch(() => {}));
+  return ok();
+}
+
+/** Client answers the pro's "it's done": yes completes it; no sends the pro back to finish. */
+export async function confirmJobDoneAction(jobId: string, yes: boolean): Promise<{ ok?: true; error?: string }> {
+  const user = await requireUser();
+  const { ref, job } = await loadJob(jobId);
+  if (!job || job.clientId !== user.id || job.status !== "assigned") return { error: "This job isn't waiting for your confirmation." };
+  if (yes) {
+    if (await completeBrokerJob(ref.id, "client")) updateTag(CATALOG_TAG);
+    return ok();
+  }
+  await ref.update({ doneRequestedAt: FieldValue.delete(), updatedAt: Date.now() });
+  if (job.proId) {
+    await notify({
+      userId: job.proId,
+      kind: "status",
+      title: "The client says the job isn't finished",
+      body: `"${job.title}" is still open. Call the client to see what's left, then mark it done again.`,
+      href: jobHref(ref.id),
+      cta: "Open job",
+    });
+  }
+  after(() => emailAdmins({ subject: `Not finished: ${job.title}`, title: `${user.name} says the job isn't finished`, body: "The pro marked it done but the client disagrees. You may want to follow up.", href: adminHref(ref.id), cta: "Open job" }).catch(() => {}));
+  return ok();
+}
+
+// ---------------- Pro ----------------
+
+/** Assigned pro: "the job is done". The client confirms, or it's confirmed after 3 days. */
+export async function proMarkDoneAction(jobId: string): Promise<{ ok?: true; error?: string }> {
+  const user = await requireUser();
+  const { ref, job } = await loadJob(jobId);
+  if (!job || job.proId !== user.id || job.status !== "assigned") return { error: "This job isn't assigned to you." };
+  if (job.doneRequestedAt) return ok();
+  await ref.update({ doneRequestedAt: Date.now(), updatedAt: Date.now() });
+  await notify({
+    userId: job.clientId,
+    kind: "status",
+    title: "Is your job finished?",
+    body: `${user.name.split(" ")[0]} says "${job.title}" is done. Confirm it to leave a review, or tell us if it isn't finished. If you don't answer, it's confirmed in 3 days.`,
+    href: jobHref(ref.id),
+    cta: "Confirm or reply",
+  });
+  return ok();
+}
+
+// ---------------- Admin ----------------
+
+/** Admin: send the client a price (after any bargaining with the pro). */
+export async function quoteJobAction(jobId: string, price: number, note: string): Promise<{ ok?: true; error?: string }> {
+  try {
+    await requireAdmin();
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+  const { ref, job } = await loadJob(jobId);
+  if (!job || (job.status !== "new" && job.status !== "quoted")) return { error: "You can only price a job before it's paid." };
+  const amount = money(price);
+  if (!amount) return { error: "Enter the price for the client." };
+  await ref.update({ status: "quoted", price: amount, proPayout: proPayoutFor(amount), quotedAt: Date.now(), paymentClaimedAt: FieldValue.delete(), adminNote: String(note ?? "").slice(0, 500), updatedAt: Date.now() });
+  await notify({
+    userId: job.clientId,
+    kind: "status",
+    title: `Your price from findMe: ${naira(amount)}`,
+    body: `For "${job.title}". Pay findMe to book it, or ask for a better price.${job.clientOffer && amount <= job.clientOffer ? " We matched your offer!" : ""}`,
+    href: jobHref(ref.id),
+    cta: "See price & pay",
+  });
+  return ok();
+}
+
+/** Admin: the client's money arrived. */
+export async function markJobPaidAction(jobId: string): Promise<{ ok?: true; error?: string }> {
+  try {
+    await requireAdmin();
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+  const { ref, job } = await loadJob(jobId);
+  if (!job || job.status !== "quoted") return { error: "Send a price before marking it paid." };
+  await ref.update({ status: job.proId ? "assigned" : "paid", paidAt: Date.now(), updatedAt: Date.now() });
+  await notify({
+    userId: job.clientId,
+    kind: "status",
+    title: "Payment received",
+    body: `Thanks! We got ${naira(job.price)} for "${job.title}". We're assigning a pro and they'll call you soon.`,
+    href: jobHref(ref.id),
+    cta: "View job",
+  });
+  return ok();
+}
+
+/** Admin: send a pro. They see the client's contact; the client never sees theirs. */
+export async function assignJobAction(jobId: string, proId: string): Promise<{ ok?: true; error?: string }> {
+  try {
+    await requireAdmin();
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+  const { ref, job } = await loadJob(jobId);
+  if (!job || !["quoted", "paid", "assigned"].includes(job.status)) return { error: "Price the job before assigning a pro." };
+  const pro = (await users().doc(safeId(proId)).get()).data() as UserDoc | undefined;
+  if (!pro || pro.role !== "provider" || pro.banned) return { error: "Pick a professional." };
+  const previous = job.proId;
+  await ref.update({ proId: safeId(proId), assignedAt: Date.now(), doneRequestedAt: FieldValue.delete(), status: job.status === "quoted" ? "quoted" : "assigned", updatedAt: Date.now() });
+  if (previous && previous !== proId) {
+    await notify({ userId: previous, kind: "status", title: "A job was moved", body: `"${job.title}" has been given to another pro. You don't need to do anything.`, href: "/dashboard/jobs", cta: "Your jobs" });
+  }
+  await notify({
+    userId: safeId(proId),
+    kind: "request",
+    title: `New job from findMe: ${job.title}`,
+    body: `${job.location}${job.when ? ` · ${job.when}` : ""}. You'll be paid ${naira(job.proPayout || proPayoutFor(job.price))} (${naira(job.price)} less findMe's ${FINDME_FEE_LABEL}) once the client confirms it's done. Open the job for the client's details.`,
+    href: jobHref(ref.id),
+    cta: "Open job",
+  });
+  await notify({
+    userId: job.clientId,
+    kind: "status",
+    title: `${pro.name.split(" ")[0]} will do your job`,
+    body: `findMe has assigned ${pro.name.split(" ")[0]} to "${job.title}". They'll contact you soon.`,
+    href: jobHref(ref.id),
+    cta: "View job",
+  });
+  return ok();
+}
+
+/** Admin: the pro has been paid their share. */
+export async function markProPaidAction(jobId: string): Promise<{ ok?: true; error?: string }> {
+  try {
+    await requireAdmin();
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+  const { ref, job } = await loadJob(jobId);
+  if (!job || job.status !== "completed" || !job.proId) return { error: "Pay the pro once the client has confirmed the job." };
+  await ref.update({ proPaidAt: Date.now(), updatedAt: Date.now() });
+  await notify({
+    userId: job.proId,
+    kind: "status",
+    title: `You've been paid ${naira(job.proPayout)}`,
+    body: `findMe has sent your payment for "${job.title}". Thanks for doing great work!`,
+    href: jobHref(ref.id),
+    cta: "View job",
+  });
+  return ok();
+}
+
+/** Admin: cancel a job at any stage (refund the client yourself if they paid). */
+export async function adminCancelJobAction(jobId: string): Promise<{ ok?: true; error?: string }> {
+  try {
+    await requireAdmin();
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+  const { ref, job } = await loadJob(jobId);
+  if (!job || job.status === "completed" || job.status === "cancelled") return { error: "This job can't be cancelled." };
+  await ref.update({ status: "cancelled", cancelledAt: Date.now(), updatedAt: Date.now() });
+  await notify({ userId: job.clientId, kind: "status", title: "Your job was cancelled", body: `findMe cancelled "${job.title}". If you paid, we'll refund you.`, href: jobHref(ref.id), cta: "View job" });
+  if (job.proId) await notify({ userId: job.proId, kind: "status", title: "A job was cancelled", body: `"${job.title}" was cancelled. You don't need to go.`, href: "/dashboard/jobs", cta: "Your jobs" });
+  return ok();
+}
