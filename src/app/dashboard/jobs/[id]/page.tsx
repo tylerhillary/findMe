@@ -58,11 +58,19 @@ async function Job({ params, searchParams }: { params: Promise<{ id: string }>; 
         <ArrowLeft className="size-4" /> All jobs
       </Link>
 
-      {sp.new === "1" && (
+      {/* Client, price ready: point them to the payment step. Before that, just confirm the request went through. */}
+      {data.role === "client" && data.job.status === "quoted" && !data.job.paymentClaimedAt && payment !== "failed" ? (
         <FadeIn className="mt-4 flex items-start gap-3 rounded-2xl bg-emerald-50 p-4 text-emerald-900">
           <CheckCircle2 className="mt-0.5 size-5 shrink-0" />
-          <p className="text-sm"><span className="font-semibold">Request sent to findMe.</span> We&apos;ll send you a price soon. You&apos;ll get an email and a notification here.</p>
+          <p className="text-sm"><span className="font-semibold">Your request has been accepted.</span> Proceed to payment below.</p>
         </FadeIn>
+      ) : (
+        sp.new === "1" && data.job.status === "new" && (
+          <FadeIn className="mt-4 flex items-start gap-3 rounded-2xl bg-emerald-50 p-4 text-emerald-900">
+            <CheckCircle2 className="mt-0.5 size-5 shrink-0" />
+            <p className="text-sm"><span className="font-semibold">Request sent to findMe.</span> We&apos;re getting your price now.</p>
+          </FadeIn>
+        )
       )}
 
       {payment === "ok" && (
