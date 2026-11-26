@@ -66,6 +66,7 @@ export async function createJobAction(_: FormState, fd: FormData): Promise<FormS
   if (title.length < 4) fieldErrors.title = "Say in a few words what you need.";
   if (details.length < 15) fieldErrors.details = "Describe the job a little more (at least 15 characters).";
   if (!isCategory(category)) fieldErrors.category = "Pick the closest category.";
+  if (when.length < 2) fieldErrors.when = "Tell us when you need it done, e.g. This Saturday or As soon as possible.";
   if (location.length < 3) fieldErrors.location = "Where should the pro come to? Area and state is enough for now.";
   if (!phone) fieldErrors.phone = phoneRaw ? "Enter a valid Nigerian number, e.g. 0803 123 4567." : "Add a number so the pro we send can reach you.";
   if (Object.keys(fieldErrors).length) return { fieldErrors };
@@ -100,7 +101,7 @@ export async function createJobAction(_: FormState, fd: FormData): Promise<FormS
       details: [
         ["Category", categoryName(category)],
         ["Where", location],
-        ["When", when || "Not given"],
+        ["When", when],
         ["Their offer", clientOffer ? naira(clientOffer) : "No offer"],
         ["Pro they picked", preferredName || "Any"],
         ["Phone", formatNgPhone(phone!)],

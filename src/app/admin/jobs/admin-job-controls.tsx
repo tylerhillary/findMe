@@ -43,7 +43,7 @@ export function AdminJobControls({
           <div className="mt-2 flex flex-wrap gap-2">
             <div className="relative w-40">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-semibold text-muted">₦</span>
-              <Input type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} className="h-10 pl-7" />
+              <Input type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} className="h-10 pl-7 sm:pl-8" />
             </div>
             <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note to client (optional)" className="h-10 min-w-0 flex-1" />
             <button disabled={pending || !n} onClick={() => run("quote", () => quoteJobAction(jobId, n, note))} className={btn("primary", "sm", "h-10")}>

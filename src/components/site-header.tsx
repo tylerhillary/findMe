@@ -27,7 +27,7 @@ async function HeaderAuth() {
     return (
       <div className="flex items-center gap-1 sm:gap-2">
         <NotificationBell unread={unread} />
-        <UserMenu user={{ name: user.name, email: user.email, avatar: user.avatar }} />
+        <UserMenu user={{ id: user.id, name: user.name, email: user.email, avatar: user.avatar, role: user.role }} />
       </div>
     );
   }

@@ -7,7 +7,7 @@ import { TeamBadgeToggle } from "./team-badge-toggle";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AlertTriangle, ArrowLeft, BadgeCheck, CalendarDays, Clock, Flag, MapPin, MessageSquareQuote, ShieldCheck, Trophy } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CalendarDays, Clock, Flag, MapPin, MessageSquareQuote, Trophy } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { CategoryIcon } from "@/components/category-icon";
@@ -18,7 +18,7 @@ import { shownName } from "@/lib/names";
 import { categoryName } from "@/lib/categories";
 import { getNow, getProviderProfile, hasReported, type ProviderProfile } from "@/lib/queries";
 import { ReportButton } from "@/components/report-dialog";
-import { PhoneVerifiedBadge, TeamBadge, VerifiedAccountBadge } from "@/components/verify-phone";
+import { IdVerifiedBadge, PhoneVerifiedBadge, TeamBadge, TrustedProBadge, VerifiedAccountBadge } from "@/components/verify-phone";
 import { HireButton, RequestPanel } from "./request-panel";
 
 export async function generateMetadata({ params }: PageProps<"/pro/[id]">): Promise<Metadata> {
@@ -89,16 +89,8 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
                 {p.emailVerified && <VerifiedAccountBadge />}
                 {p.team && <TeamBadge />}
                 {p.phoneVerified && <PhoneVerifiedBadge />}
-                {p.ninVerified && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700" title="Identity confirmed with their NIN">
-                    <ShieldCheck className="size-3.5" /> ID verified
-                  </span>
-                )}
-                {p.jobsDone >= 3 && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700">
-                    <BadgeCheck className="size-3.5" /> Trusted pro
-                  </span>
-                )}
+                {p.ninVerified && <IdVerifiedBadge />}
+                {p.jobsDone >= 3 && <TrustedProBadge />}
               </div>
               {p.businessName && <p className="mt-0.5 text-sm font-medium text-muted">Run by {p.name.split(" ")[0]}</p>}
               <p className="mt-1 text-[15px] leading-snug text-ink-soft sm:mt-1.5 sm:text-lg">{p.headline}</p>

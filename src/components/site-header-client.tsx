@@ -133,7 +133,7 @@ export function HeaderShell({ auth, transparent }: { auth: ReactNode; transparen
   );
 }
 
-export function UserMenu({ user }: { user: { name: string; email: string; avatar: string | null } }) {
+export function UserMenu({ user }: { user: { id: string; name: string; email: string; avatar: string | null; role: "client" | "provider" } }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -153,7 +153,8 @@ export function UserMenu({ user }: { user: { name: string; email: string; avatar
   const items = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/dashboard/requests", label: "Requests & messages", icon: MessageSquareText },
-    { href: "/dashboard/profile", label: "Edit profile", icon: UserRound },
+    // Pros see their public page as others do (it has its own edit button). Editing lives in the dashboard.
+    ...(user.role === "provider" ? [{ href: `/pro/${user.id}`, label: "View profile", icon: UserRound }] : []),
     { href: "/dashboard/settings", label: "Account settings", icon: Settings },
   ];
 

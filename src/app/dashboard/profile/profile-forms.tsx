@@ -178,8 +178,8 @@ export function ProfileForm({ profile, startListed }: { profile: Profile; startL
           <div>
             <Label htmlFor="rate" hint="optional">Your rate (₦)</Label>
             <div className="relative">
-              <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-semibold text-muted">₦</span>
-              <Input id="rate" name="rate" type="number" min={0} defaultValue={profile.hourly_rate || ""} placeholder="0" className="pl-8" />
+              <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 font-semibold text-muted sm:left-4">₦</span>
+              <Input id="rate" name="rate" type="number" min={0} defaultValue={profile.hourly_rate || ""} placeholder="0" className="pl-9 sm:pl-10" />
             </div>
             <RateUnitPicker name="rateUnit" defaultValue={profile.rate_unit} />
           </div>

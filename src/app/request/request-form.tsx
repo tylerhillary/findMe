@@ -79,8 +79,12 @@ export function RequestForm({ pro, defaults }: { pro: PickedPro | null; defaults
             <FieldError msg={e.category} />
           </div>
           <div>
-            <Label htmlFor="when" hint="optional">When?</Label>
-            <Input id="when" name="when" placeholder="e.g. This Saturday morning" />
+            <Label htmlFor="when">When do you need it done?</Label>
+            <Input id="when" name="when" list="when-options" autoComplete="off" placeholder="e.g. This Saturday morning" aria-invalid={!!e.when} />
+            <datalist id="when-options">
+              {["As soon as possible", "Today", "Tomorrow", "This weekend", "Next week", "Within 2 weeks", "I'm flexible"].map((w) => <option key={w} value={w} />)}
+            </datalist>
+            <FieldError msg={e.when} />
           </div>
         </div>
         <div>
@@ -104,8 +108,8 @@ export function RequestForm({ pro, defaults }: { pro: PickedPro | null; defaults
             <div className="mt-3">
               <Label htmlFor="offer">Your offer (₦)</Label>
               <div className="relative">
-                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-semibold text-muted">₦</span>
-                <Input id="offer" name="offer" type="number" min={0} placeholder={pro?.price ? String(Math.round(pro.price * 0.85)) : "25000"} className="pl-8" />
+                <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 font-semibold text-muted sm:left-4">₦</span>
+                <Input id="offer" name="offer" type="number" min={0} placeholder={pro?.price ? String(Math.round(pro.price * 0.85)) : "25000"} className="pl-9 sm:pl-10" />
               </div>
               <p className="mt-1.5 text-xs text-muted">We&apos;ll ask {first ?? "the pro"} if they can do it for this, then send you our best price.</p>
             </div>

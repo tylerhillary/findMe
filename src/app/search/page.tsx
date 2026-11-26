@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, BadgeCheck, Lock, SearchX, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, BadgeCheck, SearchX, ShieldCheck, Sparkles } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { ShowMore } from "./show-more";
@@ -76,7 +76,6 @@ async function SearchBody({ searchParams }: { searchParams: Promise<Raw> }) {
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-muted sm:text-sm">
             <span className="inline-flex items-center gap-1.5"><BadgeCheck className="size-4 text-brand-500" /> {totalPros} skilled {totalPros === 1 ? "pro" : "pros"}</span>
             <span className="inline-flex items-center gap-1.5"><ShieldCheck className="size-4 text-emerald-500" /> Reviews from real jobs</span>
-            <span className="hidden items-center gap-1.5 sm:inline-flex"><Lock className="size-4 text-brand-500" /> Numbers shared only after they accept</span>
           </div>
           <div className="mt-4 max-w-3xl sm:mt-6">
             <SearchBar key={(params.q ?? "") + (params.category ?? "")} defaultValue={params.q ?? ""} size="md" category={params.category} />

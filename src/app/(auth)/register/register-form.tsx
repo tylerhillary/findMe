@@ -348,8 +348,8 @@ export function RegisterForm({ ninEnabled }: { ninEnabled: boolean }) {
                       <div>
                         <Label htmlFor="rate" hint="optional">Your rate (₦)</Label>
                         <div className="relative">
-                          <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-semibold text-muted">₦</span>
-                          <Input id="rate" type="number" min={0} value={rate} onChange={(e) => setRate(e.target.value)} placeholder="10000" className="pl-8" />
+                          <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 font-semibold text-muted sm:left-4">₦</span>
+                          <Input id="rate" type="number" min={0} value={rate} onChange={(e) => setRate(e.target.value)} placeholder="10000" className="pl-9 sm:pl-10" />
                         </div>
                         <RateUnitPicker value={rateUnit} onChange={setRateUnit} />
                       </div>

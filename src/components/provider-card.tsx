@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { rateSuffix } from "@/lib/price";
-import { ArrowUpRight, BadgeCheck, MapPin } from "lucide-react";
+import { ArrowUpRight, MapPin } from "lucide-react";
 import type { ProviderCard as Card } from "@/lib/queries";
 import { categoryName } from "@/lib/categories";
 import { Avatar, Rating, cn, formatMoney } from "./ui";
 import { CategoryIcon } from "./category-icon";
-import { PhoneVerifiedBadge, TeamBadge, VerifiedAccountBadge } from "./verify-phone";
+import { IdVerifiedBadge, PhoneVerifiedBadge, TeamBadge, TrustedProBadge, VerifiedAccountBadge } from "./verify-phone";
 import { shownName } from "@/lib/names";
 
 export function ProviderCard({ p, highlight }: { p: Card; highlight?: string[] }) {
@@ -36,7 +36,8 @@ export function ProviderCard({ p, highlight }: { p: Card; highlight?: string[] }
             {p.team && <TeamBadge compact />}
             {p.emailVerified && <VerifiedAccountBadge compact />}
             {p.phoneVerified && <PhoneVerifiedBadge compact />}
-            {p.jobsDone >= 3 && <BadgeCheck className="size-4.5 shrink-0 text-brand-500" aria-label="Trusted pro" />}
+            {p.ninVerified && <IdVerifiedBadge compact />}
+            {p.jobsDone >= 3 && <TrustedProBadge compact />}
           </div>
           <p className="mt-0.5 line-clamp-2 text-[13px] leading-snug text-ink-soft sm:text-sm">{p.headline || "findMe professional"}</p>
         </div>

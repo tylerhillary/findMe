@@ -71,8 +71,8 @@ export function PayButtons({ jobId, price, claimed }: { jobId: string; price: nu
           {offering ? (
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-semibold text-muted">₦</span>
-                <Input type="number" min={0} value={offer} onChange={(e) => setOffer(e.target.value)} placeholder={String(Math.round(price * 0.85))} className="pl-8" autoFocus />
+                <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 font-semibold text-muted sm:left-4">₦</span>
+                <Input type="number" min={0} value={offer} onChange={(e) => setOffer(e.target.value)} placeholder={String(Math.round(price * 0.85))} className="pl-9 sm:pl-10" autoFocus />
               </div>
               <button disabled={pending || !offer} onClick={() => run("offer", () => counterOfferAction(jobId, Number(offer)))} className={btn("outline", "md", "shrink-0")}>
                 {spin("offer") ? <Loader2 className="size-4 animate-spin" /> : "Send offer"}

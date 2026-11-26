@@ -193,8 +193,8 @@ function ServiceDrawer({ service, defaultCategory, onClose, onSaved }: { service
             <div>
               <Label htmlFor="price">Price (₦)</Label>
               <div className="relative">
-                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-semibold text-muted">₦</span>
-                <Input id="price" name="price" type="number" min={1} defaultValue={service?.price} placeholder="50000" className="pl-8" aria-invalid={!!state.fieldErrors?.price} />
+                <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 font-semibold text-muted sm:left-4">₦</span>
+                <Input id="price" name="price" type="number" min={1} defaultValue={service?.price} placeholder="50000" className="pl-9 sm:pl-10" aria-invalid={!!state.fieldErrors?.price} />
               </div>
               <FieldError msg={state.fieldErrors?.price} />
             </div>
