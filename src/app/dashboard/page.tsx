@@ -103,10 +103,16 @@ async function Overview({ searchParams }: { searchParams: Promise<Record<string,
     <div className="space-y-5 sm:space-y-6">
       {sp.welcome === "1" && <WelcomeBanner name={first} isPro={isPro} />}
       {admin && (
-        <Link href="/admin/verifications" className="card flex items-center justify-between gap-3 p-4 text-sm font-semibold hover:border-brand-300 sm:px-6">
-          <span>Admin: phone numbers to verify by call</span>
-          <ArrowRight className="size-4 text-brand-600" />
-        </Link>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Link href="/admin/reports" className="card flex items-center justify-between gap-3 p-4 text-sm font-semibold hover:border-brand-300 sm:px-6">
+            <span>Admin: reports</span>
+            <ArrowRight className="size-4 text-brand-600" />
+          </Link>
+          <Link href="/admin/verifications" className="card flex items-center justify-between gap-3 p-4 text-sm font-semibold hover:border-brand-300 sm:px-6">
+            <span>Admin: phone numbers to verify</span>
+            <ArrowRight className="size-4 text-brand-600" />
+          </Link>
+        </div>
       )}
       {callCode && <ExpectCallCard phone={profile.phone} code={callCode} isPro={isPro} />}
       {profile.phone_verified && <PhoneVerifiedCard phone={profile.phone} isPro={isPro} />}

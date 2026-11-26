@@ -79,6 +79,7 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
     console.warn("[findMe] signed-in user has no profile:", uid);
     return null;
   }
+  if (u.banned) return null; // banned by an admin
   return {
     id: uid,
     name: u.name,

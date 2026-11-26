@@ -72,7 +72,7 @@ function cardFrom(id: string, u: UserDoc): ProviderCard {
 // Public fields only — phone numbers and emails never enter the cached catalog.
 const PUBLIC_FIELDS = [
   "name", "businessName", "headline", "bio", "location", "category", "hourlyRate", "rateUnit", "available", "avatar",
-  "skills", "ratingSum", "reviewCount", "jobsDone", "startingPrice", "flagged", "phoneConfirmed", "emailVerified", "ninVerified",
+  "skills", "ratingSum", "reviewCount", "jobsDone", "startingPrice", "flagged", "banned", "phoneConfirmed", "emailVerified", "ninVerified",
 ] as const;
 
 /**
@@ -95,7 +95,7 @@ async function loadCatalog(): Promise<CatalogEntry[]> {
     byUser.set(s.userId, [...(byUser.get(s.userId) ?? []), { title: s.title, description: s.description, category: s.category }]);
   }
   return users.docs
-    .filter((d) => !(d.data() as UserDoc).flagged) // reported by several people — hidden until reviewed
+    .filter((d) => !(d.data() as UserDoc).flagged && !(d.data() as UserDoc).banned) // reported (hidden until reviewed) or banned
     .map((d) => {
       const u = d.data() as UserDoc;
       return { ...cardFrom(d.id, u), bio: u.bio ?? "", services: byUser.get(d.id) ?? [] };

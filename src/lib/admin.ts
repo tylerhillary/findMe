@@ -7,8 +7,8 @@ import { formatNgPhone } from "./phone";
 
 const adminEmails = () => (process.env.ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
 
-/** Where "new number to verify" emails go: ADMIN_EMAILS, or findMe's main admin if that isn't set. */
-const verifyInbox = () => (adminEmails().length ? adminEmails() : ["tylerhillary03@gmail.com"]);
+/** Where admin emails go: ADMIN_EMAILS, or findMe's main admin if that isn't set. */
+const adminInbox = () => (adminEmails().length ? adminEmails() : ["tylerhillary03@gmail.com"]);
 
 /** Admins: anyone whose email is in ADMIN_EMAILS, or whose profile has admin: true. */
 export async function isAdmin(uid: string, email: string) {
@@ -52,5 +52,27 @@ export async function emailAdminsNumberToVerify(p: { uid: string; name: string; 
     ],
     footnote: "On your phone? The admin page has a Call button for each person.",
   });
-  await Promise.all(verifyInbox().map((to) => sendEmail({ to, subject: `Verify number: ${p.name} (${formatNgPhone(p.phone)})`, html })));
+  await Promise.all(adminInbox().map((to) => sendEmail({ to, subject: `Verify number: ${p.name} (${formatNgPhone(p.phone)})`, html })));
+}
+
+/** Emails the admins about a new report, with what happened and a link to review it. */
+export async function emailAdminsReport(r: { reportedName: string; reportedRole: string; reporterName: string; reason: string; details: string; count: number; hidden: boolean }) {
+  const html = emailLayout({
+    name: "",
+    title: r.hidden ? `${r.reportedName} was hidden from search` : `New report: ${r.reportedName}`,
+    body: r.hidden
+      ? `${r.reportedName} has now been reported by ${r.count} different people, so they were hidden from search automatically. Please review and decide whether to restore or ban them.`
+      : `${r.reporterName} reported ${r.reportedName}. Please take a look.`,
+    href: "/admin/reports",
+    cta: "Review reports",
+    details: [
+      ["Reported", `${r.reportedName} (${r.reportedRole === "provider" ? "professional" : "client"})`],
+      ["By", r.reporterName],
+      ["Reason", r.reason],
+      ["Reports so far", String(r.count)],
+    ],
+    ...(r.details ? { quote: { from: r.reporterName, text: r.details } } : {}),
+  });
+  const subject = r.hidden ? `Hidden after ${r.count} reports: ${r.reportedName}` : `Report: ${r.reportedName} (${r.reason})`;
+  await Promise.all(adminInbox().map((to) => sendEmail({ to, subject, html })));
 }

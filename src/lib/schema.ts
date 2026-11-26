@@ -46,6 +46,8 @@ export type UserDoc = {
   reportCount?: number;
   /** Hidden from search after repeated reports, until an admin reviews it. */
   flagged?: boolean;
+  /** Banned by an admin: can't sign in, hidden everywhere. */
+  banned?: boolean;
   createdAt: number;
 };
 
@@ -58,6 +60,9 @@ export type ReportDoc = {
   details: string;
   status: "open" | "reviewed" | "dismissed";
   createdAt: number;
+  /** What the admin decided, and when. */
+  outcome?: "dismissed" | "hidden" | "banned";
+  decidedAt?: number;
 };
 
 /** blocks/{blockerId}__{blockedId} — blocker no longer hears from blocked, and vice versa. */
@@ -90,6 +95,8 @@ export type RequestDoc = {
   reviewed?: boolean;
   /** Set when the job was completed and its chat deleted. */
   chatClearedAt?: number;
+  /** Completed while a report was open: the chat is kept as evidence until an admin decides. */
+  chatHeldForReport?: boolean;
   createdAt: number;
   updatedAt: number;
 };

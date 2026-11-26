@@ -10,6 +10,7 @@ import { getNow } from "@/lib/queries";
 import { formatNgPhone, telLink } from "@/lib/phone";
 import type { UserDoc } from "@/lib/schema";
 import { CallButtons } from "./call-buttons";
+import { AdminNav } from "../admin-nav";
 
 export const metadata: Metadata = { title: "Verify numbers · Admin", robots: { index: false } };
 
@@ -59,6 +60,7 @@ async function Content() {
 
   return (
     <div>
+      <AdminNav current="/admin/verifications" />
       <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-600">Admin</p>
       <h1 className="mt-1 font-display text-[1.6rem] font-extrabold tracking-tight sm:text-3xl">Verify phone numbers</h1>
       <p className="mt-1.5 max-w-2xl text-sm text-ink-soft">

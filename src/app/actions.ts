@@ -15,7 +15,7 @@ import { MODE_COOKIE, MODE_COOKIE_OPTIONS } from "@/lib/mode";
 import { cleanNin, deleteNinRecords, isNinFormat, verifyNin } from "@/lib/nin";
 import { APP_URL, emailConfigured, emailLayout, sendEmail } from "@/lib/email";
 import { publicName } from "@/lib/names";
-import { emailAdminsNumberToVerify, isAdmin } from "@/lib/admin";
+import { emailAdminsNumberToVerify, emailAdminsReport, isAdmin } from "@/lib/admin";
 import { asRateUnit } from "@/lib/price";
 import { createHash } from "node:crypto";
 import type { BlockDoc, CoverDoc, MessageDoc, NotificationDoc, ReportDoc, RequestDoc, ReviewDoc, ServiceDoc, Skill, SupportDoc, UserDoc } from "@/lib/schema";
@@ -552,6 +552,12 @@ export async function pollThreadAction(
   };
 }
 
+/** Deletes a completed job's chat. */
+async function clearChat(ref: FirebaseFirestore.DocumentReference) {
+  await db().recursiveDelete(ref.collection("messages")).catch((e) => console.error("[findMe] couldn't clear chat:", e));
+  await ref.update({ messageCount: 0, chatClearedAt: Date.now(), chatHeldForReport: FieldValue.delete() }).catch(() => {});
+}
+
 const TRANSITIONS: Record<"provider" | "client", Partial<Record<RequestStatus, RequestStatus[]>>> = {
   provider: { pending: ["accepted", "declined"], accepted: ["completed"] },
   client: { pending: ["cancelled"], accepted: ["cancelled"] },
@@ -582,9 +588,12 @@ export async function updateRequestStatusAction(requestId: string, status: Reque
   });
   if (changed && status === "completed") {
     updateTag(CATALOG_TAG);
-    // Job done: delete the chat for both people's privacy. Numbers are hidden again by the page.
-    await db().recursiveDelete(ref.collection("messages")).catch((e) => console.error("[findMe] couldn't clear chat:", e));
-    await ref.update({ messageCount: 0, chatClearedAt: Date.now() }).catch(() => {});
+    // Job done: delete the chat for both people's privacy (numbers are hidden again by the page).
+    // If either has an open report against the other, keep it as evidence until an admin decides.
+    const [a, b] = await db().getAll(reports().doc(`${changed.clientId}__${changed.providerId}`), reports().doc(`${changed.providerId}__${changed.clientId}`));
+    const reported = [a, b].some((d) => d.exists && (d.data() as ReportDoc).status === "open");
+    if (reported) await ref.update({ chatHeldForReport: true }).catch(() => {});
+    else await clearChat(ref);
   }
   if (changed) {
     const first = user.name.split(" ")[0];
@@ -668,17 +677,20 @@ export async function reportUserAction(_: FormState, fd: FormData): Promise<Form
   const reportedRef = users().doc(reportedId);
   const reportRef = reports().doc(`${user.id}__${reportedId}`);
   let hidden = false;
+  let reported: UserDoc | undefined;
+  let count = 0;
   const error = await db().runTransaction(async (t) => {
     const [reportedSnap, existing] = await Promise.all([t.get(reportedRef), t.get(reportRef)]);
     if (!reportedSnap.exists) return "This account no longer exists.";
+    reported = reportedSnap.data() as UserDoc;
+    count = reported.reportCount ?? 0;
     const now = Date.now();
     if (existing.exists) {
-      t.update(reportRef, { reason, details, requestId, status: "open", createdAt: now });
+      t.update(reportRef, { reason, details, requestId, status: "open", createdAt: now, outcome: FieldValue.delete(), decidedAt: FieldValue.delete() });
       return null;
     }
     t.create(reportRef, { reporterId: user.id, reportedId, requestId, reason, details, status: "open", createdAt: now } satisfies ReportDoc);
-    const reported = reportedSnap.data() as UserDoc;
-    const count = (reported.reportCount ?? 0) + 1;
+    count += 1;
     hidden = reported.role === "provider" && count >= AUTO_HIDE_AFTER && !reported.flagged;
     t.update(reportedRef, { reportCount: count, ...(hidden ? { flagged: true } : {}) });
     return null;
@@ -689,6 +701,18 @@ export async function reportUserAction(_: FormState, fd: FormData): Promise<Form
     await blocks().doc(`${user.id}__${reportedId}`).set({ blockerId: user.id, blockedId: reportedId, createdAt: Date.now() } satisfies BlockDoc);
   }
   if (hidden) updateTag(CATALOG_TAG);
+  const who = reported!;
+  after(() =>
+    emailAdminsReport({
+      reportedName: who.role === "provider" ? publicName(who) : who.name,
+      reportedRole: who.role,
+      reporterName: user.name,
+      reason: REPORT_REASONS.find((r) => r.key === reason)?.label ?? reason,
+      details,
+      count: Math.max(count, 1),
+      hidden,
+    }).catch((e) => console.error("[findMe] report email failed:", e)),
+  );
   refresh();
   return { ok: true, message: "Report received" };
 }
@@ -816,6 +840,61 @@ export async function markCallAttemptAction(userId: string): Promise<{ ok?: true
   const admin = await requireUser("/admin/verifications");
   if (!(await isAdmin(admin.id, admin.email))) return { error: "Only admins can do this." };
   await users().doc(String(userId ?? "").slice(0, 128)).update({ lastCallAt: Date.now() });
+  refresh();
+  return { ok: true };
+}
+
+// ---------------- Admin: reports ----------------
+
+export type ReportDecision = "dismiss" | "hide" | "ban" | "unban";
+
+/**
+ * Admin decision on everyone's open reports about one person:
+ * - dismiss: reports weren't founded; back in search, report count reset
+ * - hide: keep them out of search (they can still sign in and finish jobs)
+ * - ban: can't sign in, hidden everywhere, signed out on every device
+ * - unban: undo a ban (they come back hidden until you dismiss)
+ * Chats kept as evidence for these reports are cleared once decided.
+ */
+export async function decideReportsAction(reportedId: string, decision: ReportDecision): Promise<{ ok?: true; error?: string }> {
+  const admin = await requireUser("/admin/reports");
+  if (!(await isAdmin(admin.id, admin.email))) return { error: "Only admins can do this." };
+  const id = String(reportedId ?? "").slice(0, 128);
+  if (!["dismiss", "hide", "ban", "unban"].includes(decision)) return { error: "Unknown decision." };
+  if (id === admin.id && decision === "ban") return { error: "You can't ban yourself." };
+  const ref = users().doc(id);
+  const u = (await ref.get()).data() as UserDoc | undefined;
+  if (!u) return { error: "This account no longer exists." };
+
+  const now = Date.now();
+  if (decision === "unban") {
+    await adminAuth().updateUser(id, { disabled: false }).catch(() => {});
+    await ref.update({ banned: false, flagged: true });
+  } else {
+    // Single-field queries, filtered here, so no composite Firestore index is needed.
+    const open = { docs: (await reports().where("reportedId", "==", id).get()).docs.filter((d) => (d.data() as ReportDoc).status === "open") };
+    const outcome = decision === "dismiss" ? "dismissed" : decision === "hide" ? "hidden" : "banned";
+    const batch = db().batch();
+    open.docs.forEach((d) => batch.update(d.ref, { status: decision === "dismiss" ? "dismissed" : "reviewed", outcome, decidedAt: now }));
+    batch.update(ref, decision === "dismiss" ? { flagged: false, reportCount: 0 } : decision === "hide" ? { flagged: true } : { flagged: true, banned: true });
+    await batch.commit();
+    if (decision === "ban") {
+      await adminAuth().updateUser(id, { disabled: true }).catch((e) => console.error("[findMe] couldn't disable account:", e));
+      await adminAuth().revokeRefreshTokens(id).catch(() => {});
+    }
+    // Evidence no longer needed: clear chats that were kept because of these reports.
+    const reporters = open.docs.map((d) => (d.data() as ReportDoc).reporterId);
+    const theirs = await requests().where("participants", "array-contains", id).get();
+    await Promise.all(
+      theirs.docs
+        .filter((d) => {
+          const r = d.data() as RequestDoc;
+          return r.chatHeldForReport && r.participants.some((p) => reporters.includes(p));
+        })
+        .map((d) => clearChat(d.ref)),
+    );
+  }
+  updateTag(CATALOG_TAG);
   refresh();
   return { ok: true };
 }
