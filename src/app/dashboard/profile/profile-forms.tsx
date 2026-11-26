@@ -54,8 +54,6 @@ export function ProfileForm({ profile, startListed }: { profile: Profile; startL
   const [removed, setRemoved] = useState(false);
   const [listed, setListed] = useState(startListed || profile.role === "provider");
   const [available, setAvailable] = useState(profile.available);
-  const [whatsapp, setWhatsapp] = useState(profile.whatsapp);
-  const [showPhone, setShowPhone] = useState(profile.show_phone);
   const [name, setName] = useState(profile.name);
   const [bio, setBio] = useState(profile.bio);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -195,31 +193,13 @@ export function ProfileForm({ profile, startListed }: { profile: Profile; startL
           <div className="sm:col-span-2 rounded-2xl border border-line bg-canvas/60 p-4 sm:p-5">
             <p className="flex items-center gap-2 font-semibold"><Phone className="size-4 text-brand-600" /> Contact number</p>
             <p className="mt-1 text-sm text-muted">
-              {listed ? "Shared with clients after you accept their request." : "Shared with a pro only after they accept your request."}
+              {listed ? "Only findMe sees it. We call you about jobs; clients never get your number." : "Only findMe and the pro we send to your job see it."}
             </p>
             <div className="mt-4">
               <Label htmlFor="phone" hint={listed ? "Required for pros" : "Optional"}>Phone or business line</Label>
               <PhoneInput id="phone" name="phone" defaultValue={profile.phone ? formatNgPhone(profile.phone).replace(/^\+234 /, "") : ""} aria-invalid={!!state.fieldErrors?.phone} />
               <FieldError msg={state.fieldErrors?.phone} />
               <PhoneConfirm phone={profile.phone} verified={profile.phone_verified} />
-            </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div className="flex items-start gap-3 rounded-xl border border-line bg-white p-3">
-                <Toggle name="whatsapp" checked={whatsapp} onChange={setWhatsapp} label="Number is on WhatsApp" />
-                <div>
-                  <p className="text-sm font-semibold">On WhatsApp</p>
-                  <p className="text-xs text-muted">Adds a WhatsApp button next to Call.</p>
-                </div>
-              </div>
-              {listed && (
-                <div className="flex items-start gap-3 rounded-xl border border-line bg-white p-3">
-                  <Toggle name="showPhone" checked={showPhone} onChange={setShowPhone} label="Show number publicly" />
-                  <div>
-                    <p className="text-sm font-semibold">Show on my profile</p>
-                    <p className="text-xs text-muted">Anyone can call you. Best for businesses.</p>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
           <div className="sm:col-span-2">

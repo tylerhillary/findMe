@@ -13,7 +13,7 @@ import { categoryName } from "@/lib/categories";
 import { formatNgPhone, telLink } from "@/lib/phone";
 import { rateSuffix, asRateUnit } from "@/lib/price";
 import { findMeFeeFor } from "@/lib/fees";
-import type { JobDoc, UserDoc } from "@/lib/schema";
+import type { JobDoc, PayoutDoc, UserDoc } from "@/lib/schema";
 import { cn, formatMoney } from "@/components/ui";
 import { AdminNav } from "../admin-nav";
 import { AdminJobControls, type ProOption } from "./admin-job-controls";
@@ -67,6 +67,12 @@ async function Content() {
       rating: u.reviewCount ? (u.ratingSum ?? 0) / u.reviewCount : 0,
     }));
   const proById = new Map(pros.map((p) => [p.id, p]));
+  // Bank details for pros you owe (completed, not yet paid).
+  const owedIds = [...new Set(jobs.filter((j) => j.status === "completed" && !j.proPaidAt && j.proId).map((j) => j.proId!))];
+  const payouts = new Map<string, PayoutDoc>();
+  if (owedIds.length) {
+    (await db().getAll(...owedIds.map((id) => db().collection("payouts").doc(id)))).forEach((d) => d.exists && payouts.set(d.id, d.data() as PayoutDoc));
+  }
 
   const optionsFor = (j: Job): ProOption[] =>
     pros
@@ -141,6 +147,15 @@ async function Content() {
                       {j.paymentClaimedAt && j.status === "quoted" && <p className="font-semibold text-sky-700">Client says they paid · {day(j.paymentClaimedAt)}</p>}
                       {j.doneRequestedAt && <p className="font-semibold text-amber-700">Pro said done · {day(j.doneRequestedAt)}</p>}
                       {j.proPaidAt && <p className="text-emerald-700">Pro paid · {day(j.proPaidAt)}</p>}
+                      {j.status === "completed" && !j.proPaidAt && j.proId && (
+                        <p className="sm:col-span-2 rounded-lg bg-emerald-50 px-3 py-2 text-emerald-900">
+                          {payouts.get(j.proId) ? (
+                            <>Pay <span className="font-bold">{formatMoney(j.proPayout)}</span> to <span className="font-semibold">{payouts.get(j.proId)!.accountName}</span> · {payouts.get(j.proId)!.bankName} · <span className="font-mono font-bold tracking-wider">{payouts.get(j.proId)!.accountNumber}</span></>
+                          ) : (
+                            <>No bank details yet. Ask the pro to add them under Profile → Where we pay you.</>
+                          )}
+                        </p>
+                      )}
                     </div>
                     <p className="mt-3 whitespace-pre-wrap rounded-xl bg-canvas px-3 py-2 text-sm text-ink-soft">{j.details}</p>
 

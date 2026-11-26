@@ -1,4 +1,7 @@
 import { Suspense } from "react";
+import { db } from "@/lib/firebase-admin";
+import type { PayoutDoc } from "@/lib/schema";
+import { PayoutForm } from "./payout-form";
 import type { Metadata } from "next";
 import { Briefcase } from "lucide-react";
 import { requireUser } from "@/lib/auth";
@@ -26,7 +29,12 @@ export default function ProfilePage({ searchParams }: PageProps<"/dashboard/prof
 
 async function Content({ searchParams }: { searchParams: PageProps<"/dashboard/profile">["searchParams"] }) {
   const user = await requireUser();
-  const [profile, sp, nin] = await Promise.all([getMyProfile(user.id), searchParams, getNinStatus(user.id)]);
+  const [profile, sp, nin, payout] = await Promise.all([
+    getMyProfile(user.id),
+    searchParams,
+    getNinStatus(user.id),
+    db().collection("payouts").doc(user.id).get().then((d) => (d.data() as PayoutDoc | undefined) ?? null),
+  ]);
   // Arrived from the Hiring/Working switch without a pro profile yet.
   const setup = sp.setup === "1" && user.role !== "provider";
   return (
@@ -48,6 +56,7 @@ async function Content({ searchParams }: { searchParams: PageProps<"/dashboard/p
         <ProfileForm profile={profile} startListed={setup} />
         <div className="space-y-6 lg:sticky lg:top-10">
           {(nin.verified || ninChecksEnabled()) && <VerifyNinCard verified={nin.verified} last4={nin.last4} lastError={nin.lastError} isPro={user.role === "provider"} />}
+          {user.role === "provider" && <PayoutForm current={payout ? { bankName: payout.bankName, accountNumber: payout.accountNumber, accountName: payout.accountName } : null} />}
           <SkillsManager skills={profile.skills} />
         </div>
       </div>

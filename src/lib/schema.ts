@@ -200,3 +200,6 @@ export type JobDoc = {
   createdAt: number;
   updatedAt: number;
 };
+
+/** payouts/{uid}: where findMe sends a pro's pay. Private: only the pro and admins see it. */
+export type PayoutDoc = { bankName: string; accountNumber: string; accountName: string; updatedAt: number };

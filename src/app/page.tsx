@@ -198,29 +198,29 @@ export default function Home() {
         <section id="pricing" className="mx-auto max-w-7xl scroll-mt-14 px-4 py-12 sm:scroll-mt-16 sm:px-6 sm:py-20 lg:px-8 lg:py-28">
           <SectionHeading
             eyebrow="Pricing"
-            title="Free to hire. Free to list. No commission."
-            sub="findMe earns from an optional Pro plan for professionals. Everyone keeps 100% of what they earn."
+            title="Free to ask. Free to list. Just 3%."
+            sub="Clients pay findMe the price we agree. Pros get 97% of it once the client confirms the job is done."
           />
           <div className="mx-auto grid max-w-4xl gap-3 sm:gap-6 md:grid-cols-2">
             <PlanCard
-              name="Free"
+              name="For clients"
               price="₦0"
-              note="Everyone, for good"
-              points={["Hiring is always free for clients", "A public profile, skills and services", "Requests, private chat and reviews", "Verified badge after email confirmation", "No commission on any job"]}
-              cta={<a href="/mode?to=work" className={btn("outline", "md", "w-full")}>Create your free profile</a>}
+              note="to request a service"
+              points={["Tell us what you need, free", "See pros' prices and make an offer", "Pay findMe, never the pro", "We hold your money until you confirm the job is done", "Rate the pro when it's finished"]}
+              cta={<Link href="/request" className={btn("outline", "md", "w-full")}>Request a service</Link>}
             />
             <PlanCard
               highlight
-              name="findMe Pro"
-              price="₦2,500"
-              per="/month"
-              note="For pros · launching soon"
-              points={["Everything in Free", "Top placement in your category", "A Pro badge on your profile and card", "Profile insights: views and requests", "Featured on the home page in rotation"]}
-              cta={<span className={btn("primary", "md", "w-full pointer-events-none opacity-80")}>Coming soon. Free while we launch</span>}
+              name="For pros"
+              price="3%"
+              per=" per job"
+              note="Free to list · you keep 97%"
+              points={["A free profile, skills and services", "findMe brings you clients and handles payment", "Your pay shown on every job before you start", "Paid by findMe once the client confirms", "Good reviews mean more jobs"]}
+              cta={<a href="/mode?to=work" className={btn("primary", "md", "w-full")}>Create your free profile</a>}
             />
           </div>
           <p className="mx-auto mt-6 max-w-2xl text-center text-xs text-muted sm:text-sm">
-            Prices in naira. Pro is not on sale yet. Nobody is charged without upgrading.
+            Prices in naira. findMe&apos;s 3% comes out of the job price; clients never pay extra on top of the price we agree.
           </p>
         </section>
 
@@ -243,8 +243,8 @@ export default function Home() {
                 the right clients never hear about them.
               </p>
               <p>
-                Hillary founded findMe to fix that: one account to hire or offer skills, private contact until a job is accepted, and reviews
-                from real completed work. Hillary leads the product end to end.
+                Hillary founded findMe to fix that: tell findMe what you need, and we send a trusted pro, hold the payment until the job is done, and
+                keep reviews from real completed work. Hillary leads the product end to end.
               </p>
               <p className="text-sm">
                 Questions or partnerships? <Link href="/contact" className="font-semibold text-brand-700 hover:underline">Contact us</Link>.

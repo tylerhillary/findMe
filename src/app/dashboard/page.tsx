@@ -14,7 +14,6 @@ import {
   MapPin,
   PencilLine,
   Plus,
-  Search,
   Send,
   ShieldCheck,
   Star,
@@ -25,8 +24,10 @@ import {
 import { requireUser } from "@/lib/auth";
 import { getMode } from "@/lib/mode";
 import { CATEGORIES } from "@/lib/categories";
-import { getNow, getMyProfile, getMyRequests, getMyServices, type MyService, type RequestSummary } from "@/lib/queries";
-import { Avatar, StatusPill, btn, cn, formatMoney, timeAgo } from "@/components/ui";
+import { getNow, getMyProfile, getMyServices, type MyService } from "@/lib/queries";
+import { getMyJobs, type JobWithId } from "@/lib/job-queries";
+import { jobStatusLabel } from "@/lib/job-status";
+import { Avatar, btn, cn, formatMoney, timeAgo } from "@/components/ui";
 import { CategoryIcon } from "@/components/category-icon";
 import { FadeIn } from "@/components/motion";
 import { WelcomeBanner } from "./welcome-banner";
@@ -51,9 +52,9 @@ type Kpi = { label: string; value: string; sub: string; icon: LucideIcon; tint: 
 async function Overview({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const user = await requireUser();
   // One read each for profile, requests and services — the numbers below are worked out from these.
-  const [profile, requests, services, sp, now] = await Promise.all([
+  const [profile, { asked, assigned }, services, sp, now] = await Promise.all([
     getMyProfile(user.id),
-    getMyRequests(user.id),
+    getMyJobs(user.id),
     getMyServices(user.id),
     searchParams,
     getNow(),
@@ -68,21 +69,24 @@ async function Overview({ searchParams }: { searchParams: Promise<Record<string,
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const today = new Intl.DateTimeFormat("en-NG", { timeZone: TZ, weekday: "long", day: "numeric", month: "long" }).format(now);
 
-  const incoming = requests.filter((r) => r.direction === "incoming");
-  const outgoing = requests.filter((r) => r.direction === "outgoing");
-  const count = (list: RequestSummary[], status: RequestSummary["status"]) => list.filter((r) => r.status === status).length;
   const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  const is = (list: JobWithId[], ...st: JobWithId["status"][]) => list.filter((j) => st.includes(j.status));
 
-  const pending = count(incoming, "pending");
-  const toRate = requests.filter((r) => r.needsReview);
-  const completedJobs = incoming.filter((r) => r.status === "completed");
-  const earned = completedJobs.reduce((sum, r) => sum + (r.budget || 0), 0);
+  // Pro side: jobs findMe gave them. Client side: what they asked findMe for.
+  const toDo = assigned.filter((j) => j.status === "assigned" && !j.doneRequestedAt);
+  const waiting = assigned.filter((j) => j.status === "assigned" && j.doneRequestedAt);
+  const doneJobs = is(assigned, "completed");
+  const earned = doneJobs.filter((j) => j.proPaidAt).reduce((sum, j) => sum + j.proPayout, 0);
+  const onTheWay = doneJobs.filter((j) => !j.proPaidAt).reduce((sum, j) => sum + j.proPayout, 0);
+  const toPay = asked.filter((j) => j.status === "quoted" && !j.paymentClaimedAt);
+  const toConfirm = asked.filter((j) => j.status === "assigned" && j.doneRequestedAt);
+  const toRate = asked.filter((j) => j.status === "completed" && !j.reviewed);
 
   const kpis: Kpi[] = isPro
     ? [
-        { label: "New requests", value: String(pending), sub: pending ? "Awaiting your reply" : "You're all caught up", icon: Inbox, tint: "bg-amber-50 text-amber-600", href: "/dashboard/requests" },
-        { label: "Active jobs", value: String(count(incoming, "accepted")), sub: "In progress now", icon: Zap, tint: "bg-sky-50 text-sky-600", href: "/dashboard/requests" },
-        { label: "Earnings", value: formatMoney(earned), sub: `From ${plural(completedJobs.length, "completed job")}`, icon: Wallet, tint: "bg-emerald-50 text-emerald-600", href: "/dashboard/requests" },
+        { label: "To do", value: String(toDo.length), sub: toDo.length ? "Jobs findMe gave you" : "No jobs right now", icon: Inbox, tint: "bg-amber-50 text-amber-600", href: "/dashboard/jobs" },
+        { label: "Waiting", value: String(waiting.length), sub: "For clients to confirm", icon: Zap, tint: "bg-sky-50 text-sky-600", href: "/dashboard/jobs" },
+        { label: "Earned", value: formatMoney(earned), sub: onTheWay ? `${formatMoney(onTheWay)} on the way` : `From ${plural(doneJobs.length, "job")}`, icon: Wallet, tint: "bg-emerald-50 text-emerald-600", href: "/dashboard/jobs" },
         {
           label: "Rating",
           value: profile.review_count ? profile.rating.toFixed(1) : "—",
@@ -93,10 +97,10 @@ async function Overview({ searchParams }: { searchParams: Promise<Record<string,
         },
       ]
     : [
-        { label: "Requests sent", value: String(outgoing.length), sub: "All time", icon: Send, tint: "bg-violet-50 text-violet-600", href: "/dashboard/requests" },
-        { label: "Awaiting reply", value: String(count(outgoing, "pending")), sub: "Pros yet to respond", icon: Hourglass, tint: "bg-amber-50 text-amber-600", href: "/dashboard/requests" },
-        { label: "In progress", value: String(count(outgoing, "accepted")), sub: "Accepted jobs", icon: Zap, tint: "bg-sky-50 text-sky-600", href: "/dashboard/requests" },
-        { label: "Completed", value: String(count(outgoing, "completed")), sub: "Jobs done", icon: CheckCircle2, tint: "bg-emerald-50 text-emerald-600", href: "/dashboard/requests" },
+        { label: "Requests", value: String(asked.length), sub: "All time", icon: Send, tint: "bg-violet-50 text-violet-600", href: "/dashboard/jobs" },
+        { label: "Getting a price", value: String(is(asked, "new").length + toPay.length), sub: toPay.length ? `${plural(toPay.length, "price")} ready to pay` : "From findMe", icon: Hourglass, tint: "bg-amber-50 text-amber-600", href: "/dashboard/jobs" },
+        { label: "In progress", value: String(is(asked, "paid", "assigned").length), sub: "Paid, pro on the way", icon: Zap, tint: "bg-sky-50 text-sky-600", href: "/dashboard/jobs" },
+        { label: "Completed", value: String(is(asked, "completed").length), sub: "Jobs done", icon: CheckCircle2, tint: "bg-emerald-50 text-emerald-600", href: "/dashboard/jobs" },
       ];
 
   return (
@@ -140,59 +144,37 @@ async function Overview({ searchParams }: { searchParams: Promise<Record<string,
               </Link>
             </>
           ) : (
-            <Link href="/search" className={btn("primary", "md", "max-sm:h-9 max-sm:text-[13px]")}>
-              <Search className="size-4" /> Find talent
+            <Link href="/request" className={btn("primary", "md", "max-sm:h-9 max-sm:text-[13px]")}>
+              <Plus className="size-4" /> Request a service
             </Link>
           )}
         </div>
       </FadeIn>
 
       {/* Needs attention */}
-      {isPro && pending > 0 && (
-        <FadeIn delay={0.04}>
-          <Link
-            href="/dashboard/requests"
-            className="group flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 transition hover:border-amber-300 hover:bg-amber-50"
-          >
-            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-700">
-              <BellRing className="size-4.5" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-amber-950">{plural(pending, "new request")} waiting for your reply</p>
-              <p className="truncate text-[13px] text-amber-900/70">Pros who reply quickly win more jobs.</p>
-            </div>
-            <span className="hidden text-sm font-semibold text-amber-800 sm:inline">Review</span>
-            <ArrowRight className="size-4 shrink-0 text-amber-800 transition-transform group-hover:translate-x-0.5" />
-          </Link>
-        </FadeIn>
-      )}
-
-      {/* Finished jobs waiting for this user's rating */}
-      {toRate.length > 0 && (
-        <FadeIn delay={0.05}>
-          <Link
-            href={`/dashboard/requests/${toRate[0].id}#review`}
-            className="group flex items-center gap-3 rounded-2xl border border-violet-200 bg-violet-50/70 px-4 py-3 transition hover:border-violet-300 hover:bg-violet-50"
-          >
-            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-500">
-              <Star className="size-4.5 fill-current" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-violet-950">
-                {toRate.length === 1
-                  ? `How did ${toRate[0].other.name.split(" ")[0]} do? Rate your job`
-                  : `${toRate.length} finished jobs are waiting for your rating`}
-              </p>
-              <p className="truncate text-[13px] text-violet-900/70">
-                {toRate.length === 1 ? `“${toRate[0].title}” · ` : `Start with ${toRate[0].other.name} · `}
-                your review helps others hire with confidence.
-              </p>
-            </div>
-            <span className="hidden text-sm font-semibold text-violet-800 sm:inline">Rate now</span>
-            <ArrowRight className="size-4 shrink-0 text-violet-800 transition-transform group-hover:translate-x-0.5" />
-          </Link>
-        </FadeIn>
-      )}
+      {(() => {
+        const item = isPro
+          ? toDo[0] && { href: `/dashboard/jobs/${toDo[0].id}`, title: toDo.length === 1 ? `New job: ${toDo[0].title}` : `${plural(toDo.length, "job")} to do`, sub: "Call the client to arrange it, then mark it done.", tone: "amber" as const }
+          : toConfirm[0]
+            ? { href: `/dashboard/jobs/${toConfirm[0].id}`, title: `Is "${toConfirm[0].title}" finished?`, sub: "The pro says it's done. Confirm it so we can pay them.", tone: "amber" as const }
+            : toPay[0]
+              ? { href: `/dashboard/jobs/${toPay[0].id}`, title: `Your price is ready: ${formatMoney(toPay[0].price)}`, sub: `For "${toPay[0].title}". Pay findMe to book it, or ask for a better price.`, tone: "amber" as const }
+              : toRate[0] && { href: `/dashboard/jobs/${toRate[0].id}#review`, title: `How did "${toRate[0].title}" go?`, sub: "Rate the pro. Your review helps us send the best people.", tone: "violet" as const };
+        if (!item) return null;
+        const c = item.tone === "amber" ? "border-amber-200 bg-amber-50/70 text-amber-950 hover:border-amber-300" : "border-violet-200 bg-violet-50/70 text-violet-950 hover:border-violet-300";
+        return (
+          <FadeIn delay={0.04}>
+            <Link href={item.href} className={cn("group flex items-center gap-3 rounded-2xl border px-4 py-3 transition", c)}>
+              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-white/70"><BellRing className="size-4.5" /></span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold">{item.title}</p>
+                <p className="truncate text-[13px] opacity-70">{item.sub}</p>
+              </div>
+              <ArrowRight className="size-4 shrink-0 transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          </FadeIn>
+        );
+      })()}
 
       {/* Key numbers */}
       <FadeIn delay={0.06}>
@@ -224,7 +206,7 @@ async function Overview({ searchParams }: { searchParams: Promise<Record<string,
       <div className="grid items-start gap-5 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_320px] [&>*]:min-w-0">
         <div className="space-y-5 sm:space-y-6">
           <FadeIn delay={0.1}>
-            <RecentRequests requests={isPro ? incoming : outgoing} now={now} isPro={isPro} />
+            <RecentJobs jobs={isPro ? assigned : asked} now={now} isPro={isPro} />
           </FadeIn>
           <FadeIn delay={0.14}>{isPro ? <ServicesPanel services={services} /> : <ExplorePanel />}</FadeIn>
         </div>
@@ -281,49 +263,36 @@ function EmptyState({ icon: Icon, title, body, cta }: { icon: LucideIcon; title:
 
 /* ───────────────────────── sections ───────────────────────── */
 
-function RecentRequests({ requests, now, isPro }: { requests: RequestSummary[]; now: number; isPro: boolean }) {
-  const rows = requests.slice(0, 5);
+function RecentJobs({ jobs, now, isPro }: { jobs: JobWithId[]; now: number; isPro: boolean }) {
+  const rows = jobs.slice(0, 5);
   return (
-    <Panel title="Recent requests" action={requests.length > 0 && <PanelLink href="/dashboard/requests">View all</PanelLink>}>
+    <Panel title={isPro ? "Your findMe jobs" : "Your requests"} action={jobs.length > 0 && <PanelLink href="/dashboard/jobs">View all</PanelLink>}>
       {rows.length === 0 ? (
         <EmptyState
           icon={Inbox}
-          title="No requests yet"
-          body={isPro ? "Complete your profile and add a service so clients can find you." : "Search for a skill and send your first request. It's free."}
-          cta={isPro ? { href: "/dashboard/services?new=1", label: "Publish a service" } : { href: "/search", label: "Find talent" }}
+          title={isPro ? "No jobs yet" : "No requests yet"}
+          body={isPro ? "Complete your profile and services. findMe sends you jobs that match your skills." : "Tell findMe what you need. We send a price, then a trusted pro."}
+          cta={isPro ? { href: "/dashboard/services?new=1", label: "Publish a service" } : { href: "/request", label: "Request a service" }}
         />
       ) : (
-        <>
-          <div className="hidden grid-cols-[minmax(0,1fr)_7rem_8rem] gap-4 border-b border-line bg-canvas/60 px-5 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted sm:grid">
-            <span>Request</span>
-            <span className="text-right">Budget</span>
-            <span className="text-right">Status</span>
-          </div>
-          <ul className="divide-y divide-line">
-            {rows.map((r) => (
-              <li key={r.id}>
-                <Link
-                  href={`/dashboard/requests/${r.id}`}
-                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 transition-colors hover:bg-canvas sm:grid-cols-[minmax(0,1fr)_7rem_8rem] sm:gap-4 sm:px-5"
-                >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <Avatar name={r.other.name} src={r.other.avatar} size={36} />
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold">{r.title}</p>
-                      <p className="truncate text-[12.5px] text-muted">
-                        {r.direction === "incoming" ? "From" : "To"} {r.other.name} · {timeAgo(r.updatedAt, now)}
-                      </p>
-                    </div>
+        <ul className="divide-y divide-line">
+          {rows.map((j) => {
+            const st = jobStatusLabel(j, isPro ? "pro" : "client");
+            const amount = isPro ? j.proPayout : j.price;
+            return (
+              <li key={j.id}>
+                <Link href={`/dashboard/jobs/${j.id}`} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-canvas sm:px-5">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">{j.title}</p>
+                    <p className="truncate text-[12.5px] text-muted">{j.location} · {timeAgo(j.updatedAt, now)}</p>
                   </div>
-                  <p className="hidden text-right text-sm font-semibold tabular-nums sm:block">{r.budget > 0 ? formatMoney(r.budget) : "—"}</p>
-                  <div className="flex justify-end">
-                    <StatusPill status={r.status} />
-                  </div>
+                  {amount > 0 && <p className="hidden text-sm font-semibold tabular-nums sm:block">{formatMoney(amount)}</p>}
+                  <span className={cn("shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold", st.tone)}>{st.label}</span>
                 </Link>
               </li>
-            ))}
-          </ul>
-        </>
+            );
+          })}
+        </ul>
       )}
     </Panel>
   );

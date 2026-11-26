@@ -19,7 +19,7 @@ import { emailAdminsNumberToVerify, emailAdminsReport, isAdmin } from "@/lib/adm
 import { clearChat, completeJob } from "@/lib/jobs";
 import { asRateUnit } from "@/lib/price";
 import { createHash } from "node:crypto";
-import type { BlockDoc, CoverDoc, JobDoc, MessageDoc, NotificationDoc, ReportDoc, RequestDoc, ReviewDoc, ServiceDoc, Skill, SupportDoc, UserDoc } from "@/lib/schema";
+import type { BlockDoc, CoverDoc, JobDoc, PayoutDoc, MessageDoc, NotificationDoc, ReportDoc, RequestDoc, ReviewDoc, ServiceDoc, Skill, SupportDoc, UserDoc } from "@/lib/schema";
 import { AUTO_HIDE_AFTER, REPORT_REASONS } from "@/lib/safety";
 
 const PHONE_ERROR = "Enter a valid Nigerian number, e.g. 0803 123 4567.";
@@ -284,8 +284,8 @@ export async function updateProfileAction(_: FormState, fd: FormData): Promise<F
     available: fd.get("available") === "on",
     role,
     phone: phone ?? "",
-    whatsapp: fd.get("whatsapp") === "on",
-    showPhone: fd.get("showPhone") === "on",
+    // Numbers are never shown publicly now that findMe arranges every job.
+    showPhone: false,
   };
   if (avatar) update.avatar = avatar;
   if (fd.get("removeAvatar") === "1") update.avatar = null;
@@ -777,6 +777,7 @@ export async function deleteAccountAction(idToken: string): Promise<{ error?: st
   ]);
   writer.delete(users().doc(uid));
   writer.delete(db().collection("covers").doc(uid));
+  writer.delete(db().collection("payouts").doc(uid));
   await writer.close();
   await deleteNinRecords(uid);
   await adminAuth().deleteUser(uid);
@@ -904,4 +905,20 @@ export async function setTeamBadgeAction(userId: string, on: boolean): Promise<{
   updateTag(CATALOG_TAG);
   refresh();
   return { ok: true };
+}
+
+/** Pro: where findMe should send their pay (their 97% of each job). */
+export async function savePayoutAction(_: FormState, fd: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const bankName = str(fd, "bankName", 60);
+  const accountNumber = str(fd, "accountNumber", 20).replace(/\D/g, "");
+  const accountName = str(fd, "accountName", 80);
+  const fieldErrors: Record<string, string> = {};
+  if (bankName.length < 2) fieldErrors.bankName = "Choose or type your bank.";
+  if (!/^\d{10}$/.test(accountNumber)) fieldErrors.accountNumber = "Nigerian account numbers have 10 digits.";
+  if (accountName.length < 3) fieldErrors.accountName = "Enter the name on the account.";
+  if (Object.keys(fieldErrors).length) return { fieldErrors };
+  await db().collection("payouts").doc(user.id).set({ bankName, accountNumber, accountName, updatedAt: Date.now() } satisfies PayoutDoc);
+  refresh();
+  return { ok: true, message: "Payout details saved" };
 }
