@@ -19,7 +19,7 @@ import { shownName } from "@/lib/names";
 import { categoryName } from "@/lib/categories";
 import { getNow, getProviderProfile, hasReported, type ProviderProfile } from "@/lib/queries";
 import { ReportButton } from "@/components/report-dialog";
-import { IdVerifiedBadge, PhoneVerifiedBadge, TeamBadge, TrustedProBadge, VerifiedAccountBadge, VerifiedTick } from "@/components/verify-phone";
+import { IdVerifiedBadge, PhoneVerifiedBadge, TeamBadge, TrustedProBadge, VerifiedTick } from "@/components/verify-phone";
 import { HireButton, RequestPanel } from "./request-panel";
 
 export async function generateMetadata({ params }: PageProps<"/pro/[id]">): Promise<Metadata> {
@@ -88,7 +88,6 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="font-display text-[1.45rem] font-extrabold leading-tight tracking-tight sm:text-4xl">{shownName(p)}</h1>
                 {p.verifiedAs && <VerifiedTick kind={p.verifiedAs} />}
-                {p.emailVerified && <VerifiedAccountBadge />}
                 {p.team && <TeamBadge />}
                 {p.phoneVerified && <PhoneVerifiedBadge />}
                 {p.ninVerified && <IdVerifiedBadge />}
