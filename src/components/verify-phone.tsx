@@ -1,21 +1,45 @@
 import { Award, BadgeCheck, Crown, Fingerprint, MailCheck, Phone } from "lucide-react";
+import type { VerifiedKind } from "@/lib/schema";
 import { cn } from "./ui";
 
 /*
  * One colour per kind of check, so people can tell them apart at a glance:
- * blue = email confirmed, green = phone confirmed by findMe, violet = ID (NIN) confirmed,
- * orange = Trusted pro (3+ completed jobs), gold = findMe team.
+ * verified ticks (blue individual, black company, green government), grey = email confirmed,
+ * green phone = phone confirmed by findMe, violet = ID (NIN) confirmed, orange = Trusted pro, gold = findMe team.
  */
 
-/** Blue badge shown wherever other people see an account whose email is confirmed. */
+/** Small grey badge: the account's email address is confirmed. (Blue ticks are for verified people.) */
 export function VerifiedAccountBadge({ compact, className }: { compact?: boolean; className?: string }) {
   return compact ? (
-    <BadgeCheck className={cn("size-4 shrink-0 fill-sky-500 text-white", className)} aria-label="Verified account" role="img">
-      <title>Verified account</title>
+    <span className={cn("grid size-4 shrink-0 place-items-center rounded-full bg-slate-400 text-white", className)} role="img" aria-label="Email confirmed" title="Email confirmed">
+      <MailCheck className="size-2.5" strokeWidth={3} />
+    </span>
+  ) : (
+    <span className={cn("inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600 ring-1 ring-inset ring-slate-200", className)} title="Email address confirmed">
+      <MailCheck className="size-3.5" /> Email confirmed
+    </span>
+  );
+}
+
+const TICK: Record<VerifiedKind, { label: string; fill: string; pill: string; title: string }> = {
+  individual: { label: "Verified individual", fill: "fill-sky-500", pill: "bg-sky-50 text-sky-700 ring-sky-200", title: "findMe checked this person's ID" },
+  company: { label: "Verified company", fill: "fill-zinc-900", pill: "bg-zinc-900 text-white ring-zinc-900", title: "findMe checked this company's registration (CAC)" },
+  government: { label: "Verified government", fill: "fill-emerald-600", pill: "bg-emerald-50 text-emerald-800 ring-emerald-200", title: "findMe confirmed this is a government body" },
+};
+
+/**
+ * The verified tick an admin gives after checking documents:
+ * blue = individual, black = company / organisation, green = government.
+ */
+export function VerifiedTick({ kind, compact, className }: { kind: VerifiedKind; compact?: boolean; className?: string }) {
+  const t = TICK[kind];
+  return compact ? (
+    <BadgeCheck className={cn("size-[18px] shrink-0 text-white", t.fill, className)} aria-label={t.label} role="img">
+      <title>{t.label}</title>
     </BadgeCheck>
   ) : (
-    <span className={cn("inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700 ring-1 ring-inset ring-sky-200", className)} title="Email address confirmed">
-      <MailCheck className="size-3.5" /> Email verified
+    <span className={cn("inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset", t.pill, className)} title={t.title}>
+      <BadgeCheck className="size-3.5" /> {t.label}
     </span>
   );
 }

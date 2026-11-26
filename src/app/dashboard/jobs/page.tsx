@@ -22,7 +22,7 @@ export default function JobsPage() {
 
 async function Jobs() {
   const user = await requireUser("/dashboard/jobs");
-  const { asked, assigned } = await getMyJobs(user.id);
+  const { asked, assigned, offers } = await getMyJobs(user.id);
   const isDone = (j: JobWithId) => j.status === "completed" || j.status === "cancelled";
   const history: HistoryItem[] = [
     ...assigned.filter(isDone).map((j) => ({ job: j, side: "pro" as const })),
@@ -42,6 +42,27 @@ async function Jobs() {
         <Link href="/request" className={btn("primary", "md")}><Plus className="size-4" /> Request a service</Link>
       </FadeIn>
 
+      {offers.length > 0 && (
+        <section>
+          <h2 className="text-sm font-bold uppercase tracking-wider text-muted">Client offers for you</h2>
+          <ul className="mt-3 divide-y divide-line overflow-hidden rounded-2xl border border-amber-200 bg-white">
+            {offers.map((j) => (
+              <li key={j.id}>
+                <Link href={`/dashboard/jobs/${j.id}`} className="flex items-center gap-3 px-4 py-3.5 transition hover:bg-canvas sm:px-5">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-bold">{j.title}</p>
+                    <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted"><MapPin className="size-3" /> {j.location}</p>
+                  </div>
+                  <span className={cn("shrink-0 rounded-full px-2.5 py-1 text-xs font-bold", j.proAnswer ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700")}>
+                    {j.proAnswer ? "Answered" : `Offer ${formatMoney(j.clientOffer)}`}
+                  </span>
+                  <ArrowRight className="size-4 shrink-0 text-muted" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {assigned.some((j) => !isDone(j)) && <JobList title="Jobs findMe gave you" jobs={assigned.filter((j) => !isDone(j))} side="pro" />}
       {(asked.some((j) => !isDone(j)) || !history.length) && (
         <JobList title={history.length ? "Your open requests" : "Your requests"} jobs={asked.filter((j) => !isDone(j))} side="client" empty={!history.length} />

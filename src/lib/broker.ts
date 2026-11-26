@@ -4,7 +4,8 @@ import { db } from "./firebase-admin";
 import { notify } from "./notify";
 import { emailAdmins } from "./admin";
 import { AUTO_CONFIRM_MS } from "./jobs";
-import type { JobDoc } from "./schema";
+import { FINDME_FEE_LABEL, proPayoutFor } from "./fees";
+import type { JobDoc, UserDoc } from "./schema";
 import type { PaystackTx } from "./paystack";
 
 const naira = (n: number) => new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", currencyDisplay: "narrowSymbol", maximumFractionDigits: 0 }).format(n);
@@ -92,5 +93,27 @@ export async function recordPaystackPayment(jobId: string, tx: PaystackTx): Prom
     href: `/admin/jobs#${ref.id}`,
     cta: "Open job",
   }).catch(() => {});
+  return true;
+}
+
+/**
+ * Bargaining: tells a pro (usually the one the client picked) what the client offered, and asks
+ * them to accept it or name their final price. Clears any earlier answer. Bell + email.
+ */
+export async function askProAboutOffer(jobId: string, proId: string): Promise<boolean> {
+  const ref = db().collection("jobs").doc(jobId);
+  const j = (await ref.get()).data() as JobDoc | undefined;
+  if (!j || !j.clientOffer || (j.status !== "new" && j.status !== "quoted")) return false;
+  const pro = (await db().collection("users").doc(proId).get()).data() as UserDoc | undefined;
+  if (!pro || pro.role !== "provider" || pro.banned) return false;
+  await ref.update({ askProId: proId, askedAt: Date.now(), proAnswer: FieldValue.delete() });
+  await notify({
+    userId: proId,
+    kind: "request",
+    title: `A client offered ${naira(j.clientOffer)} for your service`,
+    body: `"${j.title}" in ${j.location}${j.when ? `, ${j.when}` : ""}.${j.price ? ` findMe had quoted ${naira(j.price)}.` : ""} If you accept, you get ${naira(proPayoutFor(j.clientOffer))} after findMe's ${FINDME_FEE_LABEL}. Accept the offer, or tell us your final price.`,
+    href: `/dashboard/jobs/${jobId}`,
+    cta: "Answer the offer",
+  });
   return true;
 }

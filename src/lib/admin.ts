@@ -1,7 +1,7 @@
 import "server-only";
 import { randomInt } from "node:crypto";
 import { db } from "./firebase-admin";
-import type { UserDoc } from "./schema";
+import type { NotificationDoc, UserDoc } from "./schema";
 import { emailLayout, sendEmail } from "./email";
 import { formatNgPhone } from "./phone";
 import { teamEmails } from "./team";
@@ -13,6 +13,28 @@ const MAIN_ADMIN = "tylerhillary03@gmail.com";
 
 /** Where admin emails go: the main admin plus everyone in ADMIN_EMAILS (no duplicates). */
 const adminInbox = () => [...new Set([MAIN_ADMIN, ...adminEmails().map((e) => e.toLowerCase())])];
+
+/**
+ * Puts an admin email under the bell too, for every admin account (team emails and admin: true),
+ * so nothing is only in an inbox.
+ */
+export async function notifyAdminsInApp(title: string, body: string, href: string) {
+  const emails = adminInbox();
+  const chunks: string[][] = [];
+  for (let i = 0; i < emails.length; i += 10) chunks.push(emails.slice(i, i + 10));
+  const snaps = await Promise.all([
+    db().collection("users").where("admin", "==", true).select().get(),
+    ...chunks.map((c) => db().collection("users").where("email", "in", c).select().get()),
+  ]);
+  const ids = new Set(snaps.flatMap((s) => s.docs.map((d) => d.id)));
+  if (!ids.size) return;
+  const batch = db().batch();
+  const now = Date.now();
+  for (const userId of ids) {
+    batch.set(db().collection("notifications").doc(), { userId, kind: "status", title, body, href, requestId: null, read: false, createdAt: now } satisfies NotificationDoc);
+  }
+  await batch.commit();
+}
 
 /** Admins: anyone whose email is in ADMIN_EMAILS, or whose profile has admin: true. */
 export async function isAdmin(uid: string, email: string) {
@@ -56,7 +78,10 @@ export async function emailAdminsNumberToVerify(p: { uid: string; name: string; 
     ],
     footnote: "On your phone? The admin page has a Call button for each person.",
   });
-  await Promise.all(adminInbox().map((to) => sendEmail({ to, subject: `Verify number: ${p.name} (${formatNgPhone(p.phone)})`, html })));
+  await Promise.all([
+    ...adminInbox().map((to) => sendEmail({ to, subject: `Verify number: ${p.name} (${formatNgPhone(p.phone)})`, html })),
+    notifyAdminsInApp(title, `Call ${formatNgPhone(p.phone)} to verify this number. Their code: ${code}.`, "/admin/verifications").catch(() => {}),
+  ]);
 }
 
 /** Emails the admins about a new report, with what happened and a link to review it. */
@@ -78,11 +103,17 @@ export async function emailAdminsReport(r: { reportedName: string; reportedRole:
     ...(r.details ? { quote: { from: r.reporterName, text: r.details } } : {}),
   });
   const subject = r.hidden ? `Hidden after ${r.count} reports: ${r.reportedName}` : `Report: ${r.reportedName} (${r.reason})`;
-  await Promise.all(adminInbox().map((to) => sendEmail({ to, subject, html })));
+  await Promise.all([
+    ...adminInbox().map((to) => sendEmail({ to, subject, html })),
+    notifyAdminsInApp(subject, r.hidden ? `${r.reportedName} was hidden from search after ${r.count} reports.` : `${r.reporterName} reported ${r.reportedName}.`, "/admin/reports").catch(() => {}),
+  ]);
 }
 
 /** A general email to the admins, e.g. a new job request or a payment to check. */
 export async function emailAdmins(m: { subject: string; title: string; body: string; href: string; cta: string; details?: [string, string][]; quote?: { from: string; text: string } }) {
   const html = emailLayout({ name: "", title: m.title, body: m.body, href: m.href, cta: m.cta, details: m.details, quote: m.quote });
-  await Promise.all(adminInbox().map((to) => sendEmail({ to, subject: m.subject, html })));
+  await Promise.all([
+    ...adminInbox().map((to) => sendEmail({ to, subject: m.subject, html })),
+    notifyAdminsInApp(m.title, m.body, m.href).catch(() => {}),
+  ]);
 }

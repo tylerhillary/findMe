@@ -24,6 +24,7 @@ export async function GET(req: Request) {
     db().collection("notifications").where("userId", "==", user.id).orderBy("createdAt", "desc").limit(10),
     db().collection("jobs").where("clientId", "==", user.id),
     db().collection("jobs").where("proId", "==", user.id),
+    db().collection("jobs").where("askProId", "==", user.id),
     db().collection("users").doc(user.id),
   ];
   if (admin) {

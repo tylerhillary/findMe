@@ -10,7 +10,7 @@ import { db } from "./firebase-admin";
 import { CATEGORIES, categoryName, type RequestStatus } from "./categories";
 import { inState } from "./nigeria";
 import { publicName } from "./names";
-import type { RequestDoc, ReviewDoc, ServiceDoc, UserDoc } from "./schema";
+import type { RequestDoc, ReviewDoc, ServiceDoc, UserDoc, VerifiedKind } from "./schema";
 
 /** Cache tag for the public provider catalog (search, featured, category counts). */
 export const CATALOG_TAG = "catalog";
@@ -40,6 +40,8 @@ export type ProviderCard = {
   ninVerified: boolean;
   /** Part of the findMe team (gold badge). Worked out from the email, which isn't kept here. */
   team: boolean;
+  /** Admin-granted verified tick: individual (blue), company (black) or government (green). */
+  verifiedAs: VerifiedKind | null;
   score?: number;
 };
 
@@ -71,13 +73,16 @@ function cardFrom(id: string, u: UserDoc): ProviderCard {
     emailVerified: !!u.emailVerified,
     ninVerified: !!u.ninVerified,
     team: hasTeamBadge(u),
+    verifiedAs: asVerifiedKind(u.verifiedAs),
   };
 }
+
+const asVerifiedKind = (v: unknown): VerifiedKind | null => (v === "individual" || v === "company" || v === "government" ? v : null);
 
 // Public fields only — phone numbers and emails never enter the cached catalog.
 const PUBLIC_FIELDS = [
   "name", "businessName", "headline", "bio", "location", "category", "hourlyRate", "rateUnit", "available", "avatar",
-  "skills", "ratingSum", "reviewCount", "jobsDone", "startingPrice", "flagged", "banned", "teamBadge", "phoneConfirmed", "emailVerified", "ninVerified",
+  "skills", "ratingSum", "reviewCount", "jobsDone", "startingPrice", "flagged", "banned", "teamBadge", "phoneConfirmed", "emailVerified", "ninVerified", "verifiedAs",
 ] as const;
 
 /**

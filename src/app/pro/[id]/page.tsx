@@ -4,6 +4,7 @@ import { db } from "@/lib/firebase-admin";
 import { isTeamEmail } from "@/lib/team";
 import type { UserDoc } from "@/lib/schema";
 import { TeamBadgeToggle } from "./team-badge-toggle";
+import { VerifiedPicker } from "./verified-picker";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -18,7 +19,7 @@ import { shownName } from "@/lib/names";
 import { categoryName } from "@/lib/categories";
 import { getNow, getProviderProfile, hasReported, type ProviderProfile } from "@/lib/queries";
 import { ReportButton } from "@/components/report-dialog";
-import { IdVerifiedBadge, PhoneVerifiedBadge, TeamBadge, TrustedProBadge, VerifiedAccountBadge } from "@/components/verify-phone";
+import { IdVerifiedBadge, PhoneVerifiedBadge, TeamBadge, TrustedProBadge, VerifiedAccountBadge, VerifiedTick } from "@/components/verify-phone";
 import { HireButton, RequestPanel } from "./request-panel";
 
 export async function generateMetadata({ params }: PageProps<"/pro/[id]">): Promise<Metadata> {
@@ -86,6 +87,7 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
             <div className="min-w-0 sm:pt-[6.25rem]">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="font-display text-[1.45rem] font-extrabold leading-tight tracking-tight sm:text-4xl">{shownName(p)}</h1>
+                {p.verifiedAs && <VerifiedTick kind={p.verifiedAs} />}
                 {p.emailVerified && <VerifiedAccountBadge />}
                 {p.team && <TeamBadge />}
                 {p.phoneVerified && <PhoneVerifiedBadge />}
@@ -251,6 +253,9 @@ async function Panel({ p }: { p: ProviderProfile }) {
       {raw && (
         <div className="mt-3 rounded-2xl border border-dashed border-amber-300 bg-white px-4 py-3">
           <TeamBadgeToggle userId={p.id} on={!!raw.teamBadge} automatic={isTeamEmail(raw.email)} />
+          <div className="mt-3 border-t border-dashed border-amber-200 pt-3">
+            <VerifiedPicker userId={p.id} current={p.verifiedAs} />
+          </div>
         </div>
       )}
     </>

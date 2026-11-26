@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Check, CheckCircle2, CreditCard, HandCoins, Loader2, X } from "lucide-react";
-import { cancelJobAction, claimPaidAction, payWithPaystackAction, confirmJobDoneAction, counterOfferAction, proMarkDoneAction } from "@/app/job-actions";
+import { answerOfferAction, cancelJobAction, claimPaidAction, payWithPaystackAction, confirmJobDoneAction, counterOfferAction, proMarkDoneAction } from "@/app/job-actions";
 import { Input, btn } from "@/components/ui";
 
 type Result = { ok?: true; error?: string };
@@ -131,6 +131,44 @@ export function ProDoneButton({ jobId }: { jobId: string }) {
       <button disabled={pending} onClick={() => run("done", () => proMarkDoneAction(jobId), "Tell the client the job is done? They'll be asked to confirm.")} className={btn("dark", "lg", "w-full")}>
         {spin("done") ? <Loader2 className="size-5 animate-spin" /> : <CheckCircle2 className="size-5" />} Mark job as done
       </button>
+      <Err msg={error} />
+    </div>
+  );
+}
+
+/** Pro asked about a client's offer: accept it, or give their final price. */
+export function AnswerOfferButtons({ jobId, offer, feeRate }: { jobId: string; offer: number; feeRate: number }) {
+  const { run, spin, pending, error } = useRun();
+  const [countering, setCountering] = useState(false);
+  const [amount, setAmount] = useState("");
+  const naira = (n: number) => new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", currencyDisplay: "narrowSymbol", maximumFractionDigits: 0 }).format(n);
+  const n = Math.round(Number(amount.replace(/[^\d.]/g, "")) || 0);
+  return (
+    <div>
+      {!countering ? (
+        <div className="grid gap-2 sm:grid-cols-2">
+          <button disabled={pending} onClick={() => run("yes", () => answerOfferAction(jobId, true, 0), `Accept ${naira(offer)}? You'll get ${naira(Math.round(offer * (1 - feeRate)))} if the client books.`)} className={btn("primary", "md", "w-full")}>
+            {spin("yes") ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />} Accept {naira(offer)}
+          </button>
+          <button disabled={pending} onClick={() => setCountering(true)} className={btn("secondary", "md", "w-full")}>
+            <HandCoins className="size-4" /> My final price
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-semibold text-muted">₦</span>
+              <Input autoFocus inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="What the client should pay" className="h-11 pl-7 sm:pl-8" />
+            </div>
+            <button disabled={pending || !n} onClick={() => run("no", () => answerOfferAction(jobId, false, n))} className={btn("primary", "md")}>
+              {spin("no") ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />} Send
+            </button>
+            <button disabled={pending} onClick={() => setCountering(false)} className={btn("ghost", "md")} aria-label="Back"><X className="size-4" /></button>
+          </div>
+          {n > 0 && <p className="text-xs text-muted">You&apos;d get {naira(Math.round(n * (1 - feeRate)))} after findMe&apos;s fee.</p>}
+        </div>
+      )}
       <Err msg={error} />
     </div>
   );

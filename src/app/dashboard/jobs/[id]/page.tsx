@@ -9,14 +9,14 @@ import { db } from "@/lib/firebase-admin";
 import { bankDetails, getJob } from "@/lib/job-queries";
 import { jobStatusLabel } from "@/lib/job-status";
 import { AUTO_CONFIRM_MS } from "@/lib/jobs";
-import { FINDME_FEE_LABEL, findMeFeeFor } from "@/lib/fees";
+import { FINDME_FEE_LABEL, FINDME_FEE_RATE, findMeFeeFor, proPayoutFor } from "@/lib/fees";
 import { categoryName } from "@/lib/categories";
 import { Avatar, cn, formatMoney } from "@/components/ui";
 import { FadeIn } from "@/components/motion";
 import { ContactButtons } from "@/components/contact-card";
 import { TeamBadge } from "@/components/verify-phone";
 import { ReviewForm } from "../../requests/[id]/thread-client";
-import { CancelJobButton, ConfirmDoneButtons, PayButtons, PaystackButton, ProDoneButton } from "../job-buttons";
+import { AnswerOfferButtons, CancelJobButton, ConfirmDoneButtons, PayButtons, PaystackButton, ProDoneButton } from "../job-buttons";
 import { checkPayment, jobIdOf, paystackReady, paystackTestMode } from "@/lib/paystack";
 import { recordPaystackPayment } from "@/lib/broker";
 
@@ -49,8 +49,8 @@ async function Job({ params, searchParams }: { params: Promise<{ id: string }>; 
     payment = data.job.status === "quoted" ? "failed" : "ok";
   }
   const { job, role, pro, review, clientTeam } = data;
-  const side = role === "pro" ? "pro" : "client";
-  const st = jobStatusLabel(job, side);
+  const side = role === "pro" || role === "offer" ? "pro" : "client";
+  const st = role === "offer" ? { label: job.proAnswer ? "You answered" : "Client's offer", tone: "bg-amber-50 text-amber-700" } : jobStatusLabel(job, side);
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -92,7 +92,7 @@ async function Job({ params, searchParams }: { params: Promise<{ id: string }>; 
         <p className="mt-4 whitespace-pre-wrap rounded-xl bg-canvas px-4 py-3 text-sm text-ink-soft">{job.details}</p>
       </FadeIn>
 
-      <div className="mt-4 space-y-4">{side === "pro" ? <ProView job={job} clientTeam={clientTeam} hasPayout={(await db().collection("payouts").doc(user.id).get()).exists} /> : <ClientView job={job} pro={pro} review={review} />}</div>
+      <div className="mt-4 space-y-4">{role === "offer" ? <OfferView job={job} /> : side === "pro" ? <ProView job={job} clientTeam={clientTeam} hasPayout={(await db().collection("payouts").doc(user.id).get()).exists} /> : <ClientView job={job} pro={pro} review={review} />}</div>
     </div>
   );
 }
@@ -236,5 +236,28 @@ function ProView({ job, clientTeam, hasPayout }: { job: Data["job"]; clientTeam:
 
       {job.status === "cancelled" && <FadeIn className="card p-5 text-sm text-ink-soft sm:p-6">This job was cancelled. You don&apos;t need to go.</FadeIn>}
     </>
+  );
+}
+
+/** A pro findMe asked about the client's offer: accept it, or give a final price. No client contact here. */
+function OfferView({ job }: { job: Data["job"] }) {
+  const a = job.proAnswer;
+  return (
+    <FadeIn className="card p-5 sm:p-6">
+      <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted"><Banknote className="size-4" /> The client&apos;s offer</p>
+      <p className="mt-1 font-display text-3xl font-extrabold tracking-tight">{formatMoney(job.clientOffer)}</p>
+      <p className="mt-1 text-sm text-muted">
+        {job.price > 0 && <>findMe had quoted {formatMoney(job.price)}. </>}If you accept, you get {formatMoney(proPayoutFor(job.clientOffer))} after findMe&apos;s {FINDME_FEE_LABEL}, paid once the client confirms the job is done.
+      </p>
+      {a ? (
+        <div className="mt-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+          <p className="font-semibold">{a.accepted ? `You accepted ${formatMoney(a.amount)}.` : `Your final price: ${formatMoney(a.amount)}.`}</p>
+          <p className="mt-0.5">findMe will confirm with the client. If they book, the job comes to you here with their details.</p>
+        </div>
+      ) : (
+        <div className="mt-4"><AnswerOfferButtons jobId={job.id} offer={job.clientOffer} feeRate={FINDME_FEE_RATE} /></div>
+      )}
+      <p className="mt-3 text-xs text-muted">Everything goes through findMe: don&apos;t contact the client or take payment directly.</p>
+    </FadeIn>
   );
 }

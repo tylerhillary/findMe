@@ -144,6 +144,13 @@ async function Content() {
                       )}
                       {j.price > 0 && <p><span className="text-muted">Price:</span> <span className="font-semibold">{formatMoney(j.price)}</span> <span className="text-muted">→ pro {formatMoney(j.proPayout)}, findMe {formatMoney(findMeFeeFor(j.price))}</span></p>}
                       {assigned && <p><span className="text-muted">Pro:</span> <span className="font-semibold">{assigned.u.businessName || assigned.u.name}</span>{assigned.u.phone ? <> · <a href={telLink(assigned.u.phone)} className="text-brand-700 hover:underline">{formatNgPhone(assigned.u.phone)}</a></> : null}</p>}
+                      {j.askProId && (j.status === "new" || j.status === "quoted") && (
+                        <p className={cn("font-semibold sm:col-span-2", j.proAnswer ? "text-emerald-700" : "text-amber-700")}>
+                          {j.proAnswer
+                            ? j.proAnswer.accepted ? `Pro accepts the client's ${formatMoney(j.proAnswer.amount)}` : `Pro's final price: ${formatMoney(j.proAnswer.amount)} (client offered ${formatMoney(j.clientOffer)})`
+                            : `Asked the pro about ${formatMoney(j.clientOffer)} · waiting for their answer`}
+                        </p>
+                      )}
                       {j.paymentClaimedAt && j.status === "quoted" && <p className="font-semibold text-sky-700">Client says they paid · {day(j.paymentClaimedAt)}</p>}
                       {j.paidVia === "paystack" && <p className="font-semibold text-emerald-700">Paid on Paystack · {j.paystackRef}</p>}
                       {j.doneRequestedAt && <p className="font-semibold text-amber-700">Pro said done · {day(j.doneRequestedAt)}</p>}

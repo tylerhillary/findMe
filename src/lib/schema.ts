@@ -50,6 +50,8 @@ export type UserDoc = {
   banned?: boolean;
   /** Gold "findMe team" badge given by an admin (team emails get it automatically). */
   teamBadge?: boolean;
+  /** Verified tick an admin gives after checking documents: blue individual, black company, green government. */
+  verifiedAs?: VerifiedKind;
   createdAt: number;
 };
 
@@ -196,6 +198,11 @@ export type JobDoc = {
   doneRequestedAt?: number; // pro said it's done; client confirms or it auto-confirms
   completedAt?: number;
   proPaidAt?: number; // admin paid the pro
+  /** Bargaining: the pro findMe asked about the client's offer (usually the one the client picked). */
+  askProId?: string | null;
+  askedAt?: number;
+  /** That pro's reply: they accept the client's offer, or name their final price (what the client pays). */
+  proAnswer?: { accepted: boolean; amount: number; at: number } | null;
   cancelledAt?: number;
   reviewed?: boolean;
   adminNote?: string;
@@ -221,3 +228,6 @@ export type RecoveryDoc = {
   decidedAt?: number;
   decidedBy?: string;
 };
+
+/** Who findMe confirmed this account to be (admin-granted, after checking documents). */
+export type VerifiedKind = "individual" | "company" | "government";

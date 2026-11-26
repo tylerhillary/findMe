@@ -937,6 +937,29 @@ export async function setTeamBadgeAction(userId: string, on: boolean): Promise<{
   return { ok: true };
 }
 
+/** Admin: give (or remove) the verified tick after checking documents. */
+export async function setVerifiedAsAction(userId: string, kind: "individual" | "company" | "government" | null): Promise<{ ok?: true; error?: string }> {
+  const admin = await requireUser();
+  if (!(await isAdmin(admin.id, admin.email))) return { error: "Only admins can do this." };
+  if (kind !== null && kind !== "individual" && kind !== "company" && kind !== "government") return { error: "Pick a verification type." };
+  const ref = users().doc(String(userId ?? "").slice(0, 128));
+  if (!(await ref.get()).exists) return { error: "This account no longer exists." };
+  await ref.update({ verifiedAs: kind ?? FieldValue.delete() });
+  if (kind) {
+    await notify({
+      userId: ref.id,
+      kind: "status",
+      title: "Your account is verified",
+      body: `findMe verified you as ${kind === "individual" ? "an individual" : kind === "company" ? "a company" : "a government body"}. Your profile now shows the verified tick.`,
+      href: `/pro/${ref.id}`,
+      cta: "See your profile",
+    });
+  }
+  updateTag(CATALOG_TAG);
+  refresh();
+  return { ok: true };
+}
+
 /** Pro: where findMe should send their pay (their 90% of each job). */
 export async function savePayoutAction(_: FormState, fd: FormData): Promise<FormState> {
   const user = await requireUser();
