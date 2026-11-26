@@ -10,7 +10,7 @@ export default function TermsPage() {
     <LegalPage
       eyebrow="Legal"
       title="Terms of Service"
-      updated="23 November 2026"
+      updated="26 November 2026"
       intro={
         <p>
           These terms are the agreement between you and findMe when you use our website and services. By creating an account or using findMe, you agree to them.
@@ -23,8 +23,9 @@ export default function TermsPage() {
           title: "What findMe is",
           body: (
             <p>
-              findMe is a marketplace brought to you by Radius Technology (&ldquo;we&rdquo;, &ldquo;us&rdquo;) that helps clients find independent professionals and contact them. Professionals are not employees or agents of findMe.
-              Any agreement for work — price, timing, quality and payment — is between the client and the professional. findMe is not a party to that agreement.
+              findMe is a service brought to you by Radius Technology (&ldquo;we&rdquo;, &ldquo;us&rdquo;). Clients tell findMe what they need, we agree a price with them, take
+              their payment, and send an independent professional to do the job. Professionals are not employees or agents of findMe; they choose which jobs to accept and do
+              the work themselves.
             </p>
           ),
         },
@@ -47,7 +48,8 @@ export default function TermsPage() {
             <ul>
               <li>Describe your skills, experience, prices and availability honestly.</li>
               <li>Hold any licences or permits your work requires, and follow the law, including tax obligations.</li>
-              <li>Reply to requests promptly and do the work you agree to, to a professional standard.</li>
+              <li>When findMe gives you a job, contact the client promptly and do the work to a professional standard.</li>
+              <li>findMe may ask whether you&apos;ll do a job for less when a client makes an offer. You can say no.</li>
             </ul>
           ),
         },
@@ -57,9 +59,41 @@ export default function TermsPage() {
           body: (
             <ul>
               <li>Describe the job clearly and honestly, and treat professionals with respect.</li>
-              <li>Agree price and timing in findMe chat so there&apos;s a record.</li>
-              <li>Pay what you agreed, once you&apos;re satisfied the agreed work has been done.</li>
+              <li>Pay findMe the price we agree with you. Never pay a professional directly for a job arranged through findMe.</li>
+              <li>Confirm on findMe when the job is done, or tell us if it isn&apos;t. If you don&apos;t answer within 3 days of the professional marking it done, it&apos;s treated as confirmed.</li>
             </ul>
+          ),
+        },
+        {
+          id: "payments",
+          title: "Payments and findMe's fee",
+          body: (
+            <ul>
+              <li>Clients pay findMe for each job. We hold the payment and pay the professional after the client confirms the job is done (or it&apos;s confirmed automatically after 3 days).</li>
+              <li>findMe keeps 3% of the price the client pays. The professional receives the other 97%. Professionals can see this on every job.</li>
+              <li>If a job is cancelled after you paid, or the work isn&apos;t done, <Link href="/contact">contact us</Link> and we&apos;ll look into a refund.</li>
+            </ul>
+          ),
+        },
+        {
+          id: "no-bypass",
+          title: "Keeping jobs on findMe",
+          body: (
+            <>
+              <p>findMe only works if jobs we arrange stay on findMe. If you&apos;re a professional, for clients findMe sends you:</p>
+              <ul>
+                <li>Don&apos;t give them your phone number, social media or other contact details, and hide your number when you call (dial #31# first).</li>
+                <li>Don&apos;t ask them to contact you directly or to book you outside findMe, now or for 12 months after the job.</li>
+                <li>Don&apos;t take payment from them for any work, whether for the findMe job or anything else they ask you to do. Tell them to request it through findMe.</li>
+              </ul>
+              <p>
+                Clients: please book professionals you met on findMe through findMe. If a professional asks you to pay them directly or to deal with them outside findMe,
+                please report it. It protects your money.
+              </p>
+              <p>
+                Breaking these rules can lead to your account being suspended or closed, and any of your open jobs being given to someone else.
+              </p>
+            </>
           ),
         },
         {
@@ -79,7 +113,7 @@ export default function TermsPage() {
           title: "Reviews and reports",
           body: (
             <p>
-              Only clients who completed a job through findMe can review it. Reviews must be honest and about your own experience. You can report anyone from their profile or a
+              Only clients whose job was completed through findMe can review it. Reviews must be honest and about your own experience. You can report anyone from their profile or a
               conversation; we review reports and may hide profiles that several people report while we investigate.
             </p>
           ),
@@ -101,7 +135,8 @@ export default function TermsPage() {
             <>
               <p>
                 We work hard to keep findMe safe and available, but we can&apos;t guarantee the work, conduct or identity of any user, and findMe is provided &ldquo;as is&rdquo;.
-                To the extent the law allows, findMe isn&apos;t liable for losses arising from agreements or dealings between users.
+                To the extent the law allows, findMe isn&apos;t liable for losses caused by a user&apos;s own conduct, and our total liability for a job is limited to the amount
+                paid to findMe for it.
               </p>
               <p>Nothing in these terms limits rights you have under Nigerian consumer protection law that can&apos;t be limited.</p>
             </>

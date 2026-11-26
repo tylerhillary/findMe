@@ -13,7 +13,7 @@ import { shownName } from "@/lib/names";
 import { categoryName } from "@/lib/categories";
 import { getNow, getProviderProfile, hasReported, type ProviderProfile } from "@/lib/queries";
 import { ReportButton } from "@/components/report-dialog";
-import { PhoneVerifiedBadge, VerifiedAccountBadge } from "@/components/verify-phone";
+import { PhoneVerifiedBadge, TeamBadge, VerifiedAccountBadge } from "@/components/verify-phone";
 import { HireButton, RequestPanel } from "./request-panel";
 
 export async function generateMetadata({ params }: PageProps<"/pro/[id]">): Promise<Metadata> {
@@ -82,6 +82,7 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="font-display text-[1.45rem] font-extrabold leading-tight tracking-tight sm:text-4xl">{shownName(p)}</h1>
                 {p.emailVerified && <VerifiedAccountBadge />}
+                {p.team && <TeamBadge />}
                 {p.phoneVerified && <PhoneVerifiedBadge />}
                 {p.ninVerified && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700" title="Identity confirmed with their NIN">

@@ -1,4 +1,5 @@
 import "server-only";
+import { isTeamEmail } from "./team";
 import { settleOverdueJobs } from "./jobs";
 import { asRateUnit, type RateUnit } from "./price";
 import { cache } from "react";
@@ -37,6 +38,8 @@ export type ProviderCard = {
   emailVerified: boolean;
   /** NIN confirmed with NIMC (optional). Gives an "ID verified" badge and a boost in search. */
   ninVerified: boolean;
+  /** Part of the findMe team (gold badge). Worked out from the email, which isn't kept here. */
+  team: boolean;
   score?: number;
 };
 
@@ -67,6 +70,7 @@ function cardFrom(id: string, u: UserDoc): ProviderCard {
     phoneVerified: !!u.phoneConfirmed,
     emailVerified: !!u.emailVerified,
     ninVerified: !!u.ninVerified,
+    team: isTeamEmail(u.email),
   };
 }
 
@@ -87,7 +91,8 @@ async function loadCatalog(): Promise<CatalogEntry[]> {
   cacheLife("minutes");
 
   const [users, services] = await Promise.all([
-    db().collection("users").where("role", "==", "provider").select(...PUBLIC_FIELDS).get(),
+    // Email is read only to work out the team badge; it never enters the cached catalog.
+    db().collection("users").where("role", "==", "provider").select(...PUBLIC_FIELDS, "email").get(),
     db().collection("services").select("userId", "title", "description", "category").get(),
   ]);
   const byUser = new Map<string, CatalogEntry["services"]>();
@@ -453,9 +458,11 @@ export async function getRequestThread(requestId: string, userId: string) {
     client_name: c?.name ?? "findMe user",
     client_avatar: c?.avatar ?? null,
     client_email_verified: !!c?.emailVerified,
+    client_team: isTeamEmail(c?.email),
     provider_name: p?.name ?? "findMe user",
     provider_avatar: p?.avatar ?? null,
     provider_email_verified: !!p?.emailVerified,
+    provider_team: isTeamEmail(p?.email),
     provider_headline: p?.headline ?? "",
     service_title: (serviceSnap?.data() as ServiceDoc | undefined)?.title ?? null,
     client_phone: c?.phone ?? "",

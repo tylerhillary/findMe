@@ -2,7 +2,8 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { ExternalLink, LogOut, Settings } from "lucide-react";
 import { Avatar, Logo } from "@/components/ui";
-import { VerifiedAccountBadge } from "@/components/verify-phone";
+import { TeamBadge, VerifiedAccountBadge } from "@/components/verify-phone";
+import { isTeamEmail } from "@/lib/team";
 import { getEmailStatus, requireUser } from "@/lib/auth";
 import { getActionCounts, getUnreadCount } from "@/lib/queries";
 import { getMode } from "@/lib/mode";
@@ -109,9 +110,10 @@ async function SidebarUser() {
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-1 text-sm font-bold">
             <span className="truncate">{user.name}</span>
+            {isTeamEmail(user.email) && <TeamBadge compact />}
             {verified && <VerifiedAccountBadge compact />}
           </p>
-          <p className="truncate text-xs text-muted">{user.role === "provider" ? "Client & professional" : "Client"}</p>
+          <p className="truncate text-xs text-muted">{isTeamEmail(user.email) ? "findMe team" : user.role === "provider" ? "Client & professional" : "Client"}</p>
         </div>
         <Link href="/dashboard/settings" className="grid size-9 place-items-center rounded-lg text-muted transition hover:bg-white hover:text-ink" aria-label="Account settings" title="Account settings">
           <Settings className="size-4" />
@@ -142,7 +144,11 @@ async function MobileUser() {
       </Link>
       <Link href="/dashboard/profile" aria-label={verified ? "Your profile (verified email)" : "Your profile"} className="relative ml-1">
         <Avatar name={user.name} src={user.avatar} size={32} />
-        {verified && (
+        {isTeamEmail(user.email) ? (
+          <span className="absolute -bottom-0.5 -right-0.5 grid place-items-center rounded-full bg-white">
+            <TeamBadge compact className="size-3.5" />
+          </span>
+        ) : verified && (
           <span className="absolute -bottom-0.5 -right-0.5 grid place-items-center rounded-full bg-white">
             <VerifiedAccountBadge compact className="size-3.5" />
           </span>

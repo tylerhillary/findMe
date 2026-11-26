@@ -13,6 +13,7 @@ import { categoryName } from "@/lib/categories";
 import { Avatar, cn, formatMoney } from "@/components/ui";
 import { FadeIn } from "@/components/motion";
 import { ContactButtons } from "@/components/contact-card";
+import { TeamBadge } from "@/components/verify-phone";
 import { ReviewForm } from "../../requests/[id]/thread-client";
 import { CancelJobButton, ConfirmDoneButtons, PayButtons, ProDoneButton } from "../job-buttons";
 
@@ -33,7 +34,7 @@ async function Job({ params, searchParams }: { params: Promise<{ id: string }>; 
   const user = await requireUser(`/dashboard/jobs/${id}`);
   const data = await getJob(id, user.id, await isAdmin(user.id, user.email));
   if (!data) notFound();
-  const { job, role, pro, review } = data;
+  const { job, role, pro, review, clientTeam } = data;
   const side = role === "pro" ? "pro" : "client";
   const st = jobStatusLabel(job, side);
 
@@ -65,7 +66,7 @@ async function Job({ params, searchParams }: { params: Promise<{ id: string }>; 
         <p className="mt-4 whitespace-pre-wrap rounded-xl bg-canvas px-4 py-3 text-sm text-ink-soft">{job.details}</p>
       </FadeIn>
 
-      <div className="mt-4 space-y-4">{side === "pro" ? <ProView job={job} /> : <ClientView job={job} pro={pro} review={review} />}</div>
+      <div className="mt-4 space-y-4">{side === "pro" ? <ProView job={job} clientTeam={clientTeam} /> : <ClientView job={job} pro={pro} review={review} />}</div>
     </div>
   );
 }
@@ -124,7 +125,7 @@ function ClientView({ job, pro, review }: { job: Data["job"]; pro: Data["pro"]; 
           <Avatar name={pro.name} src={pro.avatar} size={56} />
           <div className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-wider text-muted">Your findMe pro</p>
-            <p className="text-lg font-bold">{pro.name}</p>
+            <p className="flex items-center gap-1.5 text-lg font-bold">{pro.name} {pro.team && <TeamBadge compact />}</p>
             <p className="truncate text-sm text-muted">{pro.headline}</p>
             {pro.reviewCount > 0 && <p className="mt-0.5 flex items-center gap-1 text-xs text-muted"><Star className="size-3.5 fill-amber-400 text-amber-400" /> {pro.rating.toFixed(1)} ({pro.reviewCount})</p>}
           </div>
@@ -155,7 +156,7 @@ function ClientView({ job, pro, review }: { job: Data["job"]; pro: Data["pro"]; 
   );
 }
 
-function ProView({ job }: { job: Data["job"] }) {
+function ProView({ job, clientTeam }: { job: Data["job"]; clientTeam: boolean }) {
   const fee = findMeFeeFor(job.price);
   return (
     <>
@@ -174,12 +175,12 @@ function ProView({ job }: { job: Data["job"] }) {
         <>
           <FadeIn className="card p-5 sm:p-6">
             <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted"><UserRound className="size-4" /> Client</p>
-            <p className="mt-1 text-lg font-bold">{job.clientName}</p>
+            <p className="mt-1 flex items-center gap-1.5 text-lg font-bold">{job.clientName} {clientTeam && <TeamBadge compact />}</p>
             <div className="mt-3"><ContactButtons phone={job.clientPhone} whatsapp waMessage={`Hi ${job.clientName.split(" ")[0]}, I'm from findMe about "${job.title}".`} /></div>
             <div className="mt-4 flex items-start gap-2 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
               <PhoneOff className="mt-0.5 size-4 shrink-0" />
               <p>
-                <span className="font-semibold">Hide your number when you call:</span> dial <span className="font-mono font-bold">#31#</span> before their number (e.g. #31#0803…). This is a findMe client: don&apos;t share your number or take payment from them. findMe pays you.
+                <span className="font-semibold">Hide your number when you call:</span> dial <span className="font-mono font-bold">#31#</span> before their number (e.g. #31#0803…). This is a findMe client: don&apos;t share your number or take payment from them. findMe pays you. <Link href="/terms#no-bypass" className="font-semibold underline">The rules</Link>
               </p>
             </div>
           </FadeIn>

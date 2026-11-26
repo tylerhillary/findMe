@@ -1,6 +1,6 @@
 "use client";
 
-import { PhoneVerifiedBadge } from "./verify-phone";
+import { PhoneVerifiedBadge, TeamBadge } from "./verify-phone";
 import { motion } from "motion/react";
 import { BadgeCheck, CheckCircle2, MessageCircle } from "lucide-react";
 import type { ProviderCard } from "@/lib/queries";
@@ -41,6 +41,7 @@ export function HeroVisual({ pro }: { pro: ProviderCard | null }) {
               <p className="flex items-center gap-1 font-bold">
                 <span className="truncate">{pro ? shownName(pro) : "Your name here"}</span>
                 {pro?.emailVerified && <BadgeCheck className="size-4 shrink-0 fill-sky-500 text-white" aria-label="Verified account" />}
+                {pro?.team && <TeamBadge compact />}
                 {pro?.phoneVerified && <PhoneVerifiedBadge compact />}
               </p>
               <p className="line-clamp-1 text-sm text-muted">{pro?.headline || "What you do, in one line"}</p>

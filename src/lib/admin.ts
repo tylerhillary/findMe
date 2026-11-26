@@ -4,8 +4,9 @@ import { db } from "./firebase-admin";
 import type { UserDoc } from "./schema";
 import { emailLayout, sendEmail } from "./email";
 import { formatNgPhone } from "./phone";
+import { teamEmails } from "./team";
 
-const adminEmails = () => (process.env.ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+const adminEmails = teamEmails;
 
 /** Where admin emails go: ADMIN_EMAILS, or findMe's main admin if that isn't set. */
 const adminInbox = () => (adminEmails().length ? adminEmails() : ["tylerhillary03@gmail.com"]);

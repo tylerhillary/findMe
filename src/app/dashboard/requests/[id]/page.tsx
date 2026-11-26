@@ -10,7 +10,7 @@ import { getBlockState, getRequestThread, hasReported } from "@/lib/queries";
 import { markNotificationsRead } from "@/lib/notify";
 import { BlockButton, ReportButton } from "@/components/report-dialog";
 import { Avatar, StatusPill, btn, formatMoney } from "@/components/ui";
-import { VerifiedAccountBadge } from "@/components/verify-phone";
+import { TeamBadge, VerifiedAccountBadge } from "@/components/verify-phone";
 import { ContactButtons } from "@/components/contact-card";
 import { FadeIn } from "@/components/motion";
 import { ConfirmDone, ReviewForm, StatusActions, ThreadChat } from "./thread-client";
@@ -37,8 +37,8 @@ async function Thread({ params, searchParams }: { params: Promise<{ id: string }
   }
 
   const other = t.isProvider
-    ? { id: t.client_id, name: t.client_name, avatar: t.client_avatar, role: "Client", verified: t.client_email_verified }
-    : { id: t.provider_id, name: t.provider_name, avatar: t.provider_avatar, role: t.provider_headline, verified: t.provider_email_verified };
+    ? { id: t.client_id, name: t.client_name, avatar: t.client_avatar, role: "Client", verified: t.client_email_verified, team: t.client_team }
+    : { id: t.provider_id, name: t.provider_name, avatar: t.provider_avatar, role: t.provider_headline, verified: t.provider_email_verified, team: t.provider_team };
   const me = t.isProvider ? { name: t.provider_name, avatar: t.provider_avatar } : { name: t.client_name, avatar: t.client_avatar };
   const closed = t.status === "declined" || t.status === "cancelled";
   // Numbers are exchanged only while the job is on (accepted). Once it's completed they're hidden
@@ -75,6 +75,7 @@ async function Thread({ params, searchParams }: { params: Promise<{ id: string }
                   <Link href={`/pro/${other.id}`} className="truncate font-bold hover:text-brand-700">{other.name}</Link>
                 )}
                 {other.verified && <VerifiedAccountBadge compact />}
+                {other.team && <TeamBadge compact />}
               </div>
               <p className="truncate text-xs text-muted">{other.role}</p>
             </div>
