@@ -17,6 +17,8 @@ export const CATEGORIES = [
   { slug: "logistics", name: "Delivery & Logistics", icon: "Truck", hue: "from-teal-500 to-emerald-600" },
   { slug: "food", name: "Food & Catering", icon: "ChefHat", hue: "from-red-500 to-orange-500" },
   { slug: "cleaning", name: "Cleaning & Laundry", icon: "SprayCan", hue: "from-sky-400 to-cyan-500" },
+  { slug: "hospitality", name: "Hospitality & Accommodation", icon: "BedDouble", hue: "from-indigo-500 to-violet-600" },
+  { slug: "rentals", name: "Rental Services", icon: "KeyRound", hue: "from-amber-600 to-yellow-500" },
 ] as const;
 
 export type CategorySlug = (typeof CATEGORIES)[number]["slug"];

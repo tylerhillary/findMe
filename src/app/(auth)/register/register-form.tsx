@@ -257,7 +257,7 @@ export function RegisterForm({ ninEnabled }: { ninEnabled: boolean }) {
                         <input type="checkbox" checked={whatsapp} onChange={(e) => setWhatsapp(e.target.checked)} className="size-4 accent-brand-600" />
                         This number is on WhatsApp
                       </label>
-                      <p className="mt-1 text-xs text-muted">Shared only after a request is accepted.</p>
+                      <p className="mt-1 text-xs text-muted">Kept private. findMe uses it to verify you and arrange your jobs.</p>
                     </div>
                     {ninEnabled && (
                       <div>
