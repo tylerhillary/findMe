@@ -2,7 +2,9 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { getEmailStatus, requireUser } from "@/lib/auth";
 import { FadeIn } from "@/components/motion";
-import { ChangeEmailForm, ChangePasswordForm, DeleteAccountForm } from "./settings-forms";
+import { db } from "@/lib/firebase-admin";
+import type { UserDoc } from "@/lib/schema";
+import { ChangeEmailForm, ChangePasswordForm, ChangePhoneForm, DeleteAccountForm } from "./settings-forms";
 
 export const metadata: Metadata = { title: "Account settings" };
 
@@ -22,11 +24,15 @@ export default function SettingsPage() {
 
 async function Settings() {
   const user = await requireUser();
-  const { email, verified } = await getEmailStatus(user.id);
+  const [{ email, verified }, me] = await Promise.all([getEmailStatus(user.id), db().collection("users").doc(user.id).get().then((d) => d.data() as UserDoc | undefined)]);
+  const phone = me?.phone ?? "";
   return (
     <div className="mt-5 max-w-2xl space-y-4 sm:mt-8 sm:space-y-5">
       <FadeIn delay={0.04}>
         <ChangeEmailForm email={email} verified={verified} />
+      </FadeIn>
+      <FadeIn delay={0.06}>
+        <ChangePhoneForm email={email} phone={phone} verified={!!phone && me?.verifiedPhone === phone} />
       </FadeIn>
       <FadeIn delay={0.08}>
         <ChangePasswordForm email={email} />

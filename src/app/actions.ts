@@ -803,6 +803,36 @@ export async function contactAction(_: FormState, fd: FormData): Promise<FormSta
   return { ok: true, message: "Message sent" };
 }
 
+// ---------------- Settings: phone number ----------------
+
+/**
+ * Settings: change the phone number on the account (the browser re-checks the password first).
+ * A new number shows as "not verified yet" until findMe confirms it by call or WhatsApp; going back
+ * to a number findMe already confirmed keeps it verified.
+ */
+export async function changePhoneAction(raw: string): Promise<{ ok?: true; verified?: boolean; error?: string }> {
+  const user = await requireUser("/dashboard/settings");
+  const phone = normalizeNgPhone(String(raw ?? "").slice(0, 30));
+  if (!phone) return { error: PHONE_ERROR };
+  const ref = users().doc(user.id);
+  const before = (await ref.get()).data() as UserDoc | undefined;
+  if (!before) return { error: "Account not found." };
+  if (before.phone === phone) return { error: "That's already your number." };
+  const taken = await users().where("phone", "==", phone).limit(2).get();
+  if (taken.docs.some((d) => d.id !== user.id)) return { error: "That number is already on another findMe account." };
+
+  const verified = before.verifiedPhone === phone;
+  await ref.update({ phone, phoneConfirmed: verified });
+  if (!verified) {
+    after(() =>
+      emailAdminsNumberToVerify({ uid: user.id, name: before.name, email: user.email, role: before.role, phone, changed: !!before.phone }).catch((e) => console.error("[findMe] admin verify email failed:", e)),
+    );
+  }
+  updateTag(CATALOG_TAG);
+  refresh();
+  return { ok: true, verified };
+}
+
 // ---------------- Admin: phone verification by call ----------------
 
 /**

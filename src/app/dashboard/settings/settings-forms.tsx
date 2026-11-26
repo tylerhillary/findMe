@@ -3,10 +3,12 @@
 import { useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { signInWithEmailAndPassword, signOut, updatePassword, verifyBeforeUpdateEmail } from "firebase/auth";
-import { AlertTriangle, BadgeCheck, CheckCircle2, KeyRound, Loader2, Mail, MailWarning, Trash2 } from "lucide-react";
-import { deleteAccountAction } from "@/app/actions";
+import { AlertTriangle, BadgeCheck, CheckCircle2, Clock, KeyRound, Loader2, Mail, MailWarning, Phone, Trash2 } from "lucide-react";
+import { changePhoneAction, deleteAccountAction } from "@/app/actions";
 import { authErrorMessage, clientAuth } from "@/lib/firebase-client";
 import { Input, Label, btn, cn } from "@/components/ui";
+import { PhoneInput } from "@/components/phone-input";
+import { formatNgPhone } from "@/lib/phone";
 
 /** Re-confirms the password, so sensitive changes can't be made from an unattended device. */
 async function reauth(email: string, password: string) {
@@ -149,6 +151,69 @@ export function ChangePasswordForm({ email }: { email: string }) {
               Forgot your current password?
             </Link>
           </div>
+        </div>
+      </form>
+    </Card>
+  );
+}
+
+/* ───────────── phone ───────────── */
+
+export function ChangePhoneForm({ email, phone, verified }: { email: string; phone: string; verified: boolean }) {
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [pending, start] = useTransition();
+  const [key, setKey] = useState(0);
+
+  function submit(fd: FormData) {
+    const next = String(fd.get("phone") ?? "").trim();
+    const password = String(fd.get("password") ?? "");
+    setMsg(null);
+    if (!next) return setMsg({ ok: false, text: "Enter your new number." });
+    start(async () => {
+      try {
+        await reauth(email, password);
+      } catch (e) {
+        return setMsg({ ok: false, text: authErrorMessage((e as { code?: string }).code) });
+      }
+      const res = await changePhoneAction(next).catch(() => ({ error: "Couldn't reach findMe. Check your connection and try again." }) as { error: string; verified?: boolean });
+      if ("error" in res && res.error) return setMsg({ ok: false, text: res.error });
+      setKey((k) => k + 1);
+      setMsg({
+        ok: true,
+        text: res.verified
+          ? "Number updated. findMe already verified this number, so your badge stays."
+          : "Number updated. findMe will verify it: check your dashboard for your code and the Verify on WhatsApp button.",
+      });
+    });
+  }
+
+  return (
+    <Card icon={Phone} title="Phone number" sub="Kept private. findMe uses it to verify you and arrange your jobs.">
+      <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+        <span className="text-muted">Current:</span>
+        <span className="font-semibold">{phone ? formatNgPhone(phone) : "No number yet"}</span>
+        {phone &&
+          (verified ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700"><BadgeCheck className="size-3.5" /> Verified</span>
+          ) : (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-700"><Clock className="size-3.5" /> Not verified yet</span>
+          ))}
+      </div>
+      <form key={key} action={submit} className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <Label htmlFor="newPhone">New number</Label>
+          <PhoneInput id="newPhone" name="phone" required />
+        </div>
+        <div>
+          <Label htmlFor="phonePassword">Current password</Label>
+          <Input id="phonePassword" name="password" type="password" autoComplete="current-password" required placeholder="To confirm it's you" />
+        </div>
+        <div className="sm:col-span-2">
+          {msg && <div className="mb-3"><Note ok={msg.ok}>{msg.text}</Note></div>}
+          <button disabled={pending} className={btn("dark", "md")}>
+            {pending && <Loader2 className="size-4 animate-spin" />} {phone ? "Change number" : "Add number"}
+          </button>
+          <p className="mt-2 text-xs text-muted">A new number shows as &ldquo;not verified yet&rdquo; until findMe confirms it.</p>
         </div>
       </form>
     </Card>
