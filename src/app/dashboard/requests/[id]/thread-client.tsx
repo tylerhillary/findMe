@@ -3,8 +3,8 @@
 import { useActionState, useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { Check, CheckCircle2, Loader2, Send, Star, X } from "lucide-react";
-import { leaveReviewAction, pollThreadAction, sendMessageAction, updateRequestStatusAction, type FormState } from "@/app/actions";
+import { Check, CheckCircle2, Clock, Loader2, Send, Star, X } from "lucide-react";
+import { leaveReviewAction, notDoneYetAction, pollThreadAction, sendMessageAction, updateRequestStatusAction, type FormState } from "@/app/actions";
 import type { RequestStatus } from "@/lib/categories";
 import { Avatar, Textarea, btn, cn } from "@/components/ui";
 
@@ -220,7 +220,11 @@ function Composer({ requestId, onSent }: { requestId: string; onSent: (m: Msg) =
   );
 }
 
-export function StatusActions({ requestId, status, isProvider, otherName }: { requestId: string; status: RequestStatus; isProvider: boolean; otherName: string }) {
+const AUTO_CONFIRM_DAYS = 3;
+const confirmDate = (doneAt: number) =>
+  new Date(doneAt + AUTO_CONFIRM_DAYS * 86_400_000).toLocaleDateString("en-NG", { timeZone: "Africa/Lagos", weekday: "short", day: "numeric", month: "short" });
+
+export function StatusActions({ requestId, status, isProvider, otherName, doneRequestedAt }: { requestId: string; status: RequestStatus; isProvider: boolean; otherName: string; doneRequestedAt: number | null }) {
   const [pending, start] = useTransition();
   const [target, setTarget] = useState<RequestStatus | null>(null);
   const run = (s: RequestStatus, confirmMsg?: string) => {
@@ -242,23 +246,65 @@ export function StatusActions({ requestId, status, isProvider, otherName }: { re
       </>
     );
   } else if (isProvider && status === "accepted") {
-    content = (
-      <button disabled={pending} onClick={() => run("completed", "Mark this job as completed?")} className={btn("dark", "md", "w-full")}>
-        {spin("completed") || <CheckCircle2 className="size-4" />} Mark as completed
-      </button>
+    content = doneRequestedAt ? (
+      <p className="flex items-start gap-2 text-sm text-ink-soft">
+        <Clock className="mt-0.5 size-4 shrink-0 text-amber-500" />
+        <span>Waiting for {otherName} to confirm the job is done. If they don&apos;t answer, it&apos;s confirmed automatically on {confirmDate(doneRequestedAt)}.</span>
+      </p>
+    ) : (
+      <>
+        <button disabled={pending} onClick={() => run("completed", `Tell ${otherName} the job is done? They'll be asked to confirm.`)} className={btn("dark", "md", "w-full")}>
+          {spin("completed") || <CheckCircle2 className="size-4" />} Mark job as done
+        </button>
+        <p className="mt-2 text-xs text-muted">{otherName} confirms, then you both get the review step. Chat and numbers close once it&apos;s confirmed.</p>
+      </>
     );
+  } else if (!isProvider && status === "accepted" && doneRequestedAt) {
+    content = <ConfirmDone requestId={requestId} otherName={otherName} doneRequestedAt={doneRequestedAt} />;
   } else if (!isProvider && (status === "pending" || status === "accepted")) {
     content = (
       <>
         <p className="text-sm text-ink-soft">{status === "pending" ? `Waiting for ${otherName} to accept.` : `${otherName} is working on this.`}</p>
-        <button disabled={pending} onClick={() => run("cancelled", "Cancel this request?")} className={btn("ghost", "sm", "mt-2 -ml-3 text-red-600 hover:bg-red-50 hover:text-red-700")}>
-          {spin("cancelled")} Cancel request
-        </button>
+        <div className="mt-2 flex flex-wrap items-center gap-x-2">
+          {status === "accepted" && (
+            <button disabled={pending} onClick={() => run("completed", `Is the job finished? This closes the chat and hides both phone numbers, then you can review ${otherName}.`)} className={btn("ghost", "sm", "-ml-3")}>
+              {spin("completed") || <CheckCircle2 className="size-4" />} Job finished
+            </button>
+          )}
+          <button disabled={pending} onClick={() => run("cancelled", "Cancel this request?")} className={btn("ghost", "sm", status === "accepted" ? "text-red-600 hover:bg-red-50 hover:text-red-700" : "-ml-3 text-red-600 hover:bg-red-50 hover:text-red-700")}>
+            {spin("cancelled")} Cancel request
+          </button>
+        </div>
       </>
     );
   }
   if (!content) return null;
   return <div className="mt-5 border-t border-line pt-5">{content}</div>;
+}
+
+/** Client's answer after the pro says the job is done. Also shown above the chat. */
+export function ConfirmDone({ requestId, otherName, doneRequestedAt, banner }: { requestId: string; otherName: string; doneRequestedAt: number; banner?: boolean }) {
+  const [pending, start] = useTransition();
+  const [which, setWhich] = useState<"yes" | "no" | null>(null);
+  const answer = (yes: boolean) => {
+    if (yes && !confirm(`Confirm the job is done? This closes the chat and hides both phone numbers, then you can review ${otherName}.`)) return;
+    setWhich(yes ? "yes" : "no");
+    start(() => (yes ? updateRequestStatusAction(requestId, "completed") : notDoneYetAction(requestId)));
+  };
+  return (
+    <div className={banner ? "border-b border-amber-200 bg-amber-50 px-4 py-3 sm:px-5" : ""}>
+      <p className="text-sm font-semibold text-ink">{otherName} says the job is done. Is it finished?</p>
+      <div className="mt-2.5 flex flex-wrap gap-2">
+        <button disabled={pending} onClick={() => answer(true)} className={btn("primary", "sm")}>
+          {pending && which === "yes" ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />} Yes, it&apos;s done
+        </button>
+        <button disabled={pending} onClick={() => answer(false)} className={btn("outline", "sm")}>
+          {pending && which === "no" ? <Loader2 className="size-4 animate-spin" /> : <X className="size-4" />} Not yet
+        </button>
+      </div>
+      <p className="mt-2 text-xs text-muted">If you don&apos;t answer, it&apos;s confirmed automatically on {confirmDate(doneRequestedAt)}.</p>
+    </div>
+  );
 }
 
 export function ReviewForm({ requestId, existing, name }: { requestId: string; existing: { rating: number; comment: string } | null; name: string }) {

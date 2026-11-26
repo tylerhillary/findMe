@@ -68,6 +68,11 @@ export function RequestList({ requests, isPro, now }: { requests: RequestSummary
                         <Star className="size-2.5 fill-current" /> Rate now
                       </span>
                     )}
+                    {r.awaitingConfirm && (
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
+                        {r.direction === "outgoing" ? "Confirm done" : "Awaiting confirm"}
+                      </span>
+                    )}
                     {r.status === "pending" && r.direction === "incoming" && (
                       <span className="rounded-full bg-coral-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">New</span>
                     )}

@@ -13,7 +13,7 @@ import { Avatar, StatusPill, btn, formatMoney } from "@/components/ui";
 import { VerifiedAccountBadge } from "@/components/verify-phone";
 import { ContactButtons } from "@/components/contact-card";
 import { FadeIn } from "@/components/motion";
-import { ReviewForm, StatusActions, ThreadChat } from "./thread-client";
+import { ConfirmDone, ReviewForm, StatusActions, ThreadChat } from "./thread-client";
 
 export const metadata: Metadata = { title: "Conversation" };
 
@@ -107,6 +107,8 @@ async function Thread({ params, searchParams }: { params: Promise<{ id: string }
               </div>
             </div>
           ) : (
+          <>
+          {!t.isProvider && t.done_requested_at && <ConfirmDone requestId={t.id} otherName={otherFirst} doneRequestedAt={t.done_requested_at} banner />}
           <ThreadChat
             requestId={t.id}
             userId={user.id}
@@ -119,6 +121,7 @@ async function Thread({ params, searchParams }: { params: Promise<{ id: string }
             closed={closed || blocked}
             notice={notice}
           />
+          </>
           )}
         </FadeIn>
 
@@ -157,7 +160,7 @@ async function Thread({ params, searchParams }: { params: Promise<{ id: string }
               <div className="flex items-center gap-2.5"><Banknote className="size-4 text-brand-500" /><dt className="sr-only">Budget</dt><dd className="text-ink-soft">{t.budget > 0 ? formatMoney(t.budget) : "Budget to be agreed"}</dd></div>
               <div className="flex items-center gap-2.5"><CalendarDays className="size-4 text-brand-500" /><dt className="sr-only">Sent</dt><dd className="text-ink-soft">Sent {new Date(t.created_at).toLocaleDateString("en-NG", { timeZone: "Africa/Lagos", day: "numeric", month: "short", year: "numeric" })}</dd></div>
             </dl>
-            <StatusActions requestId={t.id} status={t.status} isProvider={t.isProvider} otherName={other.name.split(" ")[0]} />
+            <StatusActions requestId={t.id} status={t.status} isProvider={t.isProvider} otherName={other.name.split(" ")[0]} doneRequestedAt={t.done_requested_at} />
           </FadeIn>
 
 

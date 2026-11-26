@@ -93,6 +93,8 @@ export type RequestDoc = {
   messageCount?: number;
   /** True once the client has left a review (false until then). */
   reviewed?: boolean;
+  /** When the pro said the job is done; the client confirms, or it auto-confirms after 3 days. */
+  doneRequestedAt?: number;
   /** Set when the job was completed and its chat deleted. */
   chatClearedAt?: number;
   /** Completed while a report was open: the chat is kept as evidence until an admin decides. */

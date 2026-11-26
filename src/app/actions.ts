@@ -16,6 +16,7 @@ import { cleanNin, deleteNinRecords, isNinFormat, verifyNin } from "@/lib/nin";
 import { APP_URL, emailConfigured, emailLayout, sendEmail } from "@/lib/email";
 import { publicName } from "@/lib/names";
 import { emailAdminsNumberToVerify, emailAdminsReport, isAdmin } from "@/lib/admin";
+import { clearChat, completeJob } from "@/lib/jobs";
 import { asRateUnit } from "@/lib/price";
 import { createHash } from "node:crypto";
 import type { BlockDoc, CoverDoc, MessageDoc, NotificationDoc, ReportDoc, RequestDoc, ReviewDoc, ServiceDoc, Skill, SupportDoc, UserDoc } from "@/lib/schema";
@@ -552,14 +553,8 @@ export async function pollThreadAction(
   };
 }
 
-/** Deletes a completed job's chat. */
-async function clearChat(ref: FirebaseFirestore.DocumentReference) {
-  await db().recursiveDelete(ref.collection("messages")).catch((e) => console.error("[findMe] couldn't clear chat:", e));
-  await ref.update({ messageCount: 0, chatClearedAt: Date.now(), chatHeldForReport: FieldValue.delete() }).catch(() => {});
-}
-
 const TRANSITIONS: Record<"provider" | "client", Partial<Record<RequestStatus, RequestStatus[]>>> = {
-  provider: { pending: ["accepted", "declined"], accepted: ["completed"] },
+  provider: { pending: ["accepted", "declined"] },
   client: { pending: ["cancelled"], accepted: ["cancelled"] },
 };
 
@@ -574,6 +569,9 @@ const STATUS_NOTE: Record<RequestStatus, string> = {
 export async function updateRequestStatusAction(requestId: string, status: RequestStatus) {
   const user = await requireUser();
   const ref = requests().doc(requestId);
+  // "Completed" takes both sides: the pro says it's done, then the client confirms (or it's
+  // confirmed automatically after 3 days). Only then is the chat cleared and the job counted.
+  if (status === "completed") return finishJob(requestId, user);
   const changed = await db().runTransaction(async (t) => {
     const r = (await t.get(ref)).data() as RequestDoc | undefined;
     if (!r) return null;
@@ -583,25 +581,14 @@ export async function updateRequestStatusAction(requestId: string, status: Reque
     const note = `__status__:${STATUS_NOTE[status]}`;
     t.update(ref, { status, updatedAt: now, lastMessage: note, messageCount: FieldValue.increment(1) });
     t.set(ref.collection("messages").doc(), { senderId: user.id, body: note, createdAt: now } satisfies MessageDoc);
-    if (status === "completed") t.update(users().doc(r.providerId), { jobsDone: FieldValue.increment(1) });
     return r;
   });
-  if (changed && status === "completed") {
-    updateTag(CATALOG_TAG);
-    // Job done: delete the chat for both people's privacy (numbers are hidden again by the page).
-    // If either has an open report against the other, keep it as evidence until an admin decides.
-    const [a, b] = await db().getAll(reports().doc(`${changed.clientId}__${changed.providerId}`), reports().doc(`${changed.providerId}__${changed.clientId}`));
-    const reported = [a, b].some((d) => d.exists && (d.data() as ReportDoc).status === "open");
-    if (reported) await ref.update({ chatHeldForReport: true }).catch(() => {});
-    else await clearChat(ref);
-  }
   if (changed) {
     const first = user.name.split(" ")[0];
     const toClient = changed.providerId === user.id;
     const text: Partial<Record<RequestStatus, { title: string; body: string; cta: string }>> = {
       accepted: { title: `${first} accepted your request`, body: `“${changed.title}” was accepted. You can now call or WhatsApp each other.`, cta: "Open conversation" },
       declined: { title: `${first} can't take your request`, body: `“${changed.title}” was declined. Try another pro on findMe.`, cta: "Find someone else" },
-      completed: { title: `${first} marked your job as done`, body: `How did “${changed.title}” go? Rate ${first} and leave a short comment to help others hire with confidence.`, cta: "Rate & review" },
       cancelled: { title: `${first} cancelled a request`, body: `“${changed.title}” was cancelled by the client.`, cta: "View request" },
     };
     const t = text[status];
@@ -612,11 +599,63 @@ export async function updateRequestStatusAction(requestId: string, status: Reque
         requestId: requestId,
         title: t.title,
         body: t.body,
-        href: status === "declined" ? "/search" : status === "completed" ? `/dashboard/requests/${requestId}#review` : `/dashboard/requests/${requestId}`,
+        href: status === "declined" ? "/search" : `/dashboard/requests/${requestId}`,
         cta: t.cta,
       });
     }
   }
+  refresh();
+}
+
+/** Pro: "the job is done" (asks the client to confirm). Client: "yes, it's done" (completes it). */
+async function finishJob(requestId: string, user: { id: string; name: string }) {
+  const ref = requests().doc(String(requestId ?? "").slice(0, 128));
+  const r = (await ref.get()).data() as RequestDoc | undefined;
+  if (!r || r.status !== "accepted") return;
+  const first = user.name.split(" ")[0];
+  if (r.clientId === user.id) {
+    if (await completeJob(ref.id, user)) updateTag(CATALOG_TAG);
+  } else if (r.providerId === user.id && !r.doneRequestedAt) {
+    const now = Date.now();
+    const note = "__status__:marked the job as done · waiting for the client to confirm";
+    const batch = db().batch();
+    batch.update(ref, { doneRequestedAt: now, updatedAt: now, lastMessage: note, messageCount: FieldValue.increment(1) });
+    batch.set(ref.collection("messages").doc(), { senderId: user.id, body: note, createdAt: now } satisfies MessageDoc);
+    await batch.commit();
+    await notify({
+      userId: r.clientId,
+      kind: "status",
+      requestId: ref.id,
+      title: `${first} says your job is done`,
+      body: `Is “${r.title}” finished? Confirm it to leave a review, or tell ${first} it isn't done yet. If you don't answer, it's confirmed automatically in 3 days.`,
+      href: `/dashboard/requests/${ref.id}`,
+      cta: "Confirm or reply",
+    });
+  }
+  refresh();
+}
+
+/** Client: "not finished yet" after the pro marked a job done. The job carries on as before. */
+export async function notDoneYetAction(requestId: string): Promise<void> {
+  const user = await requireUser();
+  const ref = requests().doc(String(requestId ?? "").slice(0, 128));
+  const r = (await ref.get()).data() as RequestDoc | undefined;
+  if (!r || r.clientId !== user.id || r.status !== "accepted" || !r.doneRequestedAt) return;
+  const now = Date.now();
+  const note = "__status__:said the job isn't finished yet";
+  const batch = db().batch();
+  batch.update(ref, { doneRequestedAt: FieldValue.delete(), updatedAt: now, lastMessage: note, messageCount: FieldValue.increment(1) });
+  batch.set(ref.collection("messages").doc(), { senderId: user.id, body: note, createdAt: now } satisfies MessageDoc);
+  await batch.commit();
+  await notify({
+    userId: r.providerId,
+    kind: "status",
+    requestId: ref.id,
+    title: `${user.name.split(" ")[0]} says the job isn't finished yet`,
+    body: `“${r.title}” is still open. Check the chat to see what's left, then mark it done again when it's finished.`,
+    href: `/dashboard/requests/${ref.id}`,
+    cta: "Open conversation",
+  });
   refresh();
 }
 

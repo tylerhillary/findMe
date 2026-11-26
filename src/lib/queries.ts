@@ -1,4 +1,5 @@
 import "server-only";
+import { settleOverdueJobs } from "./jobs";
 import { asRateUnit, type RateUnit } from "./price";
 import { cache } from "react";
 import { connection } from "next/server";
@@ -381,6 +382,8 @@ export type RequestSummary = {
   messageCount: number;
   /** A completed job this user hired for and hasn't rated yet. */
   needsReview: boolean;
+  /** The pro marked it done; waiting for the client to confirm. */
+  awaitingConfirm: boolean;
 };
 
 async function myRequestDocs(userId: string) {
@@ -390,7 +393,10 @@ async function myRequestDocs(userId: string) {
 
 export async function getMyRequests(userId: string): Promise<RequestSummary[]> {
   await connection();
-  const reqs = (await myRequestDocs(userId)).sort((a, b) => b.updatedAt - a.updatedAt);
+  let reqs = await myRequestDocs(userId);
+  // Jobs the pro marked done over 3 days ago with no answer from the client are confirmed now.
+  if (await settleOverdueJobs(reqs)) reqs = await myRequestDocs(userId);
+  reqs.sort((a, b) => b.updatedAt - a.updatedAt);
   const people = await getUsersById(reqs.map((r) => (r.providerId === userId ? r.clientId : r.providerId)));
   return reqs.map((r) => {
     const incoming = r.providerId === userId;
@@ -409,6 +415,7 @@ export async function getMyRequests(userId: string): Promise<RequestSummary[]> {
       lastMessage: r.lastMessage ?? null,
       messageCount: r.messageCount ?? 0,
       needsReview: !incoming && r.status === "completed" && r.reviewed !== true,
+      awaitingConfirm: r.status === "accepted" && !!r.doneRequestedAt,
     };
   });
 }
@@ -416,9 +423,13 @@ export async function getMyRequests(userId: string): Promise<RequestSummary[]> {
 export async function getRequestThread(requestId: string, userId: string) {
   await connection();
   const ref = db().collection("requests").doc(requestId);
-  const snap = await ref.get();
-  const r = snap.data() as RequestDoc | undefined;
+  let snap = await ref.get();
+  let r = snap.data() as RequestDoc | undefined;
   if (!r || !r.participants.includes(userId)) return null;
+  if (await settleOverdueJobs([{ id: requestId, ...r }])) {
+    snap = await ref.get();
+    r = snap.data() as RequestDoc;
+  }
 
   const [people, messagesSnap, reviewSnap, serviceSnap] = await Promise.all([
     getUsersById([r.clientId, r.providerId]),
@@ -458,6 +469,7 @@ export async function getRequestThread(requestId: string, userId: string) {
       return { id: d.id, sender_id: m.senderId, body: m.body, created_at: m.createdAt };
     }),
     review: review ? { rating: review.rating, comment: review.comment } : null,
+    done_requested_at: r.status === "accepted" ? (r.doneRequestedAt ?? null) : null,
     isProvider: r.providerId === userId,
   };
 }
