@@ -1,7 +1,8 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Briefcase, MapPin, Plus } from "lucide-react";
+import { ArrowRight, Briefcase, CheckCircle2, History, MapPin, Plus, Star, XCircle } from "lucide-react";
+import { db } from "@/lib/firebase-admin";
 import { requireUser } from "@/lib/auth";
 import { getMyJobs, type JobWithId } from "@/lib/job-queries";
 import { jobStatusLabel } from "@/lib/job-status";
@@ -22,6 +23,15 @@ export default function JobsPage() {
 async function Jobs() {
   const user = await requireUser("/dashboard/jobs");
   const { asked, assigned } = await getMyJobs(user.id);
+  const isDone = (j: JobWithId) => j.status === "completed" || j.status === "cancelled";
+  const history: HistoryItem[] = [
+    ...assigned.filter(isDone).map((j) => ({ job: j, side: "pro" as const })),
+    ...asked.filter(isDone).map((j) => ({ job: j, side: "client" as const })),
+  ].sort((a, b) => (b.job.completedAt ?? b.job.cancelledAt ?? b.job.updatedAt) - (a.job.completedAt ?? a.job.cancelledAt ?? a.job.updatedAt));
+  // Ratings clients left on completed jobs (review id = job id).
+  const done = history.filter((h) => h.job.status === "completed");
+  const reviewSnaps = done.length ? await db().getAll(...done.map((h) => db().collection("reviews").doc(h.job.id))) : [];
+  const ratings = new Map(reviewSnaps.filter((r) => r.exists).map((r) => [r.id, (r.data() as { rating: number }).rating]));
   return (
     <div className="space-y-8">
       <FadeIn className="flex flex-wrap items-end justify-between gap-3">
@@ -32,8 +42,11 @@ async function Jobs() {
         <Link href="/request" className={btn("primary", "md")}><Plus className="size-4" /> Request a service</Link>
       </FadeIn>
 
-      {assigned.length > 0 && <JobList title="Jobs findMe gave you" jobs={assigned} side="pro" />}
-      <JobList title="Your requests" jobs={asked} side="client" empty />
+      {assigned.some((j) => !isDone(j)) && <JobList title="Jobs findMe gave you" jobs={assigned.filter((j) => !isDone(j))} side="pro" />}
+      {(asked.some((j) => !isDone(j)) || !history.length) && (
+        <JobList title={history.length ? "Your open requests" : "Your requests"} jobs={asked.filter((j) => !isDone(j))} side="client" empty={!history.length} />
+      )}
+      {history.length > 0 && <JobHistory items={history} ratings={ratings} />}
       <p className="text-sm text-muted">
         Looking for an older conversation? <Link href="/dashboard/requests" className="font-semibold text-brand-700 hover:underline">See earlier requests</Link>
       </p>
@@ -79,6 +92,57 @@ function JobList({ title, jobs, side, empty }: { title: string; jobs: JobWithId[
           })}
         </ul>
       )}
+    </section>
+  );
+}
+
+type HistoryItem = { job: JobWithId; side: "client" | "pro" };
+
+const day = (ts: number) => new Date(ts).toLocaleDateString("en-NG", { timeZone: "Africa/Lagos", day: "numeric", month: "short", year: "numeric" });
+
+/** Finished and cancelled jobs, newest first: what you did for clients and what you had done. */
+function JobHistory({ items, ratings }: { items: HistoryItem[]; ratings: Map<string, number> }) {
+  const did = items.filter((h) => h.side === "pro" && h.job.status === "completed");
+  const earned = did.reduce((sum, h) => sum + (h.job.proPayout || 0), 0);
+  const hadDone = items.filter((h) => h.side === "client" && h.job.status === "completed").length;
+  return (
+    <section id="history">
+      <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted"><History className="size-4" /> Job history</h2>
+      <div className="mt-3 flex flex-wrap gap-2 text-sm">
+        {did.length > 0 && <span className="rounded-full bg-emerald-50 px-3 py-1 font-semibold text-emerald-800">{did.length} job{did.length === 1 ? "" : "s"} done · {formatMoney(earned)} earned</span>}
+        {hadDone > 0 && <span className="rounded-full bg-brand-50 px-3 py-1 font-semibold text-brand-800">{hadDone} job{hadDone === 1 ? "" : "s"} done for you</span>}
+      </div>
+      <ul className="mt-3 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-white">
+        {items.map(({ job: j, side }) => {
+          const completed = j.status === "completed";
+          const when = completed ? j.completedAt : j.cancelledAt;
+          const amount = side === "pro" ? j.proPayout : j.price;
+          const rating = ratings.get(j.id);
+          return (
+            <li key={`${side}-${j.id}`}>
+              <Link href={`/dashboard/jobs/${j.id}`} className="flex items-center gap-3 px-4 py-3.5 transition hover:bg-canvas sm:px-5">
+                <span className={cn("grid size-9 shrink-0 place-items-center rounded-xl", completed ? "bg-emerald-50 text-emerald-600" : "bg-canvas text-muted")}>
+                  {completed ? <CheckCircle2 className="size-4.5" /> : <XCircle className="size-4.5" />}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-bold">{j.title}</p>
+                  <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] text-muted">
+                    <span className="font-semibold text-ink-soft">{side === "pro" ? "You did this" : "You requested"}</span>
+                    <span>{completed ? "Completed" : "Cancelled"}{when ? ` ${day(when)}` : ""}</span>
+                    <span className="hidden sm:inline">· {categoryName(j.category)}</span>
+                    {rating ? (
+                      <span className="inline-flex items-center gap-0.5 font-semibold text-amber-600"><Star className="size-3.5 fill-amber-400 text-amber-400" /> {rating}/5</span>
+                    ) : null}
+                    {side === "pro" && completed && <span className={j.proPaidAt ? "font-semibold text-emerald-700" : "font-semibold text-amber-700"}>{j.proPaidAt ? "Paid" : "Payment on the way"}</span>}
+                  </p>
+                </div>
+                {completed && amount > 0 && <span className="shrink-0 font-extrabold">{formatMoney(amount)}</span>}
+                <ArrowRight className="size-4 shrink-0 text-muted" />
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
 }

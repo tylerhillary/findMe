@@ -92,7 +92,7 @@ export async function createJobAction(_: FormState, fd: FormData): Promise<FormS
 
   after(() =>
     emailAdmins({
-      subject: `New job request: ${title}`,
+      subject: `A client wants a service: ${title}`,
       title: `New job request from ${user.name}`,
       body: `Send ${user.name.split(" ")[0]} a price, then assign a pro once they've paid.`,
       href: adminHref(ref.id),

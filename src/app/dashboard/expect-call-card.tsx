@@ -2,13 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { CheckCircle2, PhoneIncoming, X } from "lucide-react";
+import { CheckCircle2, MessageCircle, PhoneIncoming, X } from "lucide-react";
 import { formatNgPhone } from "@/lib/phone";
 
 const DISMISS_KEY = "findme:expect-call-dismissed";
 
-/** Dashboard note: findMe will call to verify your number; tell them this code when they do. */
-export function ExpectCallCard({ phone, code, isPro }: { phone: string; code: string; isPro: boolean }) {
+/**
+ * Dashboard note on verifying your number: send findMe your code on WhatsApp (quickest), or tell
+ * it to us when we call.
+ */
+export function ExpectCallCard({ phone, code, isPro, whatsappHref }: { phone: string; code: string; isPro: boolean; whatsappHref: string | null }) {
   // Hidden until we know it wasn't dismissed on this device (avoids a flash on load).
   const [open, setOpen] = useState(false);
 
@@ -40,13 +43,22 @@ export function ExpectCallCard({ phone, code, isPro }: { phone: string; code: st
               <PhoneIncoming className="size-5" />
             </span>
             <div className="min-w-0 flex-1">
-              <h2 className="font-display text-lg font-bold tracking-tight">Expect a call from findMe</h2>
+              <h2 className="font-display text-lg font-bold tracking-tight">{whatsappHref ? "Verify your phone number" : "Expect a call from findMe"}</h2>
               <p className="mt-1 text-sm text-ink-soft">
-                We&apos;ll call {formatNgPhone(phone)} to verify your number{isPro ? " and give you the Phone verified badge" : ""}. You can keep using findMe as normal until then.
+                {whatsappHref ? (
+                  <>Quickest: send findMe your code on WhatsApp from {formatNgPhone(phone)}{isPro ? " to get the Phone verified badge" : ""}. Or wait for our call and tell us the code. You can keep using findMe as normal meanwhile.</>
+                ) : (
+                  <>We&apos;ll call {formatNgPhone(phone)} to verify your number{isPro ? " and give you the Phone verified badge" : ""}. You can keep using findMe as normal until then.</>
+                )}
               </p>
+              {whatsappHref && (
+                <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex h-10 items-center gap-2 rounded-full bg-[#25D366] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1ebe5b]">
+                  <MessageCircle className="size-4" /> Verify on WhatsApp
+                </a>
+              )}
             </div>
             <div className="shrink-0 rounded-2xl bg-canvas px-4 py-3 text-center">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-muted">Tell us this code</p>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-muted">Your code</p>
               <p className="font-display text-2xl font-extrabold tracking-[0.2em] text-ink">{code}</p>
             </div>
           </div>

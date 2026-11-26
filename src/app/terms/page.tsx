@@ -70,7 +70,7 @@ export default function TermsPage() {
           body: (
             <ul>
               <li>Clients pay findMe for each job. We hold the payment and pay the professional after the client confirms the job is done (or it&apos;s confirmed automatically after 3 days).</li>
-              <li>findMe keeps 3% of the price the client pays. The professional receives the other 97%. Professionals can see this on every job.</li>
+              <li>findMe keeps 10% of the price the client pays. The professional receives the other 90%. Professionals can see this on every job.</li>
               <li>If a job is cancelled after you paid, or the work isn&apos;t done, <Link href="/contact">contact us</Link> and we&apos;ll look into a refund.</li>
             </ul>
           ),

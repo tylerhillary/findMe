@@ -205,3 +205,19 @@ export type JobDoc = {
 
 /** payouts/{uid}: where findMe sends a pro's pay. Private: only the pro and admins see it. */
 export type PayoutDoc = { bankName: string; accountNumber: string; accountName: string; updatedAt: number };
+
+/**
+ * recovery_requests/{id}: someone who can't get into their email asks findMe to call them.
+ * An admin calls the number on the matched account, then moves the account to `newEmail`.
+ */
+export type RecoveryDoc = {
+  phone: string; // E.164, as the person typed it
+  newEmail: string;
+  name: string; // the name they gave
+  note: string;
+  userId: string | null; // account with this phone number, if any (never shown to the requester)
+  status: "open" | "approved" | "rejected";
+  createdAt: number;
+  decidedAt?: number;
+  decidedBy?: string;
+};

@@ -907,7 +907,7 @@ export async function setTeamBadgeAction(userId: string, on: boolean): Promise<{
   return { ok: true };
 }
 
-/** Pro: where findMe should send their pay (their 97% of each job). */
+/** Pro: where findMe should send their pay (their 90% of each job). */
 export async function savePayoutAction(_: FormState, fd: FormData): Promise<FormState> {
   const user = await requireUser();
   const bankName = str(fd, "bankName", 60);

@@ -97,7 +97,7 @@ async function Content() {
       <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-600">Admin</p>
       <h1 className="mt-1 font-display text-[1.6rem] font-extrabold tracking-tight sm:text-3xl">Jobs</h1>
       <div className="mt-4 grid grid-cols-3 gap-3">
-        {[["Completed jobs value", formatMoney(revenue)], ["findMe earned (3%)", formatMoney(fees)], ["Owed to pros", formatMoney(owed)]].map(([k, v]) => (
+        {[["Completed jobs value", formatMoney(revenue)], ["findMe earned", formatMoney(fees)], ["Owed to pros", formatMoney(owed)]].map(([k, v]) => (
           <div key={k} className="rounded-2xl border border-line bg-white p-3 sm:p-4">
             <p className="text-[11px] font-bold uppercase tracking-wider text-muted">{k}</p>
             <p className="mt-1 text-lg font-extrabold sm:text-xl">{v}</p>

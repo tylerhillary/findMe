@@ -81,6 +81,10 @@ export function ForgotForm() {
           <button disabled={pending} className={btn("primary", "lg", "w-full")}>
             {pending ? <Loader2 className="size-5 animate-spin" /> : "Send reset link"}
           </button>
+          <p className="text-center text-sm text-muted">
+            Can&apos;t get into your email?{" "}
+            <Link href="/account-recovery" className="font-semibold text-brand-700 hover:underline">Ask findMe to call you</Link>
+          </p>
         </form>
       </FadeIn>
     </div>

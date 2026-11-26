@@ -1,19 +1,28 @@
 "use client";
 
 import { PhoneVerifiedBadge, TeamBadge } from "./verify-phone";
-import { motion } from "motion/react";
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { BadgeCheck, CheckCircle2, MessageCircle } from "lucide-react";
 import type { ProviderCard } from "@/lib/queries";
 import { Avatar, formatMoney } from "./ui";
 import { shownName } from "@/lib/names";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
+const ROTATE_MS = 30_000; // show the next pro every 30 seconds
 
 /**
  * The hero card shows a real, listed pro with their live numbers. With nobody listed yet it shows
  * a plainly labelled example with no ratings or job counts, so nothing reads as made-up traction.
  */
-export function HeroVisual({ pro }: { pro: ProviderCard | null }) {
+export function HeroVisual({ pros }: { pros: ProviderCard[] }) {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    if (pros.length < 2) return;
+    const t = setInterval(() => setI((n) => (n + 1) % pros.length), ROTATE_MS);
+    return () => clearInterval(t);
+  }, [pros.length]);
+  const pro = pros[i % Math.max(pros.length, 1)] ?? null;
   const stats: [string, string][] = pro
     ? [
         [pro.reviewCount > 0 ? pro.rating.toFixed(1) : "New", pro.reviewCount > 0 ? `${pro.reviewCount} review${pro.reviewCount === 1 ? "" : "s"}` : "No reviews yet"],
@@ -34,6 +43,8 @@ export function HeroVisual({ pro }: { pro: ProviderCard | null }) {
         className="absolute inset-x-0 top-10 mx-auto w-[300px] sm:w-[330px]"
       >
         <div className="animate-float rounded-3xl border border-white/70 bg-white/90 p-5 shadow-lift backdrop-blur">
+          <AnimatePresence mode="wait" initial={false}>
+          <motion.div key={pro?.id ?? "example"} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.35, ease: EASE }}>
           {!pro && <p className="mb-3 text-[11px] font-bold uppercase tracking-wider text-muted">Example profile</p>}
           <div className="flex items-center gap-3">
             <Avatar name={pro ? shownName(pro) : "Your name"} src={pro?.avatar ?? null} size={52} />
@@ -70,6 +81,8 @@ export function HeroVisual({ pro }: { pro: ProviderCard | null }) {
           ) : (
             <div className="mt-4 h-10 rounded-full bg-brand-600 text-center text-sm font-semibold leading-10 text-white">Hire via findMe</div>
           )}
+          </motion.div>
+          </AnimatePresence>
         </div>
       </motion.div>
 

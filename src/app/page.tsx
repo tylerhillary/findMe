@@ -67,7 +67,7 @@ export default function Home() {
               </FadeIn>
             </div>
             <div className="hidden md:block">
-              <Suspense fallback={<HeroVisual pro={null} />}>
+              <Suspense fallback={<HeroVisual pros={[]} />}>
                 <HeroPro />
               </Suspense>
             </div>
@@ -183,7 +183,7 @@ export default function Home() {
                 points={[
                   { icon: Star, title: "Reviews count here", body: "Ratings come only from jobs completed on findMe. Off-platform work builds no reputation." },
                   { icon: TrendingUp, title: "Rank comes from results", body: "Completed jobs and good reviews move you up in search." },
-                  { icon: Wallet, title: "Just 3%", body: "findMe keeps 3% of what the client pays and pays you the rest once they confirm the job." },
+                  { icon: Wallet, title: "Just 10%", body: "findMe keeps 10% of what the client pays and pays you the rest once they confirm the job." },
                   { icon: BadgeCheck, title: "Visible trust", body: "Your badges and job history are what win new clients." },
                 ]}
               />
@@ -198,8 +198,8 @@ export default function Home() {
         <section id="pricing" className="mx-auto max-w-7xl scroll-mt-14 px-4 py-12 sm:scroll-mt-16 sm:px-6 sm:py-20 lg:px-8 lg:py-28">
           <SectionHeading
             eyebrow="Pricing"
-            title="Free to ask. Free to list. Just 3%."
-            sub="Clients pay findMe the price we agree. Pros get 97% of it once the client confirms the job is done."
+            title="Free to ask. Free to list. Just 10%."
+            sub="Clients pay findMe the price we agree. Pros get 90% of it once the client confirms the job is done."
           />
           <div className="mx-auto grid max-w-4xl gap-3 sm:gap-6 md:grid-cols-2">
             <PlanCard
@@ -212,15 +212,15 @@ export default function Home() {
             <PlanCard
               highlight
               name="For pros"
-              price="3%"
+              price="10%"
               per=" per job"
-              note="Free to list · you keep 97%"
+              note="Free to list · you keep 90%"
               points={["A free profile, skills and services", "findMe brings you clients and handles payment", "Your pay shown on every job before you start", "Paid by findMe once the client confirms", "Good reviews mean more jobs"]}
               cta={<a href="/mode?to=work" className={btn("primary", "md", "w-full")}>Create your free profile</a>}
             />
           </div>
           <p className="mx-auto mt-6 max-w-2xl text-center text-xs text-muted sm:text-sm">
-            Prices in naira. findMe&apos;s 3% comes out of the job price; clients never pay extra on top of the price we agree.
+            Prices in naira. findMe&apos;s 10% comes out of the job price; clients never pay extra on top of the price we agree.
           </p>
         </section>
 
@@ -344,8 +344,8 @@ async function Featured() {
 }
 
 async function HeroPro() {
-  const [pro] = await getFeaturedProviders(1);
-  return <HeroVisual pro={pro ?? null} />;
+  // A handful of listed pros; the card shows the next one every 30 seconds.
+  return <HeroVisual pros={await getFeaturedProviders(8)} />;
 }
 
 async function Stats() {

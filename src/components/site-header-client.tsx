@@ -6,6 +6,7 @@ import { OFFER_SKILLS_HREF, SmartLink } from "./smart-link";
 import { AnimatePresence, motion } from "motion/react";
 import { LayoutDashboard, LogOut, Menu, MessageSquareText, Search, Settings, UserRound, X } from "lucide-react";
 import { SignOutForm } from "@/components/sign-out-form";
+import { SearchBar } from "./search-bar";
 import { Avatar, Logo, btn, cn } from "./ui";
 
 const LINKS = [
@@ -19,6 +20,14 @@ const LINKS = [
 export function HeaderShell({ auth, transparent }: { auth: ReactNode; transparent?: boolean }) {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    if (!searching) return;
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setSearching(false);
+    document.addEventListener("keydown", esc);
+    return () => document.removeEventListener("keydown", esc);
+  }, [searching]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -27,7 +36,7 @@ export function HeaderShell({ auth, transparent }: { auth: ReactNode; transparen
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const solid = scrolled || !transparent || open;
+  const solid = scrolled || !transparent || open || searching;
 
   return (
     <header className="sticky top-0 z-50">
@@ -54,12 +63,24 @@ export function HeaderShell({ auth, transparent }: { auth: ReactNode; transparen
             </ul>
           </div>
           <div className="flex items-center gap-1 sm:gap-2">
-            <Link href="/search" aria-label="Search" className={btn("ghost", "sm", "size-9 px-0 lg:hidden")}>
-              <Search className="size-[18px]" />
-            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                setSearching((v) => !v);
+                setOpen(false);
+              }}
+              aria-label={searching ? "Close search" : "Search"}
+              aria-expanded={searching}
+              className={btn("ghost", "sm", "size-9 px-0")}
+            >
+              {searching ? <X className="size-[18px]" /> : <Search className="size-[18px]" />}
+            </button>
             {auth}
             <button
-              onClick={() => setOpen((o) => !o)}
+              onClick={() => {
+                setOpen((o) => !o);
+                setSearching(false);
+              }}
               className={btn("ghost", "sm", "size-9 px-0 lg:hidden")}
               aria-label={open ? "Close menu" : "Open menu"}
               aria-expanded={open}
@@ -69,6 +90,23 @@ export function HeaderShell({ auth, transparent }: { auth: ReactNode; transparen
           </div>
         </nav>
       </div>
+
+      <AnimatePresence>
+        {searching && (
+          <motion.div
+            initial={{ opacity: 0, y: -12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
+            className="absolute inset-x-0 top-14 border-b border-line bg-white/95 px-4 pb-4 pt-3 shadow-lift backdrop-blur-xl sm:top-16 sm:px-6"
+          >
+            {/* Submitting a search closes the box (also when already on /search). */}
+            <div className="mx-auto max-w-2xl" onSubmit={() => setSearching(false)}>
+              <SearchBar size="md" autoFocus />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {open && (

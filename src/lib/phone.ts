@@ -39,3 +39,15 @@ export const telLink = (e164: string) => `tel:${e164}`;
 
 export const whatsappLink = (e164: string, text?: string) =>
   `https://wa.me/${e164.replace(/^\+/, "")}${text ? `?text=${encodeURIComponent(text)}` : ""}`;
+
+/**
+ * findMe's own WhatsApp number (NEXT_PUBLIC_FINDME_WHATSAPP), as digits for wa.me links, or null
+ * when it isn't set. Accepts "+234 803 …", "0803 …" or "234803…".
+ */
+export function findMeWhatsApp(): string | null {
+  const raw = process.env.NEXT_PUBLIC_FINDME_WHATSAPP?.trim();
+  if (!raw) return null;
+  const e164 = normalizeNgPhone(raw);
+  const digits = (e164 ?? raw).replace(/\D/g, "");
+  return digits.length >= 10 ? digits : null;
+}

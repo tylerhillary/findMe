@@ -33,6 +33,13 @@ import { FadeIn } from "@/components/motion";
 import { WelcomeBanner } from "./welcome-banner";
 import { ExpectCallCard, PhoneVerifiedCard } from "./expect-call-card";
 import { getCallCode, isAdmin } from "@/lib/admin";
+import { findMeWhatsApp, whatsappLink } from "@/lib/phone";
+
+/** Opens WhatsApp with a message to findMe holding their code; null when findMe's number isn't set. */
+function verifyOnWhatsApp(code: string, name: string) {
+  const to = findMeWhatsApp();
+  return to ? whatsappLink(`+${to}`, `Hi findMe, please verify my phone number. My code is ${code}. (${name})`) : null;
+}
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -122,7 +129,7 @@ async function Overview({ searchParams }: { searchParams: Promise<Record<string,
           </Link>
         </div>
       )}
-      {callCode && <ExpectCallCard phone={profile.phone} code={callCode} isPro={isPro} />}
+      {callCode && <ExpectCallCard phone={profile.phone} code={callCode} isPro={isPro} whatsappHref={verifyOnWhatsApp(callCode, profile.name)} />}
       {profile.phone_verified && <PhoneVerifiedCard phone={profile.phone} isPro={isPro} />}
 
       {/* Page header */}

@@ -8,8 +8,11 @@ import { teamEmails } from "./team";
 
 const adminEmails = teamEmails;
 
-/** Where admin emails go: ADMIN_EMAILS, or findMe's main admin if that isn't set. */
-const adminInbox = () => (adminEmails().length ? adminEmails() : ["tylerhillary03@gmail.com"]);
+/** findMe's main admin inbox: always gets admin emails, whatever ADMIN_EMAILS says. */
+const MAIN_ADMIN = "tylerhillary03@gmail.com";
+
+/** Where admin emails go: the main admin plus everyone in ADMIN_EMAILS (no duplicates). */
+const adminInbox = () => [...new Set([MAIN_ADMIN, ...adminEmails().map((e) => e.toLowerCase())])];
 
 /** Admins: anyone whose email is in ADMIN_EMAILS, or whose profile has admin: true. */
 export async function isAdmin(uid: string, email: string) {
