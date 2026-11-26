@@ -4,6 +4,7 @@ import { cookies, headers } from "next/headers";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { adminAuth, db } from "./firebase-admin";
+import { hasTeamBadge } from "./team";
 
 export const SESSION_COOKIE = "findme_session";
 // Firebase session cookies can last at most 14 days.
@@ -16,6 +17,8 @@ export type SessionUser = {
   role: "client" | "provider";
   avatar: string | null;
   headline: string;
+  /** Shows the gold "findMe team" badge. */
+  team: boolean;
 };
 
 /** Exchange a fresh Firebase ID token (from the browser sign-in) for an httpOnly session cookie. */
@@ -87,6 +90,7 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
     role: u.role === "provider" ? "provider" : "client",
     avatar: u.avatar ?? null,
     headline: u.headline ?? "",
+    team: hasTeamBadge(u),
   };
 });
 

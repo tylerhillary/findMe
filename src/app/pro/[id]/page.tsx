@@ -1,4 +1,9 @@
 import { Suspense } from "react";
+import { isAdmin } from "@/lib/admin";
+import { db } from "@/lib/firebase-admin";
+import { isTeamEmail } from "@/lib/team";
+import type { UserDoc } from "@/lib/schema";
+import { TeamBadgeToggle } from "./team-badge-toggle";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -242,12 +247,21 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
 
 async function Panel({ p }: { p: ProviderProfile }) {
   const viewer = await getCurrentUser();
+  const admin = viewer ? await isAdmin(viewer.id, viewer.email) : false;
+  const raw = admin ? ((await db().collection("users").doc(p.id).get()).data() as UserDoc | undefined) : undefined;
   return (
-    <RequestPanel
-      provider={{ id: p.id, name: shownName(p), hourlyRate: p.hourlyRate, rateUnit: p.rateUnit, available: p.available }}
-      services={p.services.map((s) => ({ price: s.price }))}
-      isSelf={viewer?.id === p.id}
-    />
+    <>
+      <RequestPanel
+        provider={{ id: p.id, name: shownName(p), hourlyRate: p.hourlyRate, rateUnit: p.rateUnit, available: p.available }}
+        services={p.services.map((s) => ({ price: s.price }))}
+        isSelf={viewer?.id === p.id}
+      />
+      {raw && (
+        <div className="mt-3 rounded-2xl border border-dashed border-amber-300 bg-white px-4 py-3">
+          <TeamBadgeToggle userId={p.id} on={!!raw.teamBadge} automatic={isTeamEmail(raw.email)} />
+        </div>
+      )}
+    </>
   );
 }
 

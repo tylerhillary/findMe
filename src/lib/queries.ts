@@ -1,5 +1,5 @@
 import "server-only";
-import { isTeamEmail } from "./team";
+import { hasTeamBadge } from "./team";
 import { settleOverdueJobs } from "./jobs";
 import { asRateUnit, type RateUnit } from "./price";
 import { cache } from "react";
@@ -70,14 +70,14 @@ function cardFrom(id: string, u: UserDoc): ProviderCard {
     phoneVerified: !!u.phoneConfirmed,
     emailVerified: !!u.emailVerified,
     ninVerified: !!u.ninVerified,
-    team: isTeamEmail(u.email),
+    team: hasTeamBadge(u),
   };
 }
 
 // Public fields only — phone numbers and emails never enter the cached catalog.
 const PUBLIC_FIELDS = [
   "name", "businessName", "headline", "bio", "location", "category", "hourlyRate", "rateUnit", "available", "avatar",
-  "skills", "ratingSum", "reviewCount", "jobsDone", "startingPrice", "flagged", "banned", "phoneConfirmed", "emailVerified", "ninVerified",
+  "skills", "ratingSum", "reviewCount", "jobsDone", "startingPrice", "flagged", "banned", "teamBadge", "phoneConfirmed", "emailVerified", "ninVerified",
 ] as const;
 
 /**
@@ -458,11 +458,11 @@ export async function getRequestThread(requestId: string, userId: string) {
     client_name: c?.name ?? "findMe user",
     client_avatar: c?.avatar ?? null,
     client_email_verified: !!c?.emailVerified,
-    client_team: isTeamEmail(c?.email),
+    client_team: hasTeamBadge(c),
     provider_name: p?.name ?? "findMe user",
     provider_avatar: p?.avatar ?? null,
     provider_email_verified: !!p?.emailVerified,
-    provider_team: isTeamEmail(p?.email),
+    provider_team: hasTeamBadge(p),
     provider_headline: p?.headline ?? "",
     service_title: (serviceSnap?.data() as ServiceDoc | undefined)?.title ?? null,
     client_phone: c?.phone ?? "",

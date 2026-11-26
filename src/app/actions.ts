@@ -893,3 +893,15 @@ export async function decideReportsAction(reportedId: string, decision: ReportDe
   refresh();
   return { ok: true };
 }
+
+/** Admin: give or remove the gold "findMe team" badge on any account. */
+export async function setTeamBadgeAction(userId: string, on: boolean): Promise<{ ok?: true; error?: string }> {
+  const admin = await requireUser();
+  if (!(await isAdmin(admin.id, admin.email))) return { error: "Only admins can do this." };
+  const ref = users().doc(String(userId ?? "").slice(0, 128));
+  if (!(await ref.get()).exists) return { error: "This account no longer exists." };
+  await ref.update({ teamBadge: !!on });
+  updateTag(CATALOG_TAG);
+  refresh();
+  return { ok: true };
+}

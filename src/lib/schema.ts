@@ -48,6 +48,8 @@ export type UserDoc = {
   flagged?: boolean;
   /** Banned by an admin: can't sign in, hidden everywhere. */
   banned?: boolean;
+  /** Gold "findMe team" badge given by an admin (team emails get it automatically). */
+  teamBadge?: boolean;
   createdAt: number;
 };
 

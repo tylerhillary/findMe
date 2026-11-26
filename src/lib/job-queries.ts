@@ -3,7 +3,7 @@ import { connection } from "next/server";
 import { db } from "./firebase-admin";
 import { settleOverdueBrokerJobs } from "./broker";
 import type { JobDoc, UserDoc } from "./schema";
-import { isTeamEmail } from "./team";
+import { hasTeamBadge } from "./team";
 
 export type JobWithId = JobDoc & { id: string };
 
@@ -51,8 +51,8 @@ export async function getJob(id: string, uid: string, admin = false) {
     job: { id: ref.id, ...job },
     role,
     // The client only ever sees this much about the pro: no number, no surname.
-    pro: p && job.proId ? { id: job.proId, name: proShownName(p), avatar: p.avatar ?? null, headline: p.headline ?? "", rating: p.reviewCount ? Math.round(((p.ratingSum ?? 0) / p.reviewCount) * 10) / 10 : 0, reviewCount: p.reviewCount ?? 0, team: isTeamEmail(p.email) } : null,
-    clientTeam: isTeamEmail((await db().collection("users").doc(job.clientId).get()).get("email") as string | undefined),
+    pro: p && job.proId ? { id: job.proId, name: proShownName(p), avatar: p.avatar ?? null, headline: p.headline ?? "", rating: p.reviewCount ? Math.round(((p.ratingSum ?? 0) / p.reviewCount) * 10) / 10 : 0, reviewCount: p.reviewCount ?? 0, team: hasTeamBadge(p) } : null,
+    clientTeam: hasTeamBadge((await db().collection("users").doc(job.clientId).get()).data() as UserDoc | undefined),
     review: r ? { rating: r.rating, comment: r.comment } : null,
   };
 }
