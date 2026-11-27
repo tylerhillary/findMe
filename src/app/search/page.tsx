@@ -186,7 +186,7 @@ async function SearchBody({ searchParams }: { searchParams: Promise<Raw> }) {
 
 const ASSURANCES = [
   { icon: BadgeCheck, title: "Checked professionals", body: "Phone and ID checks, shown on every profile." },
-  { icon: Lock, title: "Payment held by findMe", body: "Pros are paid only after you confirm the job is done." },
+  { icon: Lock, title: "The findMe Guarantee", body: "Pros are paid only after you confirm. Not done right? They fix it, or we refund you." },
   { icon: Star, title: "Reviews from real jobs", body: "Only clients who completed a job can leave a review." },
   { icon: ReceiptText, title: "One clear price", body: "You get a single findMe price up front. No haggling." },
 ];

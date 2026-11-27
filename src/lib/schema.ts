@@ -207,6 +207,24 @@ export type JobDoc = {
   payoutStartedAt?: number;
   payoutError?: string;
   cancelledAt?: number;
+  /**
+   * findMe Guarantee: the client reported a problem after the pro said it was done.
+   * While open, the job isn't confirmed automatically and the pro isn't paid. findMe decides:
+   * not covered (client's doing or no fault: pay the pro), redo (pro fixes it first) or refund.
+   */
+  claim?: {
+    reason: string;
+    details: string;
+    openedAt: number;
+    outcome?: "not_covered" | "redo" | "refund" | "withdrawn";
+    note?: string;
+    resolvedAt?: number;
+  };
+  /** Earlier guarantee claims on this job, oldest first (a job can be reported again after a redo). */
+  pastClaims?: NonNullable<JobDoc["claim"]>[];
+  /** Refund the client owes, set when a guarantee claim ends in a refund; cleared once refunded. */
+  refundDue?: number;
+  refundedAt?: number;
   reviewed?: boolean;
   adminNote?: string;
   createdAt: number;

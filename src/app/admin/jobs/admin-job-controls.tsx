@@ -1,24 +1,25 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Banknote, Check, Landmark, Loader2, Send, UserCheck, X } from "lucide-react";
-import { adminCancelJobAction, assignJobAction, markJobPaidAction, markProPaidAction, quoteJobAction, sendPayoutAction } from "@/app/job-actions";
-import { Input, Select, btn, formatMoney } from "@/components/ui";
+import { Banknote, Check, Landmark, Loader2, RotateCcw, Send, ShieldX, Undo2, UserCheck, X } from "lucide-react";
+import { adminCancelJobAction, assignJobAction, markJobPaidAction, markProPaidAction, quoteJobAction, refundClientAction, resolveClaimAction, sendPayoutAction } from "@/app/job-actions";
+import { Input, Select, Textarea, btn, formatMoney } from "@/components/ui";
 import type { JobStatus } from "@/lib/schema";
 import { MIN_JOB_PRICE, findMeFeeFor, proPayoutFor } from "@/lib/fees";
 
 export type ProOption = { id: string; label: string; preferred: boolean };
 
 export function AdminJobControls({
-  jobId, status, price, proPayout, proId, proPaid, paymentClaimed, pros, proPrice, canPaystack, payoutBusy,
+  jobId, status, price, proPayout, proId, proPaid, paymentClaimed, pros, proPrice, canPaystack, payoutBusy, claimOpen, refundDue, canPaystackRefund,
 }: {
-  jobId: string; status: JobStatus; price: number; proPayout: number; canPaystack: boolean; payoutBusy: boolean; proId: string | null; proPaid: boolean; paymentClaimed: boolean; pros: ProOption[]; proPrice: number;
+  jobId: string; status: JobStatus; price: number; proPayout: number; canPaystack: boolean; payoutBusy: boolean; claimOpen: boolean; refundDue: number; canPaystackRefund: boolean; proId: string | null; proPaid: boolean; paymentClaimed: boolean; pros: ProOption[]; proPrice: number;
 }) {
   const [pending, start] = useTransition();
   const [which, setWhich] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [amount, setAmount] = useState(String(price || proPrice || ""));
   const [note, setNote] = useState("");
+  const [finding, setFinding] = useState("");
   const [pick, setPick] = useState(proId ?? pros.find((p) => p.preferred)?.id ?? "");
 
   const run = (key: string, fn: () => Promise<{ error?: string }>, ask?: string) => {
@@ -71,6 +72,38 @@ export function AdminJobControls({
           </Select>
           <button disabled={pending || !pick || pick === proId} onClick={() => run("assign", () => assignJobAction(jobId, pick))} className={btn("dark", "sm", "h-10")}>
             {spin("assign", UserCheck)} {proId ? "Reassign" : "Assign pro"}
+          </button>
+        </div>
+      )}
+
+      {claimOpen && (
+        <div className="rounded-xl border border-red-200 bg-white p-3 sm:p-4">
+          <p className="text-sm font-semibold">Decide the guarantee claim</p>
+          <p className="mt-0.5 text-xs text-muted">Call both sides first. Was it the pro&apos;s work, or something the client did? Your note is shown to both.</p>
+          <Textarea value={finding} onChange={(e) => setFinding(e.target.value)} rows={2} maxLength={1000} placeholder="What you found, e.g. The tap was fitted loosely; the pro will refit it." className="mt-2" />
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button disabled={pending || finding.trim().length < 5} onClick={() => run("redo", () => resolveClaimAction(jobId, "redo", finding), "Ask the pro to fix it before they're paid?")} className={btn("primary", "sm")}>
+              {spin("redo", RotateCcw)} Pro must fix it
+            </button>
+            <button disabled={pending || finding.trim().length < 5} onClick={() => run("refund", () => resolveClaimAction(jobId, "refund", finding), `Cancel the job and refund the client ${formatMoney(price)}? The pro won't be paid.`)} className={btn("danger", "sm")}>
+              {spin("refund", Undo2)} Refund the client
+            </button>
+            <button disabled={pending || finding.trim().length < 5} onClick={() => run("notcovered", () => resolveClaimAction(jobId, "not_covered", finding), "Close the claim as not covered? The job completes and the pro is paid.")} className={btn("outline", "sm")}>
+              {spin("notcovered", ShieldX)} Not covered, pay the pro
+            </button>
+          </div>
+        </div>
+      )}
+
+      {refundDue > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {canPaystackRefund && (
+            <button disabled={pending} onClick={() => run("psrefund", () => refundClientAction(jobId, "paystack"), `Refund ${formatMoney(refundDue)} to the client through Paystack?`)} className={btn("primary", "sm")}>
+              {spin("psrefund", Undo2)} Refund {formatMoney(refundDue)} with Paystack
+            </button>
+          )}
+          <button disabled={pending} onClick={() => run("manualrefund", () => refundClientAction(jobId, "manual"), `Mark ${formatMoney(refundDue)} as refunded? Only if you've sent it yourself.`)} className={btn(canPaystackRefund ? "outline" : "primary", "sm")}>
+            {spin("manualrefund", Check)} {canPaystackRefund ? "I refunded by hand" : `Refunded ${formatMoney(refundDue)}`}
           </button>
         </div>
       )}

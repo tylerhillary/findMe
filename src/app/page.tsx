@@ -173,7 +173,7 @@ export default function Home() {
                 who="For clients"
                 points={[
                   { icon: Lock, title: "Numbers stay private", body: "Only the pro findMe sends gets your number, so you are never cold-called." },
-                  { icon: History, title: "Your money is protected", body: "You pay findMe. The pro is paid only after you confirm the job was done properly." },
+                  { icon: History, title: "The findMe Guarantee", body: "You pay findMe, and the pro is paid only after you confirm. If the work isn't right, they fix it at no cost or we refund you." },
                   { icon: Flag, title: "Accountable people", body: "Report or block anyone in one tap. Every review comes from a real completed job." },
                   { icon: Search, title: "Faster next time", body: "Need help again? Ask findMe and we send someone right away." },
                 ]}
@@ -206,7 +206,7 @@ export default function Home() {
               name="For clients"
               price="₦0"
               note="to request a service"
-              points={["Tell us what you need, free", "See pros' prices", "Pay findMe, never the pro", "We hold your money until you confirm the job is done", "Rate the pro when it's finished"]}
+              points={["Tell us what you need, free", "See pros' prices", "Pay findMe, never the pro", "We hold your money until you confirm the job is done", "The findMe Guarantee: fixed for free, or your money back", "Rate the pro when it's finished"]}
               cta={<Link href="/request" className={btn("outline", "md", "w-full")}>Request a service</Link>}
             />
             <PlanCard

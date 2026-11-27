@@ -5,6 +5,7 @@ import { notify } from "./notify";
 import { emailAdmins } from "./admin";
 import { AUTO_CONFIRM_MS } from "./jobs";
 import type { JobDoc } from "./schema";
+import { claimOpen } from "./guarantee";
 import { autoPayoutsOn, type PaystackTx } from "./paystack";
 import { sendProPayout } from "./payouts";
 
@@ -15,14 +16,18 @@ const naira = (n: number) => new Intl.NumberFormat("en-NG", { style: "currency",
  * Counts it for the pro, asks the client for a review and tells the admins the pro can be paid.
  * The caller refreshes the search catalog when it can (server actions only).
  */
-export async function completeBrokerJob(id: string, by: "client" | "auto"): Promise<boolean> {
+export async function completeBrokerJob(id: string, by: "client" | "auto" | "admin"): Promise<boolean> {
   const ref = db().collection("jobs").doc(id);
   const job = await db().runTransaction(async (t) => {
     const j = (await t.get(ref)).data() as JobDoc | undefined;
     if (!j || j.status !== "assigned" || !j.proId) return null;
     if (by === "auto" && !(j.doneRequestedAt && Date.now() - j.doneRequestedAt >= AUTO_CONFIRM_MS)) return null;
+    // A reported problem stops the automatic confirmation until findMe has decided.
+    if (by === "auto" && claimOpen(j)) return null;
     const now = Date.now();
-    t.update(ref, { status: "completed", completedAt: now, doneRequestedAt: FieldValue.delete(), updatedAt: now });
+    // The client confirming while their report is open means they're now happy with it.
+    const withdrawn = by === "client" && claimOpen(j) ? { claim: { ...j.claim!, outcome: "withdrawn" as const, resolvedAt: now } } : {};
+    t.update(ref, { status: "completed", completedAt: now, doneRequestedAt: FieldValue.delete(), updatedAt: now, ...withdrawn });
     t.update(db().collection("users").doc(j.proId), { jobsDone: FieldValue.increment(1) });
     return j;
   });
@@ -32,7 +37,7 @@ export async function completeBrokerJob(id: string, by: "client" | "auto"): Prom
   await notify({
     userId: job.clientId,
     kind: "status",
-    title: by === "auto" ? "Your job was marked complete" : "Thanks for confirming",
+    title: by === "client" ? "Thanks for confirming" : "Your job was marked complete",
     body: `How did "${job.title}" go? Rate the pro and leave a short comment. It helps us send the best people.`,
     href: `${href}#review`,
     cta: "Rate & review",
@@ -52,7 +57,7 @@ export async function completeBrokerJob(id: string, by: "client" | "auto"): Prom
   await emailAdmins({
     subject: `Pay the pro: ${naira(job.proPayout)} for "${job.title}"`,
     title: "A job is complete. Time to pay the pro",
-    body: `${by === "auto" ? "Confirmed automatically after 3 days." : "The client confirmed it's done."} Pay the pro ${naira(job.proPayout)} (client paid ${naira(job.price)}), then mark it paid.${auto?.error ? ` Automatic payout didn't go: ${auto.error}` : ""}`,
+    body: `${by === "auto" ? "Confirmed automatically after 3 days." : by === "admin" ? "findMe closed the problem report as not covered." : "The client confirmed it's done."} Pay the pro ${naira(job.proPayout)} (client paid ${naira(job.price)}), then mark it paid.${auto?.error ? ` Automatic payout didn't go: ${auto.error}` : ""}`,
     href: `/admin/jobs#${id}`,
     cta: "Open job",
   }).catch(() => {});
@@ -60,8 +65,8 @@ export async function completeBrokerJob(id: string, by: "client" | "auto"): Prom
 }
 
 /** Confirms any of these jobs where the pro said "done" over 3 days ago. Runs when jobs are viewed. */
-export async function settleOverdueBrokerJobs(js: { id: string; status: string; doneRequestedAt?: number }[]): Promise<number> {
-  const due = js.filter((j) => j.status === "assigned" && j.doneRequestedAt && Date.now() - j.doneRequestedAt >= AUTO_CONFIRM_MS);
+export async function settleOverdueBrokerJobs(js: { id: string; status: string; doneRequestedAt?: number; claim?: JobDoc["claim"] }[]): Promise<number> {
+  const due = js.filter((j) => j.status === "assigned" && j.doneRequestedAt && Date.now() - j.doneRequestedAt >= AUTO_CONFIRM_MS && !claimOpen(j));
   const done = await Promise.all(due.map((j) => completeBrokerJob(j.id, "auto").catch(() => false)));
   return done.filter(Boolean).length;
 }

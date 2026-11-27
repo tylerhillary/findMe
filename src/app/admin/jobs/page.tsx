@@ -14,6 +14,7 @@ import { formatNgPhone, telLink } from "@/lib/phone";
 import { rateSuffix, asRateUnit } from "@/lib/price";
 import { feeOnJob } from "@/lib/fees";
 import { autoPayoutsOn, paystackReady } from "@/lib/paystack";
+import { claimOpen } from "@/lib/guarantee";
 import type { JobDoc, PayoutDoc, UserDoc } from "@/lib/schema";
 import { cn, formatMoney } from "@/components/ui";
 import { AdminNav } from "../admin-nav";
@@ -39,15 +40,17 @@ const day = (ts: number) => new Date(ts).toLocaleString("en-NG", { timeZone: "Af
 
 /** Which pile a job sits in, by what you need to do next. */
 function stage(j: Job) {
-  if (j.status === "new") return 0; // needs a price
-  if (j.status === "quoted" && j.paymentClaimedAt) return 1; // check payment
-  if (j.status === "paid") return 2; // paid, no pro yet
-  if (j.status === "completed" && !j.proPaidAt) return 3; // pay the pro
-  if (j.status === "quoted") return 4; // waiting for client to pay
-  if (j.status === "assigned") return 5; // in progress
-  return 6; // done / cancelled
+  if (j.status === "assigned" && claimOpen(j)) return 0; // guarantee claim to investigate
+  if (j.status === "cancelled" && j.refundDue && !j.refundedAt) return 0; // refund the client
+  if (j.status === "new") return 1; // needs a price
+  if (j.status === "quoted" && j.paymentClaimedAt) return 2; // check payment
+  if (j.status === "paid") return 3; // paid, no pro yet
+  if (j.status === "completed" && !j.proPaidAt) return 4; // pay the pro
+  if (j.status === "quoted") return 5; // waiting for client to pay
+  if (j.status === "assigned") return 6; // in progress
+  return 7; // done / cancelled
 }
-const STAGES = ["Needs a price", "Check payment", "Assign a pro", "Pay the pro", "Waiting for client payment", "In progress", "Done & cancelled"];
+const STAGES = ["Problems & refunds", "Needs a price", "Check payment", "Assign a pro", "Pay the pro", "Waiting for client payment", "In progress", "Done & cancelled"];
 
 async function Content() {
   const user = await requireUser("/admin/jobs");
@@ -129,7 +132,7 @@ async function Content() {
                 const st = jobStatusLabel(j, "admin");
                 const preferred = j.preferredProId ? proById.get(j.preferredProId) : undefined;
                 const assigned = j.proId ? proById.get(j.proId) : undefined;
-                const finished = j.status === "cancelled" || (j.status === "completed" && !!j.proPaidAt);
+                const finished = (j.status === "cancelled" && !(j.refundDue && !j.refundedAt)) || (j.status === "completed" && !!j.proPaidAt);
                 return (
                   <li key={j.id} id={j.id} className={cn("card scroll-mt-24 rounded-2xl p-4 sm:p-5", finished && "opacity-70")}>
                     <div className="flex flex-wrap items-start justify-between gap-2">
@@ -171,6 +174,22 @@ async function Content() {
                       )}
                     </div>
                     <p className="mt-3 whitespace-pre-wrap rounded-xl bg-canvas px-3 py-2 text-sm text-ink-soft">{j.details}</p>
+                    {j.claim && (
+                      <div className={cn("mt-3 rounded-xl border px-3 py-2.5 text-sm", claimOpen(j) ? "border-red-200 bg-red-50 text-red-950" : "border-line bg-canvas text-ink-soft")}>
+                        <p className="font-semibold">
+                          {claimOpen(j) ? "Guarantee claim, open" : `Guarantee claim, ${j.claim.outcome === "not_covered" ? "not covered" : j.claim.outcome === "redo" ? "pro to fix" : j.claim.outcome === "refund" ? "refunded" : "withdrawn by client"}`}
+                          {" · "}{j.claim.reason} · {day(j.claim.openedAt)}
+                        </p>
+                        <p className="mt-1 whitespace-pre-wrap">{j.claim.details}</p>
+                        {j.claim.note && <p className="mt-1.5"><span className="font-semibold">Finding:</span> {j.claim.note}</p>}
+                        {(j.pastClaims?.length ?? 0) > 0 && <p className="mt-1.5 text-xs">{j.pastClaims!.length} earlier report{j.pastClaims!.length === 1 ? "" : "s"} on this job.</p>}
+                      </div>
+                    )}
+                    {j.refundDue ? (
+                      <p className={cn("mt-2 text-sm font-semibold", j.refundedAt ? "text-emerald-700" : "text-red-600")}>
+                        {j.refundedAt ? `Refunded ${formatMoney(j.refundDue)} · ${day(j.refundedAt)}` : `Refund due to client: ${formatMoney(j.refundDue)}`}
+                      </p>
+                    ) : null}
 
                     {!finished && (
                       <div className="mt-4 border-t border-line pt-4">
@@ -186,6 +205,9 @@ async function Content() {
                           proPrice={preferred?.u.hourlyRate ?? 0}
                           canPaystack={paystack && !!j.paidAt && !!(j.proId && payouts.get(j.proId)?.recipientCode)}
                           payoutBusy={j.payoutStatus === "sending" || j.payoutStatus === "pending"}
+                          claimOpen={claimOpen(j)}
+                          refundDue={j.refundDue && !j.refundedAt ? j.refundDue : 0}
+                          canPaystackRefund={paystack && j.paidVia === "paystack" && !!j.paystackRef}
                         />
                       </div>
                     )}

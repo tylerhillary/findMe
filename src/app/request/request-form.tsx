@@ -34,7 +34,7 @@ export function RequestForm({ pro, defaults, againOf }: { pro: PickedPro | null;
       <p className="mt-2 text-[15px] text-ink-soft">
         {againOf
           ? `We've filled this in from your last job. Change anything that's different, and we'll send you a price and ask ${first} first. Your payment is protected the same way: we only pay ${first} after you confirm the job is done.`
-          : <>We&apos;ll send you a price, and once you&apos;ve paid findMe we send {first ? `${first} or another trusted pro` : "a trusted pro"} to you. We only pay the pro after you confirm the job is done well.</>}
+          : <>We&apos;ll send you a price, and once you&apos;ve paid findMe we send {first ? `${first} or another trusted pro` : "a trusted pro"} to you. We only pay the pro after you confirm the job is done well, and the findMe Guarantee means it&apos;s fixed for free or refunded if it isn&apos;t.</>}
       </p>
 
       {pro && (

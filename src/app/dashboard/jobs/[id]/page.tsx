@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Banknote, RotateCcw, CalendarDays, CheckCircle2, Clock, Headset, Landmark, MapPin, PhoneOff, ShieldCheck, Star, UserRound } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Banknote, RotateCcw, CalendarDays, CheckCircle2, Clock, Headset, Landmark, MapPin, PhoneOff, ShieldCheck, Star, UserRound } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
 import { db } from "@/lib/firebase-admin";
@@ -10,6 +10,7 @@ import { bankDetails, getJob } from "@/lib/job-queries";
 import { jobStatusLabel } from "@/lib/job-status";
 import { AUTO_CONFIRM_MS } from "@/lib/jobs";
 import { feeOnJob } from "@/lib/fees";
+import { GUARANTEE_DAYS, claimOpen } from "@/lib/guarantee";
 import { categoryName } from "@/lib/categories";
 import { Avatar, btn, cn, formatMoney } from "@/components/ui";
 import { FadeIn } from "@/components/motion";
@@ -169,6 +170,16 @@ function ClientView({ job, pro, review }: { job: Data["job"]; pro: Data["pro"]; 
         </FadeIn>
       )}
 
+      {(job.status === "paid" || (job.status === "assigned" && !job.doneRequestedAt && !claimOpen(job))) && (
+        <FadeIn className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 text-sm text-emerald-950">
+          <ShieldCheck className="mt-0.5 size-5 shrink-0 text-emerald-600" />
+          <p>
+            <span className="font-semibold">Covered by the findMe Guarantee.</span> When the pro says the job is done, you have {GUARANTEE_DAYS} days to confirm or report a problem.
+            We hold their pay until then. If the work isn&apos;t right, they fix it at no cost to you, or we refund you. <Link href="/terms#guarantee" className="font-semibold underline">How it works</Link>
+          </p>
+        </FadeIn>
+      )}
+
       {(job.status === "assigned" || job.status === "completed") && pro && (
         <FadeIn className="card flex items-center gap-4 p-5 sm:p-6">
           <Avatar name={pro.name} src={pro.avatar} size={56} />
@@ -181,7 +192,24 @@ function ClientView({ job, pro, review }: { job: Data["job"]; pro: Data["pro"]; 
         </FadeIn>
       )}
 
-      {job.status === "assigned" && (
+      {claimOpen(job) && job.status === "assigned" && (
+        <FadeIn className="card border-amber-200 p-5 sm:p-6">
+          <p className="flex items-center gap-2 font-semibold"><ShieldCheck className="size-5 text-emerald-600" /> We&apos;re looking into your report</p>
+          <p className="mt-1 text-sm text-ink-soft">
+            You reported: <span className="font-semibold">{job.claim!.reason}</span>. {first}&apos;s pay is on hold while findMe checks what happened. We may call you or ask for photos.
+          </p>
+          <p className="mt-2 text-xs text-muted">Sorted it out with {first}? You can still confirm the job is done.</p>
+          <div className="mt-3"><ConfirmDoneButtons jobId={job.id} proName={first} autoDate="" claimed /></div>
+        </FadeIn>
+      )}
+      {job.claim?.resolvedAt && job.claim.outcome !== "withdrawn" && job.claim.note && (
+        <FadeIn className="card p-5 text-sm sm:p-6">
+          <p className="font-semibold">{job.claim.outcome === "redo" ? `${first} will put it right` : job.claim.outcome === "refund" ? "We refunded this job" : "Your report wasn't covered"}</p>
+          <p className="mt-1 text-ink-soft">findMe&apos;s finding: {job.claim.note}</p>
+        </FadeIn>
+      )}
+
+      {job.status === "assigned" && !claimOpen(job) && (
         job.doneRequestedAt ? (
           <ConfirmDoneButtons jobId={job.id} proName={first} autoDate={day(job.doneRequestedAt + AUTO_CONFIRM_MS)} />
         ) : (
@@ -211,7 +239,13 @@ function ClientView({ job, pro, review }: { job: Data["job"]; pro: Data["pro"]; 
       )}
 
       {job.status === "cancelled" && (
-        <FadeIn className="card p-5 text-sm text-ink-soft sm:p-6">This request was cancelled. If you paid, findMe will refund you.</FadeIn>
+        <FadeIn className="card p-5 text-sm text-ink-soft sm:p-6">
+          {job.refundedAt
+            ? `This job was cancelled and ${formatMoney(job.refundDue ?? job.price)} was refunded to you on ${day(job.refundedAt)}.`
+            : job.refundDue
+              ? `This job was cancelled. findMe is refunding ${formatMoney(job.refundDue)} to you.`
+              : "This request was cancelled. If you paid, findMe will refund you."}
+        </FadeIn>
       )}
     </>
   );
@@ -250,7 +284,14 @@ function ProView({ job, clientTeam, hasPayout }: { job: Data["job"]; clientTeam:
               </p>
             </div>
           </FadeIn>
-          {job.doneRequestedAt ? (
+          {claimOpen(job) ? (
+            <FadeIn className="card flex items-start gap-2 border-amber-200 p-5 text-sm text-ink-soft sm:p-6">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-500" />
+              <span>
+                <span className="font-semibold text-ink">The client reported a problem: {job.claim!.reason}.</span> findMe is looking into it and may ask you to fix it. Your pay is on hold until then. Please don&apos;t argue with the client; findMe will be in touch.
+              </span>
+            </FadeIn>
+          ) : job.doneRequestedAt ? (
             <FadeIn className="card flex items-start gap-2 p-5 text-sm text-ink-soft sm:p-6">
               <Clock className="mt-0.5 size-4 shrink-0 text-amber-500" />
               Waiting for the client to confirm. If they don&apos;t answer, it&apos;s confirmed automatically on {day(job.doneRequestedAt + AUTO_CONFIRM_MS)}.
@@ -261,7 +302,17 @@ function ProView({ job, clientTeam, hasPayout }: { job: Data["job"]; clientTeam:
         </>
       )}
 
-      {job.status === "cancelled" && <FadeIn className="card p-5 text-sm text-ink-soft sm:p-6">This job was cancelled. You don&apos;t need to go.</FadeIn>}
+      {job.claim?.resolvedAt && job.claim.outcome === "redo" && job.status === "assigned" && !job.doneRequestedAt && (
+        <FadeIn className="card border-amber-200 p-5 text-sm sm:p-6">
+          <p className="font-semibold">Please fix this job</p>
+          <p className="mt-1 text-ink-soft">findMe&apos;s finding: {job.claim.note} Call the client to arrange it, then mark the job done again. You&apos;ll be paid once they confirm.</p>
+        </FadeIn>
+      )}
+      {job.status === "cancelled" && (
+        <FadeIn className="card p-5 text-sm text-ink-soft sm:p-6">
+          {job.claim?.outcome === "refund" ? `findMe refunded the client after their report, so this job isn't paid. ${job.claim.note ?? ""}` : "This job was cancelled. You don't need to go."}
+        </FadeIn>
+      )}
     </>
   );
 }

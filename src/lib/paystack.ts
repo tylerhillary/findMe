@@ -105,3 +105,8 @@ export const checkTransfer = (reference: string) => call<PaystackTransfer>(`/tra
 
 /** Automatic payouts are on only when PAYSTACK_AUTO_PAYOUTS=on (and Paystack is set up). */
 export const autoPayoutsOn = () => paystackReady() && process.env.PAYSTACK_AUTO_PAYOUTS?.trim().toLowerCase() === "on";
+
+/** Refunds a client's Paystack payment in full (Paystack sends it back to their card or account). */
+export function refundPayment(reference: string) {
+  return call<{ status: string }>("/refund", { method: "POST", body: JSON.stringify({ transaction: reference }) });
+}

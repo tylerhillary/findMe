@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, CheckCircle2, CreditCard, Loader2, X } from "lucide-react";
-import { cancelJobAction, claimPaidAction, payWithPaystackAction, confirmJobDoneAction, proMarkDoneAction } from "@/app/job-actions";
-import { btn } from "@/components/ui";
+import { AlertTriangle, Check, CheckCircle2, CreditCard, Loader2, Send, ShieldCheck } from "lucide-react";
+import { cancelJobAction, claimPaidAction, payWithPaystackAction, confirmJobDoneAction, proMarkDoneAction, reportProblemAction } from "@/app/job-actions";
+import { CLAIM_REASONS } from "@/lib/guarantee";
+import { Select, Textarea, btn } from "@/components/ui";
 
 type Result = { ok?: true; error?: string };
 
@@ -82,21 +83,69 @@ export function CancelJobButton({ jobId }: { jobId: string }) {
   );
 }
 
-/** Client: the pro says it's done. */
-export function ConfirmDoneButtons({ jobId, proName, autoDate }: { jobId: string; proName: string; autoDate: string }) {
+/** Client: the pro says it's done. Confirm it, or report a problem under the findMe Guarantee. */
+export function ConfirmDoneButtons({ jobId, proName, autoDate, claimed }: { jobId: string; proName: string; autoDate: string; claimed?: boolean }) {
   const { run, spin, pending, error } = useRun();
-  return (
-    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-      <p className="font-semibold">{proName} says the job is done. Is it finished properly?</p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button disabled={pending} onClick={() => run("yes", () => confirmJobDoneAction(jobId, true), "Confirm the job is done? We'll then pay the pro.")} className={btn("primary", "md")}>
-          {spin("yes") ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />} Yes, it&apos;s done
+  if (claimed) {
+    // A report is open: the only thing left for the client is to say it's sorted after all.
+    return (
+      <div>
+        <button disabled={pending} onClick={() => run("yes", () => confirmJobDoneAction(jobId, true), `Confirm the job is now done properly? This closes your report, we pay ${proName}, and the findMe Guarantee ends for this job.`)} className={btn("outline", "sm")}>
+          {spin("yes") ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />} It&apos;s sorted, confirm the job
         </button>
-        <button disabled={pending} onClick={() => run("no", () => confirmJobDoneAction(jobId, false))} className={btn("outline", "md")}>
-          {spin("no") ? <Loader2 className="size-4 animate-spin" /> : <X className="size-4" />} Not yet
-        </button>
+        <Err msg={error} />
       </div>
-      <p className="mt-2 text-xs text-muted">If you don&apos;t answer, it&apos;s confirmed automatically on {autoDate}.</p>
+    );
+  }
+  return <ConfirmOrReport jobId={jobId} proName={proName} autoDate={autoDate} run={run} spin={spin} pending={pending} error={error} />;
+}
+
+function ConfirmOrReport({ jobId, proName, autoDate, run, spin, pending, error }: { jobId: string; proName: string; autoDate: string } & ReturnType<typeof useRun>) {
+  const [reporting, setReporting] = useState(false);
+  const [reason, setReason] = useState("");
+  const [details, setDetails] = useState("");
+  return (
+    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:p-5">
+      <p className="font-semibold">{proName} says the job is done. Is it finished properly?</p>
+      {!reporting ? (
+        <>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              disabled={pending}
+              onClick={() => run("yes", () => confirmJobDoneAction(jobId, true), `Confirm the job is done properly? We'll then pay ${proName}, and the findMe Guarantee ends for this job.`)}
+              className={btn("primary", "md")}
+            >
+              {spin("yes") ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />} Yes, it&apos;s done
+            </button>
+            <button disabled={pending} onClick={() => setReporting(true)} className={btn("outline", "md")}>
+              <AlertTriangle className="size-4" /> Report a problem
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-amber-900/80">
+            <ShieldCheck className="mr-1 inline size-3.5 align-[-2px] text-emerald-600" />
+            Covered by the findMe Guarantee: we hold {proName}&apos;s pay until you confirm. If you don&apos;t answer, it&apos;s confirmed automatically on {autoDate}.
+          </p>
+        </>
+      ) : (
+        <div className="mt-3 space-y-3">
+          <p className="text-sm text-ink-soft">
+            We&apos;ll hold {proName}&apos;s pay and look into it. If the problem is with the work, {proName} fixes it at no cost to you, or we refund you.
+          </p>
+          <Select value={reason} onChange={(e) => setReason(e.target.value)} aria-label="What went wrong?">
+            <option value="">What went wrong?</option>
+            {CLAIM_REASONS.map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+          </Select>
+          <Textarea value={details} onChange={(e) => setDetails(e.target.value)} rows={3} maxLength={2000} placeholder="Tell us what's wrong. Photos help: we may ask you to send some." aria-label="Details" />
+          <div className="flex flex-wrap gap-2">
+            <button disabled={pending || !reason || details.trim().length < 15} onClick={() => run("report", () => reportProblemAction(jobId, reason, details))} className={btn("dark", "md")}>
+              {spin("report") ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />} Send report
+            </button>
+            <button disabled={pending} onClick={() => setReporting(false)} className={btn("ghost", "md")}>Back</button>
+          </div>
+        </div>
+      )}
       <Err msg={error} />
     </div>
   );

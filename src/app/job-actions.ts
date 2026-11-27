@@ -14,7 +14,8 @@ import { MIN_JOB_PRICE, proPayoutFor } from "@/lib/fees";
 import { markProPaid, sendProPayout } from "@/lib/payouts";
 import { CATALOG_TAG } from "@/lib/queries";
 import { completeBrokerJob } from "@/lib/broker";
-import { paystackReady, startPayment } from "@/lib/paystack";
+import { paystackReady, refundPayment, startPayment } from "@/lib/paystack";
+import { CLAIM_REASONS, GUARANTEE_DAYS, claimOpen } from "@/lib/guarantee";
 import { APP_URL } from "@/lib/email";
 import type { JobDoc, UserDoc } from "@/lib/schema";
 import type { FormState } from "@/app/actions";
@@ -335,5 +336,117 @@ export async function adminCancelJobAction(jobId: string): Promise<{ ok?: true; 
   await ref.update({ status: "cancelled", cancelledAt: Date.now(), updatedAt: Date.now() });
   await notify({ userId: job.clientId, kind: "status", title: "Your job was cancelled", body: `findMe cancelled "${job.title}". If you paid, we'll refund you.`, href: jobHref(ref.id), cta: "View job" });
   if (job.proId) await notify({ userId: job.proId, kind: "status", title: "A job was cancelled", body: `"${job.title}" was cancelled. You don't need to go.`, href: "/dashboard/jobs", cta: "Your jobs" });
+  return ok();
+}
+
+// ---------------- findMe Guarantee ----------------
+
+/**
+ * Client: "something's wrong" after the pro said the job is done. Stops the automatic
+ * confirmation and holds the pro's pay while findMe looks into it.
+ */
+export async function reportProblemAction(jobId: string, reason: string, details: string): Promise<{ ok?: true; error?: string }> {
+  const user = await requireUser();
+  const { ref, job } = await loadJob(jobId);
+  if (!job || job.clientId !== user.id) return { error: "Job not found." };
+  if (job.status !== "assigned" || !job.doneRequestedAt) return { error: "You can report a problem once the pro says the job is done, and before it's confirmed." };
+  if (claimOpen(job)) return { error: "You've already reported a problem. findMe is looking into it." };
+  if (Date.now() - job.doneRequestedAt >= GUARANTEE_DAYS * 86_400_000) return { error: `The ${GUARANTEE_DAYS} days to report a problem have passed, so the job counts as confirmed. Call findMe if something is seriously wrong.` };
+  const why = (CLAIM_REASONS as readonly string[]).includes(reason) ? reason : "";
+  const text = String(details ?? "").trim().slice(0, 2000);
+  if (!why) return { error: "Choose what went wrong." };
+  if (text.length < 15) return { error: "Tell us a little more about what's wrong (at least 15 characters)." };
+
+  const now = Date.now();
+  await ref.update({
+    claim: { reason: why, details: text, openedAt: now },
+    ...(job.claim ? { pastClaims: [...(job.pastClaims ?? []), job.claim] } : {}),
+    updatedAt: now,
+  });
+  if (job.proId) {
+    await notify({
+      userId: job.proId,
+      kind: "status",
+      title: "The client reported a problem",
+      body: `The client says "${why.toLowerCase()}" on "${job.title}". findMe will look into it and may ask you to fix it. Your pay is on hold until then.`,
+      href: jobHref(ref.id),
+      cta: "Open job",
+    });
+  }
+  after(() =>
+    emailAdmins({
+      subject: `Guarantee claim: ${job.title}`,
+      title: `${user.name} reported a problem`,
+      body: "The pro's pay is on hold and the job won't be confirmed automatically. Look into it: was it the pro's work or something the client did? Then decide on the job page.",
+      href: adminHref(ref.id),
+      cta: "Investigate",
+      details: [["Problem", why]],
+      quote: { from: user.name, text },
+    }).catch(() => {}),
+  );
+  return ok();
+}
+
+/**
+ * Admin: the outcome of a guarantee claim.
+ *  - not_covered: the client caused it or the work is fine. The job completes and the pro is paid.
+ *  - redo: the pro fixes or redoes it before being paid; the client then confirms again.
+ *  - refund: the job is cancelled, the pro isn't paid, and the client is refunded.
+ */
+export async function resolveClaimAction(jobId: string, outcome: "not_covered" | "redo" | "refund", note: string): Promise<{ ok?: true; error?: string }> {
+  try {
+    await requireAdmin();
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+  const { ref, job } = await loadJob(jobId);
+  if (!job || job.status !== "assigned" || !claimOpen(job)) return { error: "There's no open problem report on this job." };
+  if (!["not_covered", "redo", "refund"].includes(outcome)) return { error: "Choose an outcome." };
+  const why = String(note ?? "").trim().slice(0, 1000);
+  if (why.length < 5) return { error: "Write a short note on what you found. Both sides will see it." };
+  const now = Date.now();
+  const claim = { ...job.claim!, outcome, note: why, resolvedAt: now };
+  const first = job.clientName.split(" ")[0];
+
+  if (outcome === "not_covered") {
+    await ref.update({ claim, updatedAt: now });
+    await notify({ userId: job.clientId, kind: "status", title: "We've looked into your report", body: `We found the problem with "${job.title}" isn't covered by the findMe Guarantee: ${why}`, href: jobHref(ref.id), cta: "View job" });
+    if (job.proId) await notify({ userId: job.proId, kind: "status", title: "Problem report closed", body: `findMe looked into the client's report on "${job.title}" and it isn't down to your work. You'll be paid as normal.`, href: jobHref(ref.id), cta: "View job" });
+    if (await completeBrokerJob(ref.id, "admin")) updateTag(CATALOG_TAG);
+    return ok();
+  }
+
+  if (outcome === "redo") {
+    await ref.update({ claim, doneRequestedAt: FieldValue.delete(), updatedAt: now });
+    await notify({ userId: job.clientId, kind: "status", title: "Your pro will put it right", body: `We've asked your pro to fix "${job.title}" at no extra cost. ${why} Once they're done, you'll be asked to confirm again.`, href: jobHref(ref.id), cta: "View job" });
+    if (job.proId) await notify({ userId: job.proId, kind: "request", title: "Please fix this job", body: `findMe looked into ${first}'s report on "${job.title}": ${why} Call ${first} to arrange it, then mark the job done again. You'll be paid once ${first} confirms.`, href: jobHref(ref.id), cta: "Open job" });
+    return ok();
+  }
+
+  await ref.update({ claim, status: "cancelled", cancelledAt: now, doneRequestedAt: FieldValue.delete(), refundDue: job.price, updatedAt: now });
+  await notify({ userId: job.clientId, kind: "status", title: "We're refunding you", body: `findMe is refunding ${naira(job.price)} for "${job.title}". ${why}`, href: jobHref(ref.id), cta: "View job" });
+  if (job.proId) await notify({ userId: job.proId, kind: "status", title: "Job refunded to the client", body: `findMe looked into the client's report on "${job.title}" and refunded them, so this job won't be paid. ${why}`, href: jobHref(ref.id), cta: "View job" });
+  return ok();
+}
+
+/** Admin: send a refund that's due. Paystack payments go back automatically; transfers are refunded by hand. */
+export async function refundClientAction(jobId: string, how: "paystack" | "manual"): Promise<{ ok?: true; error?: string }> {
+  try {
+    await requireAdmin();
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+  const { ref, job } = await loadJob(jobId);
+  if (!job?.refundDue || job.refundedAt) return { error: "No refund is due on this job." };
+  if (how === "paystack") {
+    if (job.paidVia !== "paystack" || !job.paystackRef || !paystackReady()) return { error: "This payment wasn't made on Paystack. Refund it by hand." };
+    try {
+      await refundPayment(job.paystackRef);
+    } catch (e) {
+      return { error: `Paystack couldn't refund it: ${(e as Error).message}` };
+    }
+  }
+  await ref.update({ refundedAt: Date.now(), updatedAt: Date.now() });
+  await notify({ userId: job.clientId, kind: "status", title: `Refund sent: ${naira(job.refundDue)}`, body: `Your refund for "${job.title}" is on its way${how === "paystack" ? " to the card or account you paid with. It can take a few working days to show" : ""}.`, href: jobHref(ref.id), cta: "View job" });
   return ok();
 }

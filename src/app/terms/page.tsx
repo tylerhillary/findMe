@@ -59,7 +59,7 @@ export default function TermsPage() {
             <ul>
               <li>Describe the job clearly and honestly, and treat professionals with respect.</li>
               <li>Pay findMe the price we agree with you. Never pay a professional directly for a job arranged through findMe.</li>
-              <li>Confirm on findMe when the job is done, or tell us if it isn&apos;t. If you don&apos;t answer within 3 days of the professional marking it done, it&apos;s treated as confirmed.</li>
+              <li>Confirm on findMe when the job is done, or report a problem if it isn&apos;t (see <Link href="#guarantee">the findMe Guarantee</Link>). If you don&apos;t answer within 3 days of the professional marking it done, it&apos;s treated as confirmed.</li>
             </ul>
           ),
         },
@@ -71,6 +71,21 @@ export default function TermsPage() {
               <li>Clients pay findMe for each job. We hold the payment and pay the professional after the client confirms the job is done (or it&apos;s confirmed automatically after 3 days).</li>
               <li>findMe keeps 10% of the price the client pays, with a minimum of ₦1,000 per job. The professional receives the rest. Professionals see their exact pay on every job before they start.</li>
               <li>If a job is cancelled after you paid, or the work isn&apos;t done, <Link href="/contact">contact us</Link> and we&apos;ll look into a refund.</li>
+            </ul>
+          ),
+        },
+        {
+          id: "guarantee",
+          title: "The findMe Guarantee",
+          body: (
+            <ul>
+              <li>The guarantee covers jobs that are booked and paid for through findMe. It doesn&apos;t cover work arranged or paid for outside findMe.</li>
+              <li>When the professional marks a job done, the client has 3 days to confirm it or report a problem on the job page. We hold the professional&apos;s pay during that time.</li>
+              <li>When a problem is reported, the job isn&apos;t confirmed automatically and the professional isn&apos;t paid until findMe has looked into it. We may call both sides and ask for photos.</li>
+              <li>If the problem is with the professional&apos;s work, they fix or redo it at no extra cost before they&apos;re paid. If that isn&apos;t possible, findMe refunds the client the price they paid, and the professional isn&apos;t paid for the job.</li>
+              <li>If the problem was caused by the client or someone else, or the work was done as agreed, the guarantee doesn&apos;t apply: the job is confirmed and the professional is paid.</li>
+              <li>Once a client confirms a job is done, or the 3 days pass without a report, the guarantee ends for that job.</li>
+              <li>findMe&apos;s decision is final. Card refunds go back to the card or account used and can take a few working days to arrive.</li>
             </ul>
           ),
         },

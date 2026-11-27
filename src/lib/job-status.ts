@@ -1,9 +1,16 @@
 import type { JobDoc } from "./schema";
 
 /** A short label and colour for a job, from the viewer's side. */
-export function jobStatusLabel(j: Pick<JobDoc, "status" | "doneRequestedAt" | "paymentClaimedAt" | "proPaidAt" | "reviewed">, side: "client" | "pro" | "admin") {
+export function jobStatusLabel(j: Pick<JobDoc, "status" | "doneRequestedAt" | "paymentClaimedAt" | "proPaidAt" | "reviewed" | "claim" | "refundDue" | "refundedAt">, side: "client" | "pro" | "admin") {
   const s = j.status;
-  if (s === "cancelled") return { label: "Cancelled", tone: "bg-zinc-100 text-zinc-600" };
+  if (s === "cancelled") {
+    if (j.refundDue && !j.refundedAt && side !== "pro") return { label: side === "admin" ? "Refund the client" : "Refund on the way", tone: side === "admin" ? "bg-red-600 text-white" : "bg-sky-50 text-sky-700" };
+    if (j.refundDue) return { label: "Refunded", tone: "bg-zinc-100 text-zinc-600" };
+    return { label: "Cancelled", tone: "bg-zinc-100 text-zinc-600" };
+  }
+  if (s === "assigned" && j.claim && !j.claim.resolvedAt) {
+    return { label: side === "admin" ? "Problem reported" : side === "pro" ? "Problem reported · pay on hold" : "Report being checked", tone: side === "admin" ? "bg-red-600 text-white" : "bg-amber-50 text-amber-700" };
+  }
   if (side === "pro") {
     if (s === "completed") return j.proPaidAt ? { label: "Done · paid", tone: "bg-emerald-50 text-emerald-700" } : { label: "Done · payment on the way", tone: "bg-sky-50 text-sky-700" };
     return j.doneRequestedAt ? { label: "Waiting for client", tone: "bg-amber-50 text-amber-700" } : { label: "To do", tone: "bg-brand-50 text-brand-700" };
