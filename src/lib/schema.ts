@@ -181,6 +181,8 @@ export type JobDoc = {
   when: string; // e.g. "This weekend", "ASAP"
   /** Pro the client picked on findMe, if any (findMe may still assign someone else). */
   preferredProId: string | null;
+  /** Set when the client tapped "Book again" on an earlier job of theirs: that job's id. */
+  repeatOf?: string;
   /** Old field from when clients could make offers. Always 0 now. */
   clientOffer: number;
   status: JobStatus;

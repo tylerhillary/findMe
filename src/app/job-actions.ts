@@ -60,6 +60,7 @@ export async function createJobAction(_: FormState, fd: FormData): Promise<FormS
   const phoneRaw = str(fd, "phone", 30);
   const phone = normalizeNgPhone(phoneRaw);
   const preferred = safeId(fd.get("proId"));
+  const againOf = safeId(fd.get("againOf"));
 
   const fieldErrors: Record<string, string> = {};
   if (title.length < 4) fieldErrors.title = "Say in a few words what you need.";
@@ -80,11 +81,19 @@ export async function createJobAction(_: FormState, fd: FormData): Promise<FormS
     }
   }
 
+  // "Book again": only counts when it's the client's own finished job.
+  let repeatOf: string | undefined;
+  if (againOf) {
+    const prev = againOf.includes("/") ? undefined : ((await jobs().doc(againOf).get()).data() as JobDoc | undefined);
+    if (prev?.clientId === user.id && prev.status === "completed") repeatOf = againOf;
+  }
+
   const now = Date.now();
   const ref = jobs().doc();
   await ref.set({
     clientId: user.id, clientName: user.name, clientPhone: phone!, title, details, category, location, when,
     preferredProId, clientOffer: 0, status: "new", price: 0, proPayout: 0, proId: null, createdAt: now, updatedAt: now,
+    ...(repeatOf ? { repeatOf } : {}),
   } satisfies JobDoc);
   // Remember their number for next time.
   const me = (await users().doc(user.id).get()).data() as UserDoc | undefined;
@@ -92,7 +101,7 @@ export async function createJobAction(_: FormState, fd: FormData): Promise<FormS
 
   after(() =>
     emailAdmins({
-      subject: `A client wants a service: ${title}`,
+      subject: `${repeatOf ? "Repeat booking" : "A client wants a service"}: ${title}`,
       title: `New job request from ${user.name}`,
       body: `Send ${user.name.split(" ")[0]} a price, then assign a pro once they've paid.`,
       href: adminHref(ref.id),
@@ -101,7 +110,7 @@ export async function createJobAction(_: FormState, fd: FormData): Promise<FormS
         ["Category", categoryName(category)],
         ["Where", location],
         ["When", when],
-        ["Pro they picked", preferredName || "Any"],
+        ["Pro they picked", preferredName ? `${preferredName}${repeatOf ? " (booking again)" : ""}` : "Any"],
         ["Phone", formatNgPhone(phone!)],
       ],
       quote: { from: user.name, text: details },

@@ -22,17 +22,19 @@ export type PickedPro = {
 };
 
 /** "Tell us what you need": goes to findMe, who sends a price and then a pro. */
-export function RequestForm({ pro, defaults }: { pro: PickedPro | null; defaults: { phone: string; location: string; category: string } }) {
+export function RequestForm({ pro, defaults, againOf }: { pro: PickedPro | null; defaults: { phone: string; location: string; category: string; details?: string }; againOf?: string }) {
   const [state, action, pending] = useActionState<FormState, FormData>(createJobAction, {});
   const first = pro?.name.split(" ")[0];
   const e = state.fieldErrors ?? {};
 
   return (
     <div>
-      <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-600">Request through findMe</p>
-      <h1 className="mt-1 font-display text-[1.7rem] font-extrabold leading-tight tracking-tight sm:text-4xl">Tell us what you need</h1>
+      <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-600">{againOf ? "Book again" : "Request through findMe"}</p>
+      <h1 className="mt-1 font-display text-[1.7rem] font-extrabold leading-tight tracking-tight sm:text-4xl">{againOf && first ? `Book ${first} again` : "Tell us what you need"}</h1>
       <p className="mt-2 text-[15px] text-ink-soft">
-        We&apos;ll send you a price, and once you&apos;ve paid findMe we send {first ? `${first} or another trusted pro` : "a trusted pro"} to you. We only pay the pro after you confirm the job is done well.
+        {againOf
+          ? `We've filled this in from your last job. Change anything that's different, and we'll send you a price and ask ${first} first. Your payment is protected the same way: we only pay ${first} after you confirm the job is done.`
+          : <>We&apos;ll send you a price, and once you&apos;ve paid findMe we send {first ? `${first} or another trusted pro` : "a trusted pro"} to you. We only pay the pro after you confirm the job is done well.</>}
       </p>
 
       {pro && (
@@ -56,6 +58,7 @@ export function RequestForm({ pro, defaults }: { pro: PickedPro | null; defaults
 
       <form action={action} className="mt-6 space-y-4 sm:space-y-5">
         {pro && <input type="hidden" name="proId" value={pro.id} />}
+        {againOf && <input type="hidden" name="againOf" value={againOf} />}
         <div>
           <Label htmlFor="title">What do you need?</Label>
           <Input id="title" name="title" defaultValue={pro?.serviceTitle ?? ""} placeholder="e.g. Fix a leaking kitchen tap" aria-invalid={!!e.title} />
@@ -63,7 +66,7 @@ export function RequestForm({ pro, defaults }: { pro: PickedPro | null; defaults
         </div>
         <div>
           <Label htmlFor="details">Describe the job</Label>
-          <Textarea id="details" name="details" rows={4} placeholder="What's the problem, how big is the job, anything the pro should bring?" aria-invalid={!!e.details} />
+          <Textarea id="details" name="details" rows={4} defaultValue={defaults.details ?? ""} placeholder="What's the problem, how big is the job, anything the pro should bring?" aria-invalid={!!e.details} />
           <FieldError msg={e.details} />
         </div>
         <div className="grid gap-4 sm:grid-cols-2 sm:gap-5">

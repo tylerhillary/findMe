@@ -6,7 +6,7 @@ import { db } from "@/lib/firebase-admin";
 import { getProviderProfile } from "@/lib/queries";
 import { publicName } from "@/lib/names";
 import { formatNgPhone } from "@/lib/phone";
-import type { UserDoc } from "@/lib/schema";
+import type { JobDoc, UserDoc } from "@/lib/schema";
 import { RequestForm, type PickedPro } from "./request-form";
 
 export const metadata: Metadata = { title: "Request a service" };
@@ -29,12 +29,20 @@ async function Content({ searchParams }: { searchParams: PageProps<"/request">["
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
   const proId = one(sp.pro).slice(0, 128);
   const serviceId = one(sp.service).slice(0, 128);
-  const query = new URLSearchParams(Object.entries({ pro: proId, service: serviceId }).filter(([, v]) => v)).toString();
+  const againId = one(sp.again).slice(0, 128);
+  const query = new URLSearchParams(Object.entries({ pro: proId, service: serviceId, again: againId }).filter(([, v]) => v)).toString();
   const user = await requireUser(`/request${query ? `?${query}` : ""}`);
+
+  // "Book again": start from one of the client's own completed jobs, with the same pro.
+  const again = againId && !againId.includes("/")
+    ? await db().collection("jobs").doc(againId).get().then((s) => s.data() as JobDoc | undefined)
+    : undefined;
+  const repeat = again && again.clientId === user.id && again.status === "completed" && again.proId ? again : undefined;
+  const pickId = repeat?.proId ?? proId;
 
   const [me, pro] = await Promise.all([
     db().collection("users").doc(user.id).get().then((s) => s.data() as UserDoc | undefined),
-    proId ? getProviderProfile(proId) : Promise.resolve(null),
+    pickId ? getProviderProfile(pickId) : Promise.resolve(null),
   ]);
   const service = pro?.services.find((s) => s.id === serviceId);
   const picked: PickedPro | null = pro
@@ -49,14 +57,20 @@ async function Content({ searchParams }: { searchParams: PageProps<"/request">["
         // The pro's listed price, shown on the request form.
         price: service ? service.price : pro.hourlyRate || pro.startingPrice || 0,
         unit: service ? (service.priceUnit === "hour" ? "hour" : "job") : pro.rateUnit,
-        serviceTitle: service?.title ?? "",
+        serviceTitle: service?.title ?? repeat?.title ?? "",
       }
     : null;
 
   return (
     <RequestForm
       pro={picked}
-      defaults={{ phone: me?.phone ? formatNgPhone(me.phone).replace(/^\+234 /, "") : "", location: me?.location ?? "", category: picked?.category ?? "" }}
+      againOf={repeat && pro ? againId : undefined}
+      defaults={{
+        phone: me?.phone ? formatNgPhone(me.phone).replace(/^\+234 /, "") : "",
+        location: repeat?.location || me?.location || "",
+        category: repeat?.category ?? picked?.category ?? "",
+        details: repeat?.details ?? "",
+      }}
     />
   );
 }

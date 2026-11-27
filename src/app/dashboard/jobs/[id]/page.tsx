@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Banknote, CalendarDays, CheckCircle2, Clock, Headset, Landmark, MapPin, PhoneOff, ShieldCheck, Star, UserRound } from "lucide-react";
+import { ArrowLeft, Banknote, RotateCcw, CalendarDays, CheckCircle2, Clock, Headset, Landmark, MapPin, PhoneOff, ShieldCheck, Star, UserRound } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
 import { db } from "@/lib/firebase-admin";
@@ -11,7 +11,7 @@ import { jobStatusLabel } from "@/lib/job-status";
 import { AUTO_CONFIRM_MS } from "@/lib/jobs";
 import { feeOnJob } from "@/lib/fees";
 import { categoryName } from "@/lib/categories";
-import { Avatar, cn, formatMoney } from "@/components/ui";
+import { Avatar, btn, cn, formatMoney } from "@/components/ui";
 import { FadeIn } from "@/components/motion";
 import { ContactButtons } from "@/components/contact-card";
 import { TeamBadge } from "@/components/verify-phone";
@@ -190,6 +190,18 @@ function ClientView({ job, pro, review }: { job: Data["job"]; pro: Data["pro"]; 
             <p className="mt-1 flex items-start gap-2 text-sm text-ink-soft"><ShieldCheck className="mt-0.5 size-4 shrink-0 text-emerald-500" /> You&apos;ve already paid findMe, so don&apos;t pay {first} anything. If they ask for money, tell us.</p>
           </FadeIn>
         )
+      )}
+
+      {job.status === "completed" && job.proId && pro && (
+        <FadeIn className="card flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+          <div>
+            <p className="font-semibold">Need {first} again?</p>
+            <p className="mt-0.5 text-sm text-ink-soft">Book in one tap. We fill in the details from this job, and your payment stays protected by findMe.</p>
+          </div>
+          <Link href={`/request?again=${job.id}`} className={btn("primary", "md", "w-full shrink-0 sm:w-auto")}>
+            <RotateCcw className="size-4" /> Book {first} again
+          </Link>
+        </FadeIn>
       )}
 
       {job.status === "completed" && (

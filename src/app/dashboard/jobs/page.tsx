@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Briefcase, CheckCircle2, History, MapPin, Plus, Star, XCircle } from "lucide-react";
+import { ArrowRight, Briefcase, RotateCcw, CheckCircle2, History, MapPin, Plus, Star, XCircle } from "lucide-react";
 import { db } from "@/lib/firebase-admin";
 import { requireUser } from "@/lib/auth";
 import { getMyJobs, type JobWithId } from "@/lib/job-queries";
@@ -119,8 +119,8 @@ function JobHistory({ items, ratings }: { items: HistoryItem[]; ratings: Map<str
           const amount = side === "pro" ? j.proPayout : j.price;
           const rating = ratings.get(j.id);
           return (
-            <li key={`${side}-${j.id}`}>
-              <Link href={`/dashboard/jobs/${j.id}`} className="flex items-center gap-3 px-4 py-3.5 transition hover:bg-canvas sm:px-5">
+            <li key={`${side}-${j.id}`} className="flex items-center">
+              <Link href={`/dashboard/jobs/${j.id}`} className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3.5 transition hover:bg-canvas sm:px-5">
                 <span className={cn("grid size-9 shrink-0 place-items-center rounded-xl", completed ? "bg-emerald-50 text-emerald-600" : "bg-canvas text-muted")}>
                   {completed ? <CheckCircle2 className="size-4.5" /> : <XCircle className="size-4.5" />}
                 </span>
@@ -139,6 +139,15 @@ function JobHistory({ items, ratings }: { items: HistoryItem[]; ratings: Map<str
                 {completed && amount > 0 && <span className="shrink-0 font-extrabold">{formatMoney(amount)}</span>}
                 <ArrowRight className="size-4 shrink-0 text-muted" />
               </Link>
+              {side === "client" && completed && j.proId && (
+                <Link
+                  href={`/request?again=${j.id}`}
+                  aria-label={`Book again: ${j.title}`}
+                  className="mr-3 inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-line px-3 text-xs font-semibold text-ink transition hover:border-brand-300 hover:text-brand-700 sm:mr-4"
+                >
+                  <RotateCcw className="size-3.5" /> <span className="hidden sm:inline">Book again</span>
+                </Link>
+              )}
             </li>
           );
         })}

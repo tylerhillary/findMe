@@ -89,6 +89,7 @@ async function Content() {
   const done = jobs.filter((j) => j.status === "completed");
   const revenue = done.reduce((s, j) => s + j.price, 0);
   const fees = done.reduce((s, j) => s + feeOnJob(j), 0);
+  const repeats = jobs.filter((j) => j.repeatOf && j.status !== "cancelled").length;
   const owed = done.filter((j) => !j.proPaidAt).reduce((s, j) => s + j.proPayout, 0);
 
   return (
@@ -96,8 +97,8 @@ async function Content() {
       <AdminNav current="/admin/jobs" />
       <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-600">Admin</p>
       <h1 className="mt-1 font-display text-[1.6rem] font-extrabold tracking-tight sm:text-3xl">Jobs</h1>
-      <div className="mt-4 grid grid-cols-3 gap-3">
-        {[["Completed jobs value", formatMoney(revenue)], ["findMe earned", formatMoney(fees)], ["Owed to pros", formatMoney(owed)]].map(([k, v]) => (
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[["Completed jobs value", formatMoney(revenue)], ["findMe earned", formatMoney(fees)], ["Owed to pros", formatMoney(owed)], ["Repeat bookings", String(repeats)]].map(([k, v]) => (
           <div key={k} className="rounded-2xl border border-line bg-white p-3 sm:p-4">
             <p className="text-[11px] font-bold uppercase tracking-wider text-muted">{k}</p>
             <p className="mt-1 text-lg font-extrabold sm:text-xl">{v}</p>
@@ -127,7 +128,7 @@ async function Content() {
                   <li key={j.id} id={j.id} className={cn("card scroll-mt-24 rounded-2xl p-4 sm:p-5", finished && "opacity-70")}>
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="font-bold">{j.title}</p>
+                        <p className="font-bold">{j.title}{j.repeatOf && <span className="ml-2 inline-block rounded-full bg-emerald-50 px-2 py-0.5 align-middle text-[11px] font-semibold text-emerald-700">Repeat</span>}</p>
                         <p className="text-xs text-muted">{categoryName(j.category)} · {day(j.createdAt)}</p>
                       </div>
                       <span className={cn("rounded-full px-2.5 py-1 text-xs font-bold", st.tone)}>{st.label}</span>
