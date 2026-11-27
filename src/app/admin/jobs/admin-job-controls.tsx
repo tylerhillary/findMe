@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Banknote, Check, Loader2, Send, UserCheck, X } from "lucide-react";
-import { adminCancelJobAction, assignJobAction, markJobPaidAction, markProPaidAction, quoteJobAction } from "@/app/job-actions";
+import { Banknote, Check, Landmark, Loader2, Send, UserCheck, X } from "lucide-react";
+import { adminCancelJobAction, assignJobAction, markJobPaidAction, markProPaidAction, quoteJobAction, sendPayoutAction } from "@/app/job-actions";
 import { Input, Select, btn, formatMoney } from "@/components/ui";
 import type { JobStatus } from "@/lib/schema";
 import { MIN_JOB_PRICE, findMeFeeFor, proPayoutFor } from "@/lib/fees";
@@ -10,9 +10,9 @@ import { MIN_JOB_PRICE, findMeFeeFor, proPayoutFor } from "@/lib/fees";
 export type ProOption = { id: string; label: string; preferred: boolean };
 
 export function AdminJobControls({
-  jobId, status, price, proPayout, proId, proPaid, paymentClaimed, pros, proPrice,
+  jobId, status, price, proPayout, proId, proPaid, paymentClaimed, pros, proPrice, canPaystack, payoutBusy,
 }: {
-  jobId: string; status: JobStatus; price: number; proPayout: number; proId: string | null; proPaid: boolean; paymentClaimed: boolean; pros: ProOption[]; proPrice: number;
+  jobId: string; status: JobStatus; price: number; proPayout: number; canPaystack: boolean; payoutBusy: boolean; proId: string | null; proPaid: boolean; paymentClaimed: boolean; pros: ProOption[]; proPrice: number;
 }) {
   const [pending, start] = useTransition();
   const [which, setWhich] = useState<string | null>(null);
@@ -76,9 +76,24 @@ export function AdminJobControls({
       )}
 
       {status === "completed" && !proPaid && (
-        <button disabled={pending} onClick={() => run("propaid", () => markProPaidAction(jobId), `Mark the pro as paid ${formatMoney(proPayout || proPayoutFor(price))}?`)} className={btn("primary", "sm")}>
-          {spin("propaid", Check)} Pro paid {formatMoney(proPayout || proPayoutFor(price))}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {canPaystack && (
+            <button
+              disabled={pending || payoutBusy}
+              onClick={() => run("paystack", () => sendPayoutAction(jobId), `Send ${formatMoney(proPayout || proPayoutFor(price))} to the pro's bank account now through Paystack?`)}
+              className={btn("primary", "sm")}
+            >
+              {spin("paystack", Landmark)} {payoutBusy ? "Paystack is sending…" : `Send ${formatMoney(proPayout || proPayoutFor(price))} with Paystack`}
+            </button>
+          )}
+          <button
+            disabled={pending || payoutBusy}
+            onClick={() => run("propaid", () => markProPaidAction(jobId), `Mark the pro as paid ${formatMoney(proPayout || proPayoutFor(price))}? Only do this if you've paid them yourself.`)}
+            className={btn(canPaystack ? "outline" : "primary", "sm")}
+          >
+            {spin("propaid", Check)} {canPaystack ? "I paid by hand" : `Pro paid ${formatMoney(proPayout || proPayoutFor(price))}`}
+          </button>
+        </div>
       )}
 
       {open && (

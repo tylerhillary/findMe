@@ -13,6 +13,7 @@ import { categoryName } from "@/lib/categories";
 import { formatNgPhone, telLink } from "@/lib/phone";
 import { rateSuffix, asRateUnit } from "@/lib/price";
 import { feeOnJob } from "@/lib/fees";
+import { autoPayoutsOn, paystackReady } from "@/lib/paystack";
 import type { JobDoc, PayoutDoc, UserDoc } from "@/lib/schema";
 import { cn, formatMoney } from "@/components/ui";
 import { AdminNav } from "../admin-nav";
@@ -91,12 +92,17 @@ async function Content() {
   const fees = done.reduce((s, j) => s + feeOnJob(j), 0);
   const repeats = jobs.filter((j) => j.repeatOf && j.status !== "cancelled").length;
   const owed = done.filter((j) => !j.proPaidAt).reduce((s, j) => s + j.proPayout, 0);
+  const paystack = paystackReady();
+  const autoPay = autoPayoutsOn();
 
   return (
     <div>
       <AdminNav current="/admin/jobs" />
       <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-600">Admin</p>
       <h1 className="mt-1 font-display text-[1.6rem] font-extrabold tracking-tight sm:text-3xl">Jobs</h1>
+      <p className="mt-1 text-sm text-muted">
+        Pro payouts: {autoPay ? "automatic. Paystack pays the pro as soon as the client confirms a paid job." : paystack ? "by button. Use “Send with Paystack” on each job (set PAYSTACK_AUTO_PAYOUTS=on to make it automatic)." : "by hand. Paystack isn't set up."}
+      </p>
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[["Completed jobs value", formatMoney(revenue)], ["findMe earned", formatMoney(fees)], ["Owed to pros", formatMoney(owed)], ["Repeat bookings", String(repeats)]].map(([k, v]) => (
           <div key={k} className="rounded-2xl border border-line bg-white p-3 sm:p-4">
@@ -147,11 +153,17 @@ async function Content() {
                       {j.paymentClaimedAt && j.status === "quoted" && <p className="font-semibold text-sky-700">Client says they paid · {day(j.paymentClaimedAt)}</p>}
                       {j.paidVia === "paystack" && <p className="font-semibold text-emerald-700">Paid on Paystack · {j.paystackRef}</p>}
                       {j.doneRequestedAt && <p className="font-semibold text-amber-700">Pro said done · {day(j.doneRequestedAt)}</p>}
-                      {j.proPaidAt && <p className="text-emerald-700">Pro paid · {day(j.proPaidAt)}</p>}
+                      {j.proPaidAt && <p className="text-emerald-700">Pro paid · {day(j.proPaidAt)}{j.payoutStatus === "success" ? " · by Paystack" : ""}</p>}
+                      {!j.proPaidAt && j.payoutStatus && (
+                        <p className={cn("sm:col-span-2 font-semibold", j.payoutStatus === "failed" || j.payoutStatus === "otp" ? "text-red-600" : "text-amber-700")}>
+                          {j.payoutStatus === "failed" ? "Paystack payout failed" : j.payoutStatus === "otp" ? "Paystack payout waiting for an OTP" : "Paystack payout on its way"}
+                          {j.payoutError ? ` · ${j.payoutError}` : ""}
+                        </p>
+                      )}
                       {j.status === "completed" && !j.proPaidAt && j.proId && (
                         <p className="sm:col-span-2 rounded-lg bg-emerald-50 px-3 py-2 text-emerald-900">
                           {payouts.get(j.proId) ? (
-                            <>Pay <span className="font-bold">{formatMoney(j.proPayout)}</span> to <span className="font-semibold">{payouts.get(j.proId)!.accountName}</span> · {payouts.get(j.proId)!.bankName} · <span className="font-mono font-bold tracking-wider">{payouts.get(j.proId)!.accountNumber}</span></>
+                            <>Pay <span className="font-bold">{formatMoney(j.proPayout)}</span> to <span className="font-semibold">{payouts.get(j.proId)!.accountName}</span> · {payouts.get(j.proId)!.bankName} · <span className="font-mono font-bold tracking-wider">{payouts.get(j.proId)!.accountNumber}</span>{payouts.get(j.proId)!.recipientCode ? <span className="ml-1.5 font-semibold text-emerald-700">· verified by Paystack</span> : <span className="ml-1.5 text-emerald-900/70">· not verified, pay by hand</span>}</>
                           ) : (
                             <>No bank details yet. Ask the pro to add them under Profile → Where we pay you.</>
                           )}
@@ -172,6 +184,8 @@ async function Content() {
                           paymentClaimed={!!j.paymentClaimedAt}
                           pros={optionsFor(j)}
                           proPrice={preferred?.u.hourlyRate ?? 0}
+                          canPaystack={paystack && !!j.paidAt && !!(j.proId && payouts.get(j.proId)?.recipientCode)}
+                          payoutBusy={j.payoutStatus === "sending" || j.payoutStatus === "pending"}
                         />
                       </div>
                     )}

@@ -6,6 +6,7 @@ import { refresh, updateTag } from "next/cache";
 import { after } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { adminAuth, db } from "@/lib/firebase-admin";
+import { createRecipient, listBanks, paystackReady, resolveAccount } from "@/lib/paystack";
 import { createSession, destroySession, getCurrentUser, getSessionUid, requireUser } from "@/lib/auth";
 import { markNotificationsRead, notify } from "@/lib/notify";
 import { isCategory, SKILL_LEVELS, type RequestStatus } from "@/lib/categories";
@@ -963,8 +964,36 @@ export async function setVerifiedAsAction(userId: string, kind: "individual" | "
 /** Pro: where findMe should send their pay (their share of each job). */
 export async function savePayoutAction(_: FormState, fd: FormData): Promise<FormState> {
   const user = await requireUser();
-  const bankName = str(fd, "bankName", 60);
   const accountNumber = str(fd, "accountNumber", 20).replace(/\D/g, "");
+  const bankCode = str(fd, "bankCode", 20);
+
+  // With Paystack: the bank confirms the account name, and the account is saved with Paystack
+  // so findMe can pay it automatically.
+  if (bankCode && paystackReady()) {
+    const bank = (await listBanks().catch(() => [])).find((b) => b.code === bankCode);
+    const fieldErrors: Record<string, string> = {};
+    if (!bank) fieldErrors.bankCode = "Choose your bank from the list.";
+    if (!/^\d{10}$/.test(accountNumber)) fieldErrors.accountNumber = "Nigerian account numbers have 10 digits.";
+    if (Object.keys(fieldErrors).length) return { fieldErrors };
+    let accountName: string;
+    try {
+      accountName = await resolveAccount(accountNumber, bankCode);
+    } catch {
+      return { fieldErrors: { accountNumber: `We couldn't find this account at ${bank!.name}. Check the number and bank.` } };
+    }
+    let recipientCode: string;
+    try {
+      recipientCode = await createRecipient({ name: accountName, accountNumber, bankCode });
+    } catch {
+      return { error: "Your account was found, but we couldn't save it with our payment provider. Try again in a minute." };
+    }
+    const now = Date.now();
+    await db().collection("payouts").doc(user.id).set({ bankName: bank!.name, bankCode, accountNumber, accountName, recipientCode, verifiedAt: now, updatedAt: now } satisfies PayoutDoc);
+    refresh();
+    return { ok: true, message: `Bank account confirmed: ${accountName}` };
+  }
+
+  const bankName = str(fd, "bankName", 60);
   const accountName = str(fd, "accountName", 80);
   const fieldErrors: Record<string, string> = {};
   if (bankName.length < 2) fieldErrors.bankName = "Choose or type your bank.";

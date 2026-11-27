@@ -5,7 +5,8 @@ import { notify } from "./notify";
 import { emailAdmins } from "./admin";
 import { AUTO_CONFIRM_MS } from "./jobs";
 import type { JobDoc } from "./schema";
-import type { PaystackTx } from "./paystack";
+import { autoPayoutsOn, type PaystackTx } from "./paystack";
+import { sendProPayout } from "./payouts";
 
 const naira = (n: number) => new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", currencyDisplay: "narrowSymbol", maximumFractionDigits: 0 }).format(n);
 
@@ -44,10 +45,14 @@ export async function completeBrokerJob(id: string, by: "client" | "auto"): Prom
     href,
     cta: "View job",
   });
+  // Automatic payouts: Paystack sends the pro's share now. If it can't, an admin is emailed below.
+  const auto = autoPayoutsOn() ? await sendProPayout(id).catch((e) => ({ error: (e as Error).message } as { ok?: true; error?: string })) : null;
+  if (auto?.ok) return true;
+
   await emailAdmins({
     subject: `Pay the pro: ${naira(job.proPayout)} for "${job.title}"`,
     title: "A job is complete. Time to pay the pro",
-    body: `${by === "auto" ? "Confirmed automatically after 3 days." : "The client confirmed it's done."} Pay the pro ${naira(job.proPayout)} (client paid ${naira(job.price)}), then mark it paid.`,
+    body: `${by === "auto" ? "Confirmed automatically after 3 days." : "The client confirmed it's done."} Pay the pro ${naira(job.proPayout)} (client paid ${naira(job.price)}), then mark it paid.${auto?.error ? ` Automatic payout didn't go: ${auto.error}` : ""}`,
     href: `/admin/jobs#${id}`,
     cta: "Open job",
   }).catch(() => {});

@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { db } from "@/lib/firebase-admin";
 import type { PayoutDoc } from "@/lib/schema";
 import { PayoutForm } from "./payout-form";
+import { listBanks, paystackReady } from "@/lib/paystack";
 import type { Metadata } from "next";
 import { Briefcase } from "lucide-react";
 import { requireUser } from "@/lib/auth";
@@ -35,6 +36,7 @@ async function Content({ searchParams }: { searchParams: PageProps<"/dashboard/p
     getNinStatus(user.id),
     db().collection("payouts").doc(user.id).get().then((d) => (d.data() as PayoutDoc | undefined) ?? null),
   ]);
+  const banks = user.role === "provider" && paystackReady() ? await listBanks().catch(() => null) : null;
   // Arrived from the Hiring/Working switch without a pro profile yet.
   const setup = sp.setup === "1" && user.role !== "provider";
   return (
@@ -56,7 +58,7 @@ async function Content({ searchParams }: { searchParams: PageProps<"/dashboard/p
         <ProfileForm profile={profile} startListed={setup} />
         <div className="space-y-6 lg:sticky lg:top-10">
           {(nin.verified || ninChecksEnabled()) && <VerifyNinCard verified={nin.verified} last4={nin.last4} lastError={nin.lastError} isPro={user.role === "provider"} />}
-          {user.role === "provider" && <PayoutForm current={payout ? { bankName: payout.bankName, accountNumber: payout.accountNumber, accountName: payout.accountName } : null} />}
+          {user.role === "provider" && <PayoutForm banks={banks} current={payout ? { bankName: payout.bankName, bankCode: payout.bankCode ?? "", accountNumber: payout.accountNumber, accountName: payout.accountName, verified: !!payout.recipientCode } : null} />}
           <SkillsManager skills={profile.skills} />
         </div>
       </div>

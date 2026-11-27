@@ -11,6 +11,7 @@ import { emailAdmins, isAdmin } from "@/lib/admin";
 import { isCategory, categoryName } from "@/lib/categories";
 import { formatNgPhone, normalizeNgPhone } from "@/lib/phone";
 import { MIN_JOB_PRICE, proPayoutFor } from "@/lib/fees";
+import { markProPaid, sendProPayout } from "@/lib/payouts";
 import { CATALOG_TAG } from "@/lib/queries";
 import { completeBrokerJob } from "@/lib/broker";
 import { paystackReady, startPayment } from "@/lib/paystack";
@@ -305,15 +306,20 @@ export async function markProPaidAction(jobId: string): Promise<{ ok?: true; err
   }
   const { ref, job } = await loadJob(jobId);
   if (!job || job.status !== "completed" || !job.proId) return { error: "Pay the pro once the client has confirmed the job." };
-  await ref.update({ proPaidAt: Date.now(), updatedAt: Date.now() });
-  await notify({
-    userId: job.proId,
-    kind: "status",
-    title: `You've been paid ${naira(job.proPayout)}`,
-    body: `findMe has sent your payment for "${job.title}". Thanks for doing great work!`,
-    href: jobHref(ref.id),
-    cta: "View job",
-  });
+  if (job.payoutStatus === "sending" || job.payoutStatus === "pending") return { error: "Paystack is already sending this payout. Wait for it to finish before marking it paid by hand." };
+  await markProPaid(ref.id, "manual");
+  return ok();
+}
+
+/** Admin: pay the pro their share now through Paystack. */
+export async function sendPayoutAction(jobId: string): Promise<{ ok?: true; error?: string }> {
+  try {
+    await requireAdmin();
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+  const res = await sendProPayout(safeId(jobId));
+  if (res.error) return { error: res.error };
   return ok();
 }
 

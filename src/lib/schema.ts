@@ -199,7 +199,13 @@ export type JobDoc = {
   assignedAt?: number;
   doneRequestedAt?: number; // pro said it's done; client confirms or it auto-confirms
   completedAt?: number;
-  proPaidAt?: number; // admin paid the pro
+  proPaidAt?: number; // the pro has been paid (by Paystack transfer or by hand)
+  /** Paystack payout to the pro: where it stands, its reference and any error. */
+  payoutStatus?: "sending" | "pending" | "otp" | "success" | "failed";
+  payoutRef?: string;
+  payoutAttempts?: number;
+  payoutStartedAt?: number;
+  payoutError?: string;
   cancelledAt?: number;
   reviewed?: boolean;
   adminNote?: string;
@@ -208,7 +214,16 @@ export type JobDoc = {
 };
 
 /** payouts/{uid}: where findMe sends a pro's pay. Private: only the pro and admins see it. */
-export type PayoutDoc = { bankName: string; accountNumber: string; accountName: string; updatedAt: number };
+export type PayoutDoc = {
+  bankName: string;
+  accountNumber: string;
+  accountName: string;
+  updatedAt: number;
+  /** Set once Paystack has confirmed the account: findMe can then pay it automatically. */
+  bankCode?: string;
+  recipientCode?: string;
+  verifiedAt?: number;
+};
 
 /**
  * recovery_requests/{id}: someone who can't get into their email asks findMe to call them.

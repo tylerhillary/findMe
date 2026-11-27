@@ -1,5 +1,6 @@
 import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { cacheLife } from "next/cache";
 
 /**
  * Paystack (https://paystack.com): clients pay findMe by card, bank transfer or USSD on Paystack's
@@ -48,3 +49,59 @@ export function jobIdOf(tx: PaystackTx) {
   const meta = typeof tx.metadata === "string" ? (() => { try { return JSON.parse(tx.metadata) as { jobId?: string }; } catch { return null; } })() : tx.metadata;
   return meta?.jobId || tx.reference.split("-")[1] || "";
 }
+
+/* ───────────── Paying pros (Paystack Transfers) ─────────────
+ * Money goes out of findMe's Paystack balance to the pro's bank account.
+ * For it to send without a code each time, turn off "Confirm transfers before sending"
+ * (OTP) in Paystack: Settings → Preferences → Transfers.
+ */
+
+export type PaystackBank = { name: string; code: string };
+
+/** Nigerian banks Paystack can pay into, A–Z. */
+export async function listBanks(): Promise<PaystackBank[]> {
+  "use cache";
+  cacheLife("days");
+  const banks = await call<{ name: string; code: string; active: boolean; is_deleted?: boolean }[]>("/bank?country=nigeria&currency=NGN&perPage=200");
+  const seen = new Set<string>();
+  return banks
+    .filter((b) => b.active && !b.is_deleted && !seen.has(b.code) && seen.add(b.code))
+    .map((b) => ({ name: b.name, code: b.code }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** The real name on a bank account, straight from the bank. Throws if the account doesn't exist. */
+export async function resolveAccount(accountNumber: string, bankCode: string) {
+  const d = await call<{ account_name: string; account_number: string }>(
+    `/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(bankCode)}`,
+  );
+  return d.account_name;
+}
+
+/** Saves the account with Paystack so we can pay it; returns the recipient code. */
+export async function createRecipient(p: { name: string; accountNumber: string; bankCode: string }) {
+  const d = await call<{ recipient_code: string }>("/transferrecipient", {
+    method: "POST",
+    body: JSON.stringify({ type: "nuban", name: p.name, account_number: p.accountNumber, bank_code: p.bankCode, currency: "NGN" }),
+  });
+  return d.recipient_code;
+}
+
+export type PaystackTransfer = { status: string; reference: string; amount: number; transfer_code?: string; reason?: string };
+
+/**
+ * Sends naira to a recipient. The reference is fixed per job, so Paystack refuses a second
+ * transfer with it: a job can never be paid twice, even if this runs again.
+ */
+export function sendTransfer(p: { naira: number; recipient: string; reference: string; reason: string }) {
+  return call<PaystackTransfer>("/transfer", {
+    method: "POST",
+    body: JSON.stringify({ source: "balance", amount: Math.round(p.naira * 100), currency: "NGN", recipient: p.recipient, reference: p.reference, reason: p.reason }),
+  });
+}
+
+/** Asks Paystack what happened to a transfer. */
+export const checkTransfer = (reference: string) => call<PaystackTransfer>(`/transfer/verify/${encodeURIComponent(reference)}`);
+
+/** Automatic payouts are on only when PAYSTACK_AUTO_PAYOUTS=on (and Paystack is set up). */
+export const autoPayoutsOn = () => paystackReady() && process.env.PAYSTACK_AUTO_PAYOUTS?.trim().toLowerCase() === "on";
