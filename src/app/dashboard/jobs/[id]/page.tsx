@@ -9,7 +9,7 @@ import { db } from "@/lib/firebase-admin";
 import { bankDetails, getJob } from "@/lib/job-queries";
 import { jobStatusLabel } from "@/lib/job-status";
 import { AUTO_CONFIRM_MS } from "@/lib/jobs";
-import { FINDME_FEE_LABEL, findMeFeeFor } from "@/lib/fees";
+import { feeOnJob } from "@/lib/fees";
 import { categoryName } from "@/lib/categories";
 import { Avatar, cn, formatMoney } from "@/components/ui";
 import { FadeIn } from "@/components/motion";
@@ -206,13 +206,13 @@ function ClientView({ job, pro, review }: { job: Data["job"]; pro: Data["pro"]; 
 }
 
 function ProView({ job, clientTeam, hasPayout }: { job: Data["job"]; clientTeam: boolean; hasPayout: boolean }) {
-  const fee = findMeFeeFor(job.price);
+  const fee = feeOnJob(job);
   return (
     <>
       <FadeIn className="card p-5 sm:p-6">
         <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted"><Banknote className="size-4" /> Your pay</p>
         <p className="mt-1 font-display text-3xl font-extrabold tracking-tight">{formatMoney(job.proPayout)}</p>
-        <p className="mt-1 text-sm text-muted">Client price {formatMoney(job.price)} − findMe {FINDME_FEE_LABEL} ({formatMoney(fee)}). Paid by findMe once the client confirms the job is done.</p>
+        <p className="mt-1 text-sm text-muted">Client price {formatMoney(job.price)} − findMe fee {formatMoney(fee)}. Paid by findMe once the client confirms the job is done.</p>
         {!hasPayout && !job.proPaidAt && (
           <Link href="/dashboard/profile" className="mt-3 block rounded-xl bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-900 hover:bg-amber-100">
             Add your bank details so we can pay you →

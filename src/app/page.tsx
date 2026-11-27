@@ -183,7 +183,7 @@ export default function Home() {
                 points={[
                   { icon: Star, title: "Reviews count here", body: "Ratings come only from jobs completed on findMe. Off-platform work builds no reputation." },
                   { icon: TrendingUp, title: "Rank comes from results", body: "Completed jobs and good reviews move you up in search." },
-                  { icon: Wallet, title: "Just 10%", body: "findMe keeps 10% of what the client pays and pays you the rest once they confirm the job." },
+                  { icon: Wallet, title: "Just 10%", body: "findMe keeps 10% of what the client pays (min ₦1,000) and pays you the rest once they confirm the job." },
                   { icon: BadgeCheck, title: "Visible trust", body: "Your badges and job history are what win new clients." },
                 ]}
               />
@@ -199,7 +199,7 @@ export default function Home() {
           <SectionHeading
             eyebrow="Pricing"
             title="Free to ask. Free to list. Just 10%."
-            sub="Clients pay findMe the price we agree. Pros get 90% of it once the client confirms the job is done."
+            sub="Clients pay findMe the price we agree. Pros get the rest after findMe's 10% (min ₦1,000) once the client confirms the job is done."
           />
           <div className="mx-auto grid max-w-4xl gap-3 sm:gap-6 md:grid-cols-2">
             <PlanCard
@@ -214,13 +214,13 @@ export default function Home() {
               name="For pros"
               price="10%"
               per=" per job"
-              note="Free to list · you keep 90%"
+              note="Free to list · min ₦1,000 per job"
               points={["A free profile, skills and services", "findMe brings you clients and handles payment", "Your pay shown on every job before you start", "Paid by findMe once the client confirms", "Good reviews mean more jobs"]}
               cta={<a href="/mode?to=work" className={btn("primary", "md", "w-full")}>Create your free profile</a>}
             />
           </div>
           <p className="mx-auto mt-6 max-w-2xl text-center text-xs text-muted sm:text-sm">
-            Prices in naira. findMe&apos;s 10% comes out of the job price; clients never pay extra on top of the price we agree.
+            Prices in naira. findMe&apos;s 10% (at least ₦1,000 per job) comes out of the job price; clients never pay extra on top of the price we agree.
           </p>
         </section>
 

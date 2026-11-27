@@ -5,15 +5,14 @@ import { Banknote, Check, Loader2, Send, UserCheck, X } from "lucide-react";
 import { adminCancelJobAction, assignJobAction, markJobPaidAction, markProPaidAction, quoteJobAction } from "@/app/job-actions";
 import { Input, Select, btn, formatMoney } from "@/components/ui";
 import type { JobStatus } from "@/lib/schema";
+import { MIN_JOB_PRICE, findMeFeeFor, proPayoutFor } from "@/lib/fees";
 
 export type ProOption = { id: string; label: string; preferred: boolean };
 
-const FEE = 0.03;
-
 export function AdminJobControls({
-  jobId, status, price, proId, proPaid, paymentClaimed, pros, proPrice,
+  jobId, status, price, proPayout, proId, proPaid, paymentClaimed, pros, proPrice,
 }: {
-  jobId: string; status: JobStatus; price: number; proId: string | null; proPaid: boolean; paymentClaimed: boolean; pros: ProOption[]; proPrice: number;
+  jobId: string; status: JobStatus; price: number; proPayout: number; proId: string | null; proPaid: boolean; paymentClaimed: boolean; pros: ProOption[]; proPrice: number;
 }) {
   const [pending, start] = useTransition();
   const [which, setWhich] = useState<string | null>(null);
@@ -46,11 +45,13 @@ export function AdminJobControls({
               <Input type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} className="h-10 pl-7 sm:pl-8" />
             </div>
             <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note to client (optional)" className="h-10 min-w-0 flex-1" />
-            <button disabled={pending || !n} onClick={() => run("quote", () => quoteJobAction(jobId, n, note))} className={btn("primary", "sm", "h-10")}>
+            <button disabled={pending || n < MIN_JOB_PRICE} onClick={() => run("quote", () => quoteJobAction(jobId, n, note))} className={btn("primary", "sm", "h-10")}>
               {spin("quote", Send)} Send price
             </button>
           </div>
-          {n > 0 && <p className="mt-1.5 text-xs text-muted">Pro gets {formatMoney(Math.round(n * (1 - FEE)))} · findMe keeps {formatMoney(n - Math.round(n * (1 - FEE)))}</p>}
+          {n > 0 && (n < MIN_JOB_PRICE
+            ? <p className="mt-1.5 text-xs font-medium text-red-600">The lowest price findMe can quote is {formatMoney(MIN_JOB_PRICE)}.</p>
+            : <p className="mt-1.5 text-xs text-muted">Pro gets {formatMoney(proPayoutFor(n))} · findMe keeps {formatMoney(findMeFeeFor(n))}</p>)}
         </div>
       )}
 
@@ -75,8 +76,8 @@ export function AdminJobControls({
       )}
 
       {status === "completed" && !proPaid && (
-        <button disabled={pending} onClick={() => run("propaid", () => markProPaidAction(jobId), `Mark the pro as paid ${formatMoney(Math.round(price * (1 - FEE)))}?`)} className={btn("primary", "sm")}>
-          {spin("propaid", Check)} Pro paid {formatMoney(Math.round(price * (1 - FEE)))}
+        <button disabled={pending} onClick={() => run("propaid", () => markProPaidAction(jobId), `Mark the pro as paid ${formatMoney(proPayout || proPayoutFor(price))}?`)} className={btn("primary", "sm")}>
+          {spin("propaid", Check)} Pro paid {formatMoney(proPayout || proPayoutFor(price))}
         </button>
       )}
 

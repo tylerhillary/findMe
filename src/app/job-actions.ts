@@ -10,7 +10,7 @@ import { notify } from "@/lib/notify";
 import { emailAdmins, isAdmin } from "@/lib/admin";
 import { isCategory, categoryName } from "@/lib/categories";
 import { formatNgPhone, normalizeNgPhone } from "@/lib/phone";
-import { FINDME_FEE_LABEL, proPayoutFor } from "@/lib/fees";
+import { MIN_JOB_PRICE, proPayoutFor } from "@/lib/fees";
 import { CATALOG_TAG } from "@/lib/queries";
 import { completeBrokerJob } from "@/lib/broker";
 import { paystackReady, startPayment } from "@/lib/paystack";
@@ -218,6 +218,7 @@ export async function quoteJobAction(jobId: string, price: number, note: string)
   if (!job || (job.status !== "new" && job.status !== "quoted")) return { error: "You can only price a job before it's paid." };
   const amount = money(price);
   if (!amount) return { error: "Enter the price for the client." };
+  if (amount < MIN_JOB_PRICE) return { error: `The lowest price findMe can quote is ${naira(MIN_JOB_PRICE)}.` };
   await ref.update({ status: "quoted", price: amount, proPayout: proPayoutFor(amount), quotedAt: Date.now(), paymentClaimedAt: FieldValue.delete(), adminNote: String(note ?? "").slice(0, 500), updatedAt: Date.now() });
   await notify({
     userId: job.clientId,
@@ -271,7 +272,7 @@ export async function assignJobAction(jobId: string, proId: string): Promise<{ o
     userId: safeId(proId),
     kind: "request",
     title: `New job from findMe: ${job.title}`,
-    body: `${job.location}${job.when ? ` · ${job.when}` : ""}. You'll be paid ${naira(job.proPayout || proPayoutFor(job.price))} (${naira(job.price)} less findMe's ${FINDME_FEE_LABEL}) once the client confirms it's done. Open the job for the client's details.`,
+    body: `${job.location}${job.when ? ` · ${job.when}` : ""}. You'll be paid ${naira(job.proPayout || proPayoutFor(job.price))} (${naira(job.price)} less findMe's fee) once the client confirms it's done. Open the job for the client's details.`,
     href: jobHref(ref.id),
     cta: "Open job",
   });

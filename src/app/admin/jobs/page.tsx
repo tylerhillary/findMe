@@ -12,7 +12,7 @@ import { jobStatusLabel } from "@/lib/job-status";
 import { categoryName } from "@/lib/categories";
 import { formatNgPhone, telLink } from "@/lib/phone";
 import { rateSuffix, asRateUnit } from "@/lib/price";
-import { findMeFeeFor } from "@/lib/fees";
+import { feeOnJob } from "@/lib/fees";
 import type { JobDoc, PayoutDoc, UserDoc } from "@/lib/schema";
 import { cn, formatMoney } from "@/components/ui";
 import { AdminNav } from "../admin-nav";
@@ -88,7 +88,7 @@ async function Content() {
   const groups = STAGES.map((title, i) => ({ title, jobs: jobs.filter((j) => stage(j) === i) }));
   const done = jobs.filter((j) => j.status === "completed");
   const revenue = done.reduce((s, j) => s + j.price, 0);
-  const fees = done.reduce((s, j) => s + findMeFeeFor(j.price), 0);
+  const fees = done.reduce((s, j) => s + feeOnJob(j), 0);
   const owed = done.filter((j) => !j.proPaidAt).reduce((s, j) => s + j.proPayout, 0);
 
   return (
@@ -141,7 +141,7 @@ async function Content() {
                       {preferred && (
                         <p className="flex items-center gap-1"><Star className="size-3.5 text-amber-400" /> Picked: <Link href={`/pro/${preferred.id}`} className="font-semibold text-brand-700 hover:underline">{preferred.u.businessName || preferred.u.name}</Link>{preferred.u.hourlyRate ? ` (${formatMoney(preferred.u.hourlyRate)}${rateSuffix(asRateUnit(preferred.u.rateUnit))})` : ""}</p>
                       )}
-                      {j.price > 0 && <p><span className="text-muted">Price:</span> <span className="font-semibold">{formatMoney(j.price)}</span> <span className="text-muted">→ pro {formatMoney(j.proPayout)}, findMe {formatMoney(findMeFeeFor(j.price))}</span></p>}
+                      {j.price > 0 && <p><span className="text-muted">Price:</span> <span className="font-semibold">{formatMoney(j.price)}</span> <span className="text-muted">→ pro {formatMoney(j.proPayout)}, findMe {formatMoney(feeOnJob(j))}</span></p>}
                       {assigned && <p><span className="text-muted">Pro:</span> <span className="font-semibold">{assigned.u.businessName || assigned.u.name}</span>{assigned.u.phone ? <> · <a href={telLink(assigned.u.phone)} className="text-brand-700 hover:underline">{formatNgPhone(assigned.u.phone)}</a></> : null}</p>}
                       {j.paymentClaimedAt && j.status === "quoted" && <p className="font-semibold text-sky-700">Client says they paid · {day(j.paymentClaimedAt)}</p>}
                       {j.paidVia === "paystack" && <p className="font-semibold text-emerald-700">Paid on Paystack · {j.paystackRef}</p>}
@@ -165,6 +165,7 @@ async function Content() {
                           jobId={j.id}
                           status={j.status}
                           price={j.price}
+                          proPayout={j.proPayout}
                           proId={j.proId}
                           proPaid={!!j.proPaidAt}
                           paymentClaimed={!!j.paymentClaimedAt}

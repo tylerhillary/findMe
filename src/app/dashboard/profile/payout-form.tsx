@@ -19,7 +19,7 @@ export function PayoutForm({ current }: { current: { bankName: string; accountNu
     <form action={action} className="card p-5 sm:p-6">
       <Toast message={state.message} trigger={state} />
       <p className="flex items-center gap-2 font-bold"><Landmark className="size-5 text-brand-600" /> Where we pay you</p>
-      <p className="mt-1 text-sm text-muted">findMe sends your 90% here once the client confirms each job.</p>
+      <p className="mt-1 text-sm text-muted">findMe sends your pay here once the client confirms each job.</p>
       <div className="mt-4 space-y-3">
         <div>
           <Label htmlFor="bankName">Bank</Label>
