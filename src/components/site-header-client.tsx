@@ -2,11 +2,11 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { OFFER_SKILLS_HREF, SmartLink } from "./smart-link";
 import { AnimatePresence, motion } from "motion/react";
-import { LayoutDashboard, LogOut, Menu, MessageSquareText, Search, Settings, UserRound, X } from "lucide-react";
+import { ChevronRight, LayoutDashboard, LogOut, Menu, MessageSquareText, Settings, UserRound, X } from "lucide-react";
 import { SignOutForm } from "@/components/sign-out-form";
-import { SearchBar } from "./search-bar";
 import { Avatar, Logo, btn, cn } from "./ui";
 
 const LINKS = [
@@ -14,20 +14,13 @@ const LINKS = [
   { href: "/#categories", label: "Categories" },
   { href: "/#how", label: "How it works" },
   { href: "/#pricing", label: "Pricing" },
-  { href: OFFER_SKILLS_HREF, label: "Offer your skills" },
 ];
+const OFFER = { href: OFFER_SKILLS_HREF, label: "Offer your skills" };
 
 export function HeaderShell({ auth, transparent }: { auth: ReactNode; transparent?: boolean }) {
+  const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
-  const [searching, setSearching] = useState(false);
-
-  useEffect(() => {
-    if (!searching) return;
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && setSearching(false);
-    document.addEventListener("keydown", esc);
-    return () => document.removeEventListener("keydown", esc);
-  }, [searching]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -36,51 +29,57 @@ export function HeaderShell({ auth, transparent }: { auth: ReactNode; transparen
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const solid = scrolled || !transparent || open || searching;
+  useEffect(() => {
+    if (!open) return;
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("keydown", esc);
+    return () => document.removeEventListener("keydown", esc);
+  }, [open]);
+
+  const solid = scrolled || !transparent || open;
+  const isActive = (href: string) => !href.includes("#") && (pathname === href || pathname.startsWith(`${href}/`));
 
   return (
     <header className="sticky top-0 z-50">
       <div
         className={cn(
-          "transition-all duration-300",
-          solid ? "border-b border-line/70 bg-white/80 shadow-[0_1px_0_rgb(0_0_0/0.02)] backdrop-blur-xl" : "border-b border-transparent bg-transparent"
+          "transition-[background-color,border-color,box-shadow] duration-300",
+          solid ? "border-b border-line/80 bg-white/90 backdrop-blur-xl supports-[backdrop-filter]:bg-white/80" : "border-b border-transparent bg-transparent"
         )}
       >
-        <nav className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-3 px-4 sm:h-16 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-8">
+        <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8" aria-label="Main">
+          <div className="flex min-w-0 items-center gap-10">
             <Logo />
-            <ul className="hidden items-center gap-1 lg:flex">
-              {LINKS.map((l) => (
-                <li key={l.href}>
-                  <SmartLink
-                    href={l.href}
-                    className="relative rounded-full px-3.5 py-2 text-sm font-medium text-ink-soft transition-colors hover:text-brand-700"
-                  >
-                    {l.label}
-                  </SmartLink>
-                </li>
-              ))}
+            <ul className="hidden items-center gap-7 lg:flex">
+              {LINKS.map((l) => {
+                const active = isActive(l.href);
+                return (
+                  <li key={l.href}>
+                    <SmartLink
+                      href={l.href}
+                      aria-current={active ? "page" : undefined}
+                      className={cn(
+                        "relative py-2 text-[14px] font-medium transition-colors",
+                        "after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:origin-left after:rounded-full after:bg-ink after:transition-transform after:duration-200",
+                        active ? "text-ink after:scale-x-100" : "text-ink-soft after:scale-x-0 hover:text-ink"
+                      )}
+                    >
+                      {l.label}
+                    </SmartLink>
+                  </li>
+                );
+              })}
             </ul>
           </div>
           <div className="flex items-center gap-1 sm:gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setSearching((v) => !v);
-                setOpen(false);
-              }}
-              aria-label={searching ? "Close search" : "Search"}
-              aria-expanded={searching}
-              className={btn("ghost", "sm", "size-9 px-0")}
-            >
-              {searching ? <X className="size-[18px]" /> : <Search className="size-[18px]" />}
-            </button>
+            <SmartLink href={OFFER.href} className="hidden text-[14px] font-medium text-ink-soft transition-colors hover:text-ink lg:block">
+              {OFFER.label}
+            </SmartLink>
+            <span aria-hidden className="mx-3 hidden h-5 w-px bg-line lg:block" />
             {auth}
             <button
-              onClick={() => {
-                setOpen((o) => !o);
-                setSearching(false);
-              }}
+              type="button"
+              onClick={() => setOpen((o) => !o)}
               className={btn("ghost", "sm", "size-9 px-0 lg:hidden")}
               aria-label={open ? "Close menu" : "Open menu"}
               aria-expanded={open}
@@ -92,39 +91,31 @@ export function HeaderShell({ auth, transparent }: { auth: ReactNode; transparen
       </div>
 
       <AnimatePresence>
-        {searching && (
-          <motion.div
-            initial={{ opacity: 0, y: -12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
-            transition={{ duration: 0.22, ease: "easeOut" }}
-            className="absolute inset-x-0 top-14 border-b border-line bg-white/95 px-4 pb-4 pt-3 shadow-lift backdrop-blur-xl sm:top-16 sm:px-6"
-          >
-            {/* Submitting a search closes the box (also when already on /search). */}
-            <div className="mx-auto max-w-2xl" onSubmit={() => setSearching(false)}>
-              <SearchBar size="md" autoFocus />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, y: -12 }}
+            initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
-            transition={{ duration: 0.22, ease: "easeOut" }}
-            className="absolute inset-x-0 top-14 border-b border-line bg-white/95 px-3 pb-4 pt-2 shadow-lift backdrop-blur-xl sm:top-16 lg:hidden"
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            className="absolute inset-x-0 top-16 border-b border-line bg-white px-4 pb-5 pt-2 shadow-lift sm:px-6 lg:hidden"
           >
-            <ul className="space-y-1">
-              {LINKS.map((l, i) => (
-                <motion.li key={l.href} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.04 * i }}>
-                  <SmartLink href={l.href} onClick={() => setOpen(false)} className="block rounded-xl px-3 py-2.5 text-[15px] font-semibold text-ink hover:bg-brand-50">
-                    {l.label}
-                  </SmartLink>
-                </motion.li>
-              ))}
+            <ul className="divide-y divide-line">
+              {[...LINKS, OFFER].map((l) => {
+                const active = isActive(l.href);
+                return (
+                  <li key={l.href}>
+                    <SmartLink
+                      href={l.href}
+                      onClick={() => setOpen(false)}
+                      aria-current={active ? "page" : undefined}
+                      className={cn("flex items-center justify-between py-3.5 text-[15px] font-semibold", active ? "text-brand-700" : "text-ink")}
+                    >
+                      {l.label}
+                      <ChevronRight className="size-4 text-muted" />
+                    </SmartLink>
+                  </li>
+                );
+              })}
             </ul>
           </motion.div>
         )}

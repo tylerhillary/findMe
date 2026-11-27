@@ -5,11 +5,11 @@ import type { MouseEventHandler, ReactNode } from "react";
  * A Link that falls back to a plain <a> for /mode (a route handler that sets a cookie and
  * redirects). That needs a real navigation, and must never be prefetched.
  */
-export function SmartLink({ href, className, onClick, children }: { href: string; className?: string; onClick?: MouseEventHandler<HTMLAnchorElement>; children: ReactNode }) {
+export function SmartLink({ href, className, onClick, children, "aria-current": current }: { href: string; className?: string; onClick?: MouseEventHandler<HTMLAnchorElement>; children: ReactNode; "aria-current"?: "page" }) {
   if (href.startsWith("/mode")) {
-    return <a href={href} className={className} onClick={onClick}>{children}</a>;
+    return <a href={href} className={className} onClick={onClick} aria-current={current}>{children}</a>;
   }
-  return <Link href={href} className={className} onClick={onClick}>{children}</Link>;
+  return <Link href={href} className={className} onClick={onClick} aria-current={current}>{children}</Link>;
 }
 
 /** Where "Offer your skills" goes: sign-up for visitors, the Working side for signed-in people. */
