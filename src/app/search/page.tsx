@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, BadgeCheck, SearchX, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, BadgeCheck, ChevronRight, Lock, ReceiptText, SearchX, ShieldCheck, Star } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { ShowMore } from "./show-more";
@@ -9,7 +9,8 @@ import { SearchBar } from "@/components/search-bar";
 import { ProviderCard, ProviderCardSkeleton } from "@/components/provider-card";
 import { StaggerItem } from "@/components/motion";
 import { btn } from "@/components/ui";
-import { categoryName, isCategory } from "@/lib/categories";
+import { CATEGORIES, categoryName, isCategory } from "@/lib/categories";
+import { CategoryIcon } from "@/components/category-icon";
 import { NIGERIAN_STATES } from "@/lib/nigeria";
 import { searchProviders, type SearchParams } from "@/lib/queries";
 import { ResultsFrame, SearchNavProvider } from "./search-nav";
@@ -59,6 +60,7 @@ async function SearchBody({ searchParams }: { searchParams: Promise<Raw> }) {
   const matchTotal = Object.values(categoryCounts).reduce((a, b) => a + b, 0);
   const terms = (params.q ?? "").toLowerCase().split(/\s+/).filter((t) => t.length > 2);
   const filtered = !!(params.category || params.state || params.maxRate || params.minRating || params.available);
+  const intro = !params.q && !filtered;
 
   const heading = params.q ? `Results for “${params.q}”` : params.category ? categoryName(params.category) : "All professionals";
   const where = params.state ? ` in ${params.state}` : "";
@@ -66,22 +68,22 @@ async function SearchBody({ searchParams }: { searchParams: Promise<Raw> }) {
 
   return (
     <SearchNavProvider>
-      {/* Search header */}
-      <section className="relative overflow-hidden border-b border-line bg-white">
-        <div className="grid-bg pointer-events-none absolute inset-0 [mask-image:linear-gradient(to_bottom,black,transparent)]" />
-        <div className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-brand-200/40 blur-3xl" />
-        <div className="relative mx-auto max-w-7xl px-4 pb-5 pt-5 sm:px-6 sm:pb-8 sm:pt-10 lg:px-8">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-600">Find talent</p>
-          <h1 className="mt-1.5 font-display text-[1.55rem] font-extrabold leading-tight tracking-tight sm:text-4xl">Hire trusted professionals across Nigeria</h1>
-          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-muted sm:text-sm">
-            <span className="inline-flex items-center gap-1.5"><BadgeCheck className="size-4 text-brand-500" /> {totalPros} skilled {totalPros === 1 ? "pro" : "pros"}</span>
-            <span className="inline-flex items-center gap-1.5"><ShieldCheck className="size-4 text-emerald-500" /> Reviews from real jobs</span>
+      {intro ? (
+        <SearchIntro totalPros={totalPros} categoryCounts={categoryCounts} />
+      ) : (
+        <section className="border-b border-line bg-white">
+          <div className="mx-auto max-w-7xl px-4 pb-5 pt-4 sm:px-6 sm:pb-7 sm:pt-7 lg:px-8">
+            <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-[13px] text-muted">
+              <Link href="/search" className="font-medium hover:text-ink">Find talent</Link>
+              <ChevronRight className="size-3.5" />
+              <span className="truncate font-medium text-ink">{params.q ? "Search results" : params.category ? categoryName(params.category) : "Filtered results"}</span>
+            </nav>
+            <div className="mt-3 max-w-3xl sm:mt-4">
+              <SearchBar key={(params.q ?? "") + (params.category ?? "")} defaultValue={params.q ?? ""} size="md" category={params.category} />
+            </div>
           </div>
-          <div className="mt-4 max-w-3xl sm:mt-6">
-            <SearchBar key={(params.q ?? "") + (params.category ?? "")} defaultValue={params.q ?? ""} size="md" category={params.category} />
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       <div className="mx-auto max-w-7xl px-4 pb-12 pt-4 sm:px-6 sm:pb-16 sm:pt-8 lg:px-8">
         <div className="lg:grid lg:grid-cols-[264px_minmax(0,1fr)] lg:gap-8">
@@ -105,8 +107,8 @@ async function SearchBody({ searchParams }: { searchParams: Promise<Raw> }) {
             {/* Results toolbar */}
             <div className="mt-5 flex items-end justify-between gap-3 lg:mt-0">
               <div className="min-w-0">
-                <h2 className="truncate text-base font-bold sm:text-lg">{heading}</h2>
-                <p className="text-[13px] text-muted">{countLine}</p>
+                <h2 className="truncate text-lg font-bold tracking-tight sm:text-xl">{heading}</h2>
+                <p className="mt-0.5 text-[13px] text-muted">{countLine}</p>
               </div>
               <div className="flex shrink-0 items-center gap-3">
                 <PendingSpinner />
@@ -145,6 +147,7 @@ async function SearchBody({ searchParams }: { searchParams: Promise<Raw> }) {
                 </div>
               ) : (
                 <ShowMore
+                  pageSize={9}
                   key={JSON.stringify(params)}
                   className="mt-4 grid gap-3 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3"
                   items={results.map((p) => (
@@ -157,18 +160,13 @@ async function SearchBody({ searchParams }: { searchParams: Promise<Raw> }) {
             </ResultsFrame>
 
             {results.length > 0 && (
-              <div className="mt-8 flex flex-col items-start gap-4 rounded-2xl border border-line bg-white p-5 sm:mt-10 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-                <div className="flex items-start gap-3">
-                  <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-gradient text-white shadow-glow">
-                    <Sparkles className="size-5" />
-                  </span>
-                  <div>
-                    <p className="font-bold">Good at this kind of work?</p>
-                    <p className="text-sm text-ink-soft">List your skills and get requests from clients near you.</p>
-                  </div>
+              <div className="mt-10 flex flex-col items-start gap-4 border-t border-line pt-8 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-semibold">Offer this kind of work?</p>
+                  <p className="mt-0.5 text-sm text-ink-soft">Create a free profile and receive requests from clients near you.</p>
                 </div>
-                <a href="/mode?to=work" className={btn("dark", "md", "group w-full sm:w-auto")}>
-                  Offer your skills <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+                <a href="/mode?to=work" className={btn("outline", "md", "group w-full sm:w-auto")}>
+                  List your services <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
                 </a>
               </div>
             )}
@@ -176,6 +174,94 @@ async function SearchBody({ searchParams }: { searchParams: Promise<Raw> }) {
         </div>
       </div>
     </SearchNavProvider>
+  );
+}
+
+const ASSURANCES = [
+  { icon: BadgeCheck, title: "Checked professionals", body: "Phone and ID checks, shown on every profile." },
+  { icon: Lock, title: "Payment held by findMe", body: "Pros are paid only after you confirm the job is done." },
+  { icon: Star, title: "Reviews from real jobs", body: "Only clients who completed a job can leave a review." },
+  { icon: ReceiptText, title: "One clear price", body: "You get a single findMe price up front. No haggling." },
+];
+
+/** The landing view of Find talent, shown before any search or filter. */
+function SearchIntro({ totalPros, categoryCounts }: { totalPros: number; categoryCounts: Record<string, number> }) {
+  const top = [...CATEGORIES].sort((a, b) => (categoryCounts[b.slug] ?? 0) - (categoryCounts[a.slug] ?? 0)).slice(0, 6);
+  return (
+    <>
+      <section className="relative overflow-hidden bg-ink text-white">
+        <div className="pointer-events-none absolute inset-0 opacity-[0.35] [background-image:linear-gradient(to_right,rgb(255_255_255/0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgb(255_255_255/0.06)_1px,transparent_1px)] [background-size:56px_56px] [mask-image:radial-gradient(ellipse_at_top,black_20%,transparent_75%)]" />
+        <div className="pointer-events-none absolute -top-40 left-1/2 h-80 w-[48rem] -translate-x-1/2 rounded-full bg-brand-600/35 blur-[120px]" />
+        <div className="relative mx-auto max-w-7xl px-4 pb-10 pt-10 sm:px-6 sm:pb-14 sm:pt-16 lg:px-8 lg:pb-16 lg:pt-20">
+          <div className="max-w-3xl">
+            <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-brand-300">
+              <span className="h-px w-6 bg-brand-300/70" /> Find talent
+            </p>
+            <h1 className="mt-4 font-display text-[2rem] font-extrabold leading-[1.08] tracking-tight sm:text-5xl lg:text-[3.4rem]">
+              Hire trusted professionals across Nigeria.
+            </h1>
+            <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-white/65 sm:text-lg">
+              Compare checked profiles, rates and reviews from completed jobs. findMe arranges the work and holds your payment until
+              you confirm it is done.
+            </p>
+          </div>
+          <div className="mt-7 max-w-3xl sm:mt-9">
+            <SearchBar size="lg" />
+            <div className="no-scrollbar -mx-4 mt-4 flex items-center gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
+              <span className="shrink-0 text-[13px] text-white/50">Popular:</span>
+              {POPULAR.map((p) => (
+                <Link
+                  key={p}
+                  href={`/search?q=${encodeURIComponent(p)}`}
+                  className="shrink-0 rounded-full border border-white/15 px-3 py-1 text-[13px] font-medium text-white/80 transition-colors hover:border-white/40 hover:text-white"
+                >
+                  {p}
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          <dl className="mt-10 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/10 sm:mt-14 lg:grid-cols-4">
+            {ASSURANCES.map(({ icon: Icon, title, body }) => (
+              <div key={title} className="bg-ink/95 p-4 sm:p-5">
+                <dt className="flex items-center gap-2 text-[13px] font-semibold sm:text-sm">
+                  <Icon className="size-4 shrink-0 text-brand-300" /> {title}
+                </dt>
+                <dd className="mt-1.5 hidden text-xs leading-relaxed text-white/55 sm:block sm:text-[13px]">{body}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </section>
+
+      <section className="border-b border-line bg-white">
+        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+          <div className="flex items-baseline justify-between gap-4">
+            <h2 className="text-sm font-semibold text-ink">Browse by category</h2>
+            <p className="text-[13px] text-muted">
+              <span className="inline-flex items-center gap-1.5"><ShieldCheck className="size-4 text-emerald-600" /> {totalPros} {totalPros === 1 ? "professional" : "professionals"} listed</span>
+            </p>
+          </div>
+          <div className="no-scrollbar -mx-4 mt-4 flex gap-2.5 overflow-x-auto px-4 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 lg:grid-cols-6">
+            {top.map((c) => (
+              <Link
+                key={c.slug}
+                href={`/search?category=${c.slug}`}
+                className="group flex min-w-44 shrink-0 items-center gap-3 rounded-xl border border-line bg-white p-3 transition-colors hover:border-brand-300 hover:bg-brand-50/40 sm:min-w-0"
+              >
+                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-canvas text-ink-soft ring-1 ring-line transition-colors group-hover:text-brand-700">
+                  <CategoryIcon slug={c.slug} className="size-[18px]" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-[13px] font-semibold text-ink">{c.name}</span>
+                  <span className="block text-xs text-muted">{categoryCounts[c.slug] ?? 0} {(categoryCounts[c.slug] ?? 0) === 1 ? "pro" : "pros"}</span>
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+    </>
   );
 }
 

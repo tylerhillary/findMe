@@ -18,9 +18,8 @@ export function ProviderCard({ p, highlight }: { p: Card; highlight?: string[] }
   return (
     <Link
       href={`/pro/${p.id}`}
-      className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-line bg-white p-4 shadow-soft transition-all duration-300 hover:-translate-y-1.5 hover:border-brand-200 hover:shadow-lift sm:rounded-3xl sm:p-5"
+      className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-line bg-white p-4 shadow-[0_1px_2px_rgb(15_12_29/0.04)] transition-all duration-200 hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-100 sm:p-5"
     >
-      <div className="pointer-events-none absolute -right-16 -top-16 size-40 rounded-full bg-brand-100/0 blur-2xl transition-all duration-500 group-hover:bg-brand-100/80" />
       <div className="relative flex items-start gap-3 sm:gap-3.5">
         <div className="relative shrink-0">
           <Avatar name={shownName(p)} src={p.avatar} size={48} className="sm:hidden" />
@@ -32,7 +31,7 @@ export function ProviderCard({ p, highlight }: { p: Card; highlight?: string[] }
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            <h3 className="truncate text-[15px] font-bold sm:text-[17px]" title={p.businessName ? `${p.businessName} · ${p.name.split(" ")[0]}` : undefined}>{shownName(p)}</h3>
+            <h3 className="truncate text-[15px] font-semibold tracking-tight text-ink sm:text-base" title={p.businessName ? `${p.businessName} · ${p.name.split(" ")[0]}` : undefined}>{shownName(p)}</h3>
             {p.verifiedAs && <VerifiedTick kind={p.verifiedAs} compact />}
             {p.team && <TeamBadge compact />}
             {p.phoneVerified && <PhoneVerifiedBadge compact />}
@@ -45,7 +44,7 @@ export function ProviderCard({ p, highlight }: { p: Card; highlight?: string[] }
       </div>
 
       <div className="relative mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted sm:mt-4 sm:gap-x-4 sm:gap-y-1.5 sm:text-sm">
-        <Rating rating={p.rating} count={p.reviewCount} />
+        {p.reviewCount ? <Rating rating={p.rating} count={p.reviewCount} /> : <span className="text-xs font-medium text-muted">No reviews yet</span>}
         {p.location && (
           <span className="inline-flex items-center gap-1">
             <MapPin className="size-3.5" /> {p.location}
@@ -53,36 +52,36 @@ export function ProviderCard({ p, highlight }: { p: Card; highlight?: string[] }
         )}
       </div>
 
-      <div className="relative mt-3 flex flex-wrap gap-1.5 sm:mt-4">
+      <div className="relative mb-4 mt-3 flex flex-wrap gap-1.5 sm:mb-5 sm:mt-4">
         {skills.slice(0, 3).map((s) => {
           const match = hl.some((h) => s.toLowerCase().includes(h));
           return (
             <span
               key={s}
               className={cn(
-                "rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors sm:px-2.5 sm:py-1 sm:text-xs",
-                match ? "bg-brand-600 text-white" : "bg-brand-50 text-brand-700 group-hover:bg-brand-100"
+                "rounded-md px-2 py-0.5 text-[11px] font-medium sm:py-1 sm:text-xs",
+                match ? "bg-brand-50 text-brand-800 ring-1 ring-brand-200" : "bg-zinc-100 text-ink-soft"
               )}
             >
               {s}
             </span>
           );
         })}
-        {skills.length > 3 && <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-muted sm:px-2.5 sm:py-1 sm:text-xs">+{skills.length - 3} more</span>}
+        {skills.length > 3 && <span className="px-1 py-0.5 text-[11px] font-medium text-muted sm:py-1 sm:text-xs">+{skills.length - 3} more</span>}
       </div>
 
-      <div className="relative mt-4 flex items-center justify-between border-t border-line pt-3 sm:mt-5 sm:pt-4">
+      <div className="relative mt-auto flex items-end justify-between gap-3 border-t border-line pt-3 sm:pt-4">
         <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted">
           <CategoryIcon slug={p.category} className="size-3.5" /> {categoryName(p.category)}
         </span>
-        <span className="text-sm text-muted">
+        <span className="text-right text-sm text-muted">
           {p.hourlyRate > 0 ? (
             <>
-              <span className="text-[15px] font-extrabold text-ink sm:text-base">{formatMoney(p.hourlyRate)}</span>{rateSuffix(p.rateUnit)}
+              <span className="text-[15px] font-bold tabular-nums text-ink sm:text-base">{formatMoney(p.hourlyRate)}</span>{rateSuffix(p.rateUnit)}
             </>
           ) : p.startingPrice ? (
             <>
-              from <span className="font-extrabold text-ink">{formatMoney(p.startingPrice)}</span>
+              from <span className="font-bold tabular-nums text-ink">{formatMoney(p.startingPrice)}</span>
             </>
           ) : (
             "Ask for a quote"
