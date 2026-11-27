@@ -81,12 +81,13 @@ async function Content() {
   const optionsFor = (j: Job): ProOption[] =>
     pros
       .filter((p) => p.u.category === j.category || p.id === j.preferredProId || p.id === j.proId)
-      .sort((a, b) => Number(b.id === j.preferredProId) - Number(a.id === j.preferredProId) || Number(!!b.u.phoneConfirmed) - Number(!!a.u.phoneConfirmed) || b.rating - a.rating)
-      .concat(pros.filter((p) => p.u.category !== j.category && p.id !== j.preferredProId && p.id !== j.proId))
+      .concat(pros.filter((p) => j.interested?.includes(p.id) && p.u.category !== j.category && p.id !== j.preferredProId && p.id !== j.proId))
+      .sort((a, b) => Number(b.id === j.preferredProId) - Number(a.id === j.preferredProId) || Number(!!j.interested?.includes(b.id)) - Number(!!j.interested?.includes(a.id)) || Number(!!b.u.phoneConfirmed) - Number(!!a.u.phoneConfirmed) || b.rating - a.rating)
+      .concat(pros.filter((p) => p.u.category !== j.category && p.id !== j.preferredProId && p.id !== j.proId && !j.interested?.includes(p.id)))
       .map((p) => ({
         id: p.id,
         preferred: p.id === j.preferredProId,
-        label: `${p.u.businessName || p.u.name} · ${categoryName(p.u.category ?? "")}${p.u.hourlyRate ? ` · ${formatMoney(p.u.hourlyRate)}${rateSuffix(asRateUnit(p.u.rateUnit))}` : ""}${p.rating ? ` · ${p.rating.toFixed(1)}★` : ""}${p.u.phone ? ` · ${formatNgPhone(p.u.phone)}` : ""}`,
+        label: `${j.interested?.includes(p.id) ? "Can do it · " : ""}${p.u.businessName || p.u.name} · ${categoryName(p.u.category ?? "")}${p.u.hourlyRate ? ` · ${formatMoney(p.u.hourlyRate)}${rateSuffix(asRateUnit(p.u.rateUnit))}` : ""}${p.rating ? ` · ${p.rating.toFixed(1)}★` : ""}${p.u.phone ? ` · ${formatNgPhone(p.u.phone)}` : ""}`,
       }));
 
   const groups = STAGES.map((title, i) => ({ title, jobs: jobs.filter((j) => stage(j) === i) }));
@@ -146,10 +147,13 @@ async function Content() {
                     <div className="mt-3 grid gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2">
                       <p><span className="text-muted">Client:</span> <span className="font-semibold">{j.clientName}</span></p>
                       <p className="flex items-center gap-1"><Phone className="size-3.5 text-muted" /><a href={telLink(j.clientPhone)} className="font-semibold text-brand-700 hover:underline">{formatNgPhone(j.clientPhone)}</a></p>
-                      <p className="flex items-center gap-1"><MapPin className="size-3.5 text-muted" /> {j.location}</p>
+                      <p className="flex items-start gap-1"><MapPin className="mt-0.5 size-3.5 shrink-0 text-muted" /> <span>{j.street ? `${j.street}, ` : ""}{j.location}{j.landmark ? ` · near ${j.landmark}` : ""}</span></p>
                       {j.when && <p className="flex items-center gap-1"><CalendarDays className="size-3.5 text-muted" /> {j.when}</p>}
                       {preferred && (
                         <p className="flex items-center gap-1"><Star className="size-3.5 text-amber-400" /> Picked: <Link href={`/pro/${preferred.id}`} className="font-semibold text-brand-700 hover:underline">{preferred.u.businessName || preferred.u.name}</Link>{preferred.u.hourlyRate ? ` (${formatMoney(preferred.u.hourlyRate)}${rateSuffix(asRateUnit(preferred.u.rateUnit))})` : ""}</p>
+                      )}
+                      {!j.proId && !!j.interested?.length && (
+                        <p className="sm:col-span-2"><span className="text-muted">Pros who said they can do it:</span> {j.interested.map((id) => proById.get(id)).filter((p) => !!p).map((p, i) => <span key={p.id}>{i > 0 && ", "}<Link href={`/pro/${p.id}`} className="font-semibold text-brand-700 hover:underline">{p.u.businessName || p.u.name}</Link>{p.u.phone ? ` (${formatNgPhone(p.u.phone)})` : ""}</span>)}</p>
                       )}
                       {j.price > 0 && <p><span className="text-muted">Price:</span> <span className="font-semibold">{formatMoney(j.price)}</span> <span className="text-muted">→ pro {formatMoney(j.proPayout)}, findMe {formatMoney(feeOnJob(j))}</span></p>}
                       {assigned && <p><span className="text-muted">Pro:</span> <span className="font-semibold">{assigned.u.businessName || assigned.u.name}</span>{assigned.u.phone ? <> · <a href={telLink(assigned.u.phone)} className="text-brand-700 hover:underline">{formatNgPhone(assigned.u.phone)}</a></> : null}</p>}

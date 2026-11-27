@@ -4,6 +4,9 @@ import Link from "next/link";
 import {
   ArrowRight,
   BellRing,
+  CalendarDays,
+  ListChecks,
+  Users,
   Briefcase,
   CheckCircle2,
   Circle,
@@ -24,13 +27,20 @@ import {
 import { requireUser } from "@/lib/auth";
 import { getMode } from "@/lib/mode";
 import { CATEGORIES } from "@/lib/categories";
-import { getNow, getMyProfile, getMyServices, type MyService } from "@/lib/queries";
-import { getMyJobs, type JobWithId } from "@/lib/job-queries";
+import { getNow, getMyProfile, getMyServices, searchProviders, type MyService, type ProviderCard as ProCard } from "@/lib/queries";
+import { getMyJobs, getOpenJobsFor, type JobWithId, type OpenJob } from "@/lib/job-queries";
+import { nearness, placeLabel, type Place } from "@/lib/lgas";
+import { categoryName } from "@/lib/categories";
+import { ProviderCard } from "@/components/provider-card";
+import { OfferButton } from "./offer-button";
+import { BioPrompt } from "./bio-prompt";
+import { MIN_BIO } from "@/lib/bio";
 import { jobStatusLabel } from "@/lib/job-status";
 import { Avatar, btn, cn, formatMoney, timeAgo } from "@/components/ui";
 import { CategoryIcon } from "@/components/category-icon";
 import { FadeIn } from "@/components/motion";
 import { WelcomeBanner } from "./welcome-banner";
+import { ModeChip } from "./mode-switch";
 import { ExpectCallCard, PhoneVerifiedCard } from "./expect-call-card";
 import { getCallCode, isAdmin } from "@/lib/admin";
 import { verifyWhatsApp, whatsappLink } from "@/lib/phone";
@@ -67,10 +77,19 @@ async function Overview({ searchParams }: { searchParams: Promise<Record<string,
     getNow(),
   ]);
   // One account does both; the Hiring/Working switch decides which side this page shows.
-  const isPro = (await getMode(user)) === "work";
+  const mode = await getMode(user);
+  const isPro = mode === "work";
   const needsCall = !!profile.phone && !profile.phone_verified;
   const [callCode, admin] = await Promise.all([needsCall ? getCallCode(user.id) : null, isAdmin(user.id, user.email)]);
   const first = user.name.split(" ")[0];
+  // Working side: requests that need a pro like them. Hiring side: pros free to take work near them.
+  // Your own LGA first; the buttons add the rest of your state (?wider=state), then everywhere (?wider=all).
+  const wider: Wider = sp.wider === "all" ? "all" : sp.wider === "state" ? "state" : "none";
+  const place: Place = { state: profile.state, lga: profile.lga };
+  const [open, nearby] = await Promise.all([
+    isPro ? getOpenJobsFor(user.id, [profile.category, ...services.map((s) => s.category)], place) : null,
+    isPro ? null : availablePros(user.id, place, asked[0]?.category),
+  ]);
 
   const hour = Number(new Intl.DateTimeFormat("en-NG", { timeZone: TZ, hour: "numeric", hourCycle: "h23" }).format(now));
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
@@ -113,6 +132,7 @@ async function Overview({ searchParams }: { searchParams: Promise<Record<string,
   return (
     <div className="space-y-5 sm:space-y-6">
       {sp.welcome === "1" && <WelcomeBanner name={first} isPro={isPro} />}
+      {isPro && profile.bio.trim().length < MIN_BIO && <BioPrompt name={profile.name} avatar={profile.avatar} headline={profile.headline} bio={profile.bio} />}
       {admin && (
         <div className="grid gap-3 sm:grid-cols-3">
           <Link href="/admin/jobs" className="card flex items-center justify-between gap-3 p-4 text-sm font-semibold hover:border-brand-300 sm:px-6">
@@ -135,10 +155,16 @@ async function Overview({ searchParams }: { searchParams: Promise<Record<string,
       {/* Page header */}
       <FadeIn className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
         <div className="min-w-0">
-          <p className="text-[13px] font-medium text-muted">{today}</p>
-          <h1 className="mt-0.5 font-display text-[1.5rem] font-extrabold leading-tight tracking-tight sm:text-[2rem]">
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <ModeChip mode={mode} />
+            <p className="text-[13px] font-medium text-muted">{today}</p>
+          </div>
+          <h1 className="mt-2 font-display text-[1.5rem] font-extrabold leading-tight tracking-tight sm:text-[2rem]">
             {greeting}, {first}
           </h1>
+          <p className="mt-1 text-sm text-ink-soft">
+            {isPro ? "Your jobs, services and earnings as a pro." : "The pros you've asked findMe to book for you."}
+          </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {isPro ? (
@@ -198,16 +224,20 @@ async function Overview({ searchParams }: { searchParams: Promise<Record<string,
               )}
             >
               <div className="flex items-center justify-between gap-2">
-                <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-muted sm:text-xs">{k.label}</p>
+                <p className="truncate text-[13px] font-medium text-ink-soft">{k.label}</p>
                 <span className={cn("grid size-7 shrink-0 place-items-center rounded-lg", k.tint)}>
                   <k.icon className="size-3.5" />
                 </span>
               </div>
-              <p className="mt-2 truncate text-[1.4rem] font-extrabold tracking-tight tabular-nums sm:mt-3 sm:text-[1.75rem]">{k.value}</p>
+              <p className="mt-2 truncate font-display text-[1.5rem] font-bold tracking-tight tabular-nums sm:mt-3 sm:text-[1.85rem]">{k.value}</p>
               <p className="mt-0.5 truncate text-xs text-muted sm:text-[13px]">{k.sub}</p>
             </Link>
           ))}
         </section>
+      </FadeIn>
+
+      <FadeIn delay={0.08}>
+        {open ? <ClientsWhoNeedYou {...open} wider={wider} hasCategory={!!profile.category || services.length > 0} /> : nearby && <AvailablePros {...nearby} wider={wider} />}
       </FadeIn>
 
       <div className="grid items-start gap-5 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_320px] [&>*]:min-w-0">
@@ -253,14 +283,16 @@ function PanelLink({ href, children }: { href: string; children: ReactNode }) {
 
 function EmptyState({ icon: Icon, title, body, cta }: { icon: LucideIcon; title: string; body: string; cta?: { href: string; label: string } }) {
   return (
-    <div className="px-5 py-10 text-center sm:py-12">
-      <span className="mx-auto grid size-11 place-items-center rounded-xl bg-brand-50 text-brand-600">
-        <Icon className="size-5" />
+    <div className="flex flex-col items-start gap-4 px-4 py-6 sm:flex-row sm:items-center sm:px-5">
+      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-zinc-100 text-ink-soft">
+        <Icon className="size-[18px]" />
       </span>
-      <p className="mt-3 font-semibold">{title}</p>
-      <p className="mx-auto mt-1 max-w-xs text-sm text-muted">{body}</p>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold">{title}</p>
+        <p className="mt-0.5 text-[13px] text-muted">{body}</p>
+      </div>
       {cta && (
-        <Link href={cta.href} className={btn("secondary", "sm", "mt-4")}>
+        <Link href={cta.href} className={btn("outline", "sm", "shrink-0")}>
           {cta.label}
         </Link>
       )}
@@ -269,6 +301,199 @@ function EmptyState({ icon: Icon, title, body, cta }: { icon: LucideIcon; title:
 }
 
 /* ───────────────────────── sections ───────────────────────── */
+
+type Wider = "none" | "state" | "all";
+type Tiers<T> = { near: T[]; sameState: T[]; far: T[]; place: Place };
+
+/** Available pros, split by distance from the client: their LGA, the rest of their state, elsewhere. */
+async function availablePros(uid: string, place: Place, lastCategory?: string): Promise<Tiers<ProCard>> {
+  const { results } = await searchProviders({ available: true });
+  const out: Tiers<ProCard> = { near: [], sameState: [], far: [], place };
+  // Within each group, the category they last asked for comes first; otherwise search's own order.
+  results
+    .filter((p) => p.id !== uid)
+    .map((p, i) => ({ p, i }))
+    .sort((a, b) => Number(b.p.category === lastCategory) - Number(a.p.category === lastCategory) || a.i - b.i)
+    .forEach(({ p }) => {
+      const n = nearness(place, p);
+      // Without an LGA on one side, the whole state counts as near.
+      const bucket = n === "same_lga" || n === "unknown" || (n === "same_state" && !(place.lga && p.lga)) ? out.near : n === "same_state" ? out.sameState : out.far;
+      if (bucket.length < 48) bucket.push(p);
+    });
+  return out;
+}
+
+/** The buttons under a list: show the rest of the state, then everywhere, or go back to just your area. */
+function WiderButtons({ wider, place, sameState, far, noun }: { wider: Wider; place: Place; sameState: number; far: number; noun: string }) {
+  if (!place.state) return null;
+  const n = (k: number) => `${k} ${noun}${k === 1 ? "" : "s"}`;
+  const showState = wider === "none" && !!place.lga && sameState > 0;
+  const showAll = wider !== "all" && far > 0 && !showState;
+  if (!showState && !showAll && wider === "none") return null;
+  return (
+    <div className="flex flex-col items-center gap-2 border-t border-line px-4 py-4 text-center">
+      <div className="flex flex-wrap justify-center gap-2">
+        {showState && (
+          <Link href="/dashboard?wider=state" scroll={false} className={btn("outline", "sm")}>
+            Show {n(sameState)} elsewhere in {place.state} <ArrowRight className="size-3.5" />
+          </Link>
+        )}
+        {showAll && (
+          <Link href="/dashboard?wider=all" scroll={false} className={btn("outline", "sm")}>
+            Show {n(far)} outside {place.state} <ArrowRight className="size-3.5" />
+          </Link>
+        )}
+        {wider !== "none" && (
+          <Link href="/dashboard" scroll={false} className={btn("ghost", "sm")}>
+            <MapPin className="size-3.5" /> Only show {place.lga ?? place.state}
+          </Link>
+        )}
+      </div>
+      {(showState || showAll) && <p className="text-[12px] text-muted">They&apos;re further from you, so travel may take longer or cost more.</p>}
+    </div>
+  );
+}
+
+function AreaHeading({ children }: { children: ReactNode }) {
+  return <p className="border-t border-line bg-zinc-50/70 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted sm:px-5">{children}</p>;
+}
+
+function NoLocation({ place, what }: { place: Place; what: string }) {
+  if (place.state && place.lga) return null;
+  return (
+    <p className="flex items-center gap-2 border-b border-line bg-amber-50/70 px-4 py-2.5 text-[12.5px] text-amber-900 sm:px-5">
+      <MapPin className="size-3.5 shrink-0" />
+      <span className="flex-1">{place.state ? `Add your local government to see ${what} closest to you first.` : `Add your state and local government to see ${what} near you first.`}</span>
+      <Link href="/dashboard/profile" className="font-semibold underline underline-offset-2">Add it</Link>
+    </p>
+  );
+}
+
+function ProGrid({ pros }: { pros: ProCard[] }) {
+  return (
+    <div className="grid gap-3 p-3 sm:grid-cols-2 sm:gap-4 sm:p-4 xl:grid-cols-3">
+      {pros.map((p) => (
+        <ProviderCard key={p.id} p={p} />
+      ))}
+    </div>
+  );
+}
+
+/** The list, then (when asked for) the rest of the state, then everywhere else, under headings. */
+function TieredList<T>({ tiers, wider, render }: { tiers: Tiers<T>; wider: Wider; render: (items: T[]) => ReactNode }) {
+  const { place, sameState, far } = tiers;
+  const showState = wider !== "none" && sameState.length > 0;
+  const showFar = wider === "all" && far.length > 0;
+  return (
+    <>
+      {showState && (
+        <>
+          <AreaHeading>Elsewhere in {place.state}</AreaHeading>
+          {render(sameState)}
+        </>
+      )}
+      {showFar && (
+        <>
+          <AreaHeading>Outside {place.state}</AreaHeading>
+          {render(far)}
+        </>
+      )}
+    </>
+  );
+}
+
+function AvailablePros({ wider, ...tiers }: Tiers<ProCard> & { wider: Wider }) {
+  const { near, place } = tiers;
+  const where = placeLabel(place);
+  return (
+    <Panel
+      title={place.lga ? `Pros available in ${place.lga}` : place.state ? `Pros available in ${place.state}` : "Pros available for you"}
+      action={<PanelLink href={place.state ? `/search?state=${encodeURIComponent(place.state)}&available=1` : "/search?available=1"}>Search</PanelLink>}
+    >
+      <NoLocation place={place} what="pros" />
+      {near.length === 0 ? (
+        <EmptyState
+          icon={Users}
+          title={where ? `No pros free in ${place.lga ?? place.state} yet` : "No pros free right now"}
+          body={where ? "We're adding pros in more places. Tell findMe what you need and we'll find someone who can come to you." : "Tell findMe what you need and we'll find someone for you."}
+          cta={{ href: "/request", label: "Request a service" }}
+        />
+      ) : (
+        <ProGrid pros={near} />
+      )}
+      <TieredList tiers={tiers} wider={wider} render={(pros) => <ProGrid pros={pros} />} />
+      <WiderButtons wider={wider} place={place} sameState={tiers.sameState.length} far={tiers.far.length} noun="pro" />
+    </Panel>
+  );
+}
+
+function OpenJobRows({ jobs }: { jobs: OpenJob[] }) {
+  return (
+    <ul className="divide-y divide-line">
+      {jobs.map((j) => (
+        <li key={j.id} className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:px-5">
+          <span className="hidden size-10 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-700 sm:grid">
+            <CategoryIcon slug={j.category} className="size-[18px]" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold">
+              <span className="truncate">{j.title}</span>
+              {j.askedForYou && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700 ring-1 ring-inset ring-amber-200">Asked for you</span>}
+            </p>
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12.5px] text-muted">
+              <span>{categoryName(j.category)}</span>
+              <span className="inline-flex items-center gap-1"><MapPin className="size-3" />{j.area}</span>
+              {j.when && <span className="inline-flex items-center gap-1"><CalendarDays className="size-3" />{j.when}</span>}
+              {j.requirements > 0 && <span className="inline-flex items-center gap-1"><ListChecks className="size-3" />{j.requirements} requirement{j.requirements === 1 ? "" : "s"}</span>}
+            </p>
+          </div>
+          <div className="flex items-center justify-between gap-3 sm:justify-end">
+            <p className="text-right text-[12.5px] leading-tight text-muted">
+              {j.pay ? <><span className="block text-sm font-bold tabular-nums text-ink">{formatMoney(j.pay)}</span>your pay</> : "Price coming"}
+            </p>
+            <OfferButton jobId={j.id} offered={j.offered} />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ClientsWhoNeedYou({ wider, hasCategory, ...tiers }: Tiers<OpenJob> & { wider: Wider; hasCategory: boolean }) {
+  const { near, place, sameState, far } = tiers;
+  const area = place.lga ?? place.state;
+  const shown = near.length + (wider !== "none" ? sameState.length : 0) + (wider === "all" ? far.length : 0);
+  return (
+    <Panel
+      title={area ? `Clients in ${area} who need you` : "Clients who need you"}
+      action={near.length > 0 && <span className="text-[12.5px] text-muted">Matching what you do</span>}
+    >
+      {!hasCategory ? (
+        <EmptyState icon={Users} title="Pick what you do" body="Choose your category on your profile so we can show you clients who need it." cta={{ href: "/dashboard/profile", label: "Edit profile" }} />
+      ) : (
+        <>
+          <NoLocation place={place} what="clients" />
+          {near.length === 0 ? (
+            <EmptyState
+              icon={Users}
+              title={area ? `No open requests in ${area} right now` : "No open requests for you right now"}
+              body={`When a client${area ? ` in ${area}` : ""} asks for what you do, it shows here and you can tell findMe you can do it.`}
+            />
+          ) : (
+            <OpenJobRows jobs={near} />
+          )}
+          <TieredList tiers={tiers} wider={wider} render={(jobs) => <OpenJobRows jobs={jobs} />} />
+          <WiderButtons wider={wider} place={place} sameState={sameState.length} far={far.length} noun="request" />
+          {shown > 0 && (
+            <p className="border-t border-line bg-zinc-50/70 px-4 py-2.5 text-[12px] text-muted sm:px-5">
+              Tap &ldquo;I can do this&rdquo; and findMe will consider you. If we pick you, the job and the client&apos;s number appear in your jobs.
+            </p>
+          )}
+        </>
+      )}
+    </Panel>
+  );
+}
 
 function RecentJobs({ jobs, now, isPro }: { jobs: JobWithId[]; now: number; isPro: boolean }) {
   const rows = jobs.slice(0, 5);
@@ -372,7 +597,7 @@ function ProfilePanel({ profile, services }: { profile: Profile; services: MySer
   const steps = [
     { done: !!profile.phone, label: "Add your phone or business line", href: "/dashboard/profile" },
     { done: profile.headline.length > 5, label: "Write a headline", href: "/dashboard/profile" },
-    { done: profile.bio.length > 40, label: "Tell people about yourself", href: "/dashboard/profile" },
+    { done: profile.bio.trim().length >= MIN_BIO, label: "Tell people about yourself", href: "/dashboard/profile" },
     { done: profile.skills.length >= 3, label: "List at least 3 skills", href: "/dashboard/profile" },
     { done: services.length > 0, label: "Publish your first service", href: "/dashboard/services?new=1" },
     { done: !!profile.avatar, label: "Add a profile photo", href: "/dashboard/profile" },
@@ -383,15 +608,12 @@ function ProfilePanel({ profile, services }: { profile: Profile; services: MySer
 
   return (
     <section className="card overflow-hidden rounded-2xl">
-      <div className="relative h-16 bg-brand-gradient">
-        <div className="grid-bg absolute inset-0 opacity-30" />
-      </div>
-      <div className="px-4 pb-4 sm:px-5 sm:pb-5">
-        <div className="relative -mt-8 flex items-end justify-between gap-3">
-          <Avatar name={profile.name} src={profile.avatar} size={64} ring />
+      <div className="p-4 sm:p-5">
+        <div className="flex items-start justify-between gap-3">
+          <Avatar name={profile.name} src={profile.avatar} size={56} />
           <span
             className={cn(
-              "mb-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset",
+              "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset",
               profile.available ? "bg-emerald-50 text-emerald-700 ring-emerald-200" : "bg-zinc-100 text-zinc-600 ring-zinc-200"
             )}
           >
@@ -399,7 +621,7 @@ function ProfilePanel({ profile, services }: { profile: Profile; services: MySer
             {profile.available ? "Available" : "Busy"}
           </span>
         </div>
-        <p className="mt-2.5 truncate text-base font-bold">{profile.name}</p>
+        <p className="mt-3 truncate text-base font-bold">{profile.name}</p>
         <p className="truncate text-[13px] text-ink-soft">{profile.headline || "Add a headline so clients know what you do"}</p>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-muted">
           <span className="inline-flex items-center gap-1">
@@ -422,10 +644,10 @@ function ProfilePanel({ profile, services }: { profile: Profile; services: MySer
         <div className="mt-4 rounded-xl bg-canvas p-3">
           <div className="flex items-center justify-between text-[13px]">
             <span className="font-semibold">Profile strength</span>
-            <span className="font-bold tabular-nums text-brand-700">{pct}%</span>
+            <span className="font-bold tabular-nums text-emerald-700">{pct}%</span>
           </div>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-brand-100">
-            <div className="h-full rounded-full bg-brand-gradient transition-all duration-700" style={{ width: `${pct}%` }} />
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-zinc-200">
+            <div className="h-full rounded-full bg-emerald-500 transition-all duration-700" style={{ width: `${pct}%` }} />
           </div>
           {next.length > 0 ? (
             <ul className="mt-2.5 space-y-0.5">
@@ -451,7 +673,7 @@ function ProfilePanel({ profile, services }: { profile: Profile; services: MySer
             <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">Skills</p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {profile.skills.slice(0, 6).map((s) => (
-                <span key={s.id} className="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700">
+                <span key={s.id} className="rounded-md bg-zinc-100 px-2 py-1 text-xs font-medium text-ink-soft">
                   {s.name}
                 </span>
               ))}
@@ -464,7 +686,7 @@ function ProfilePanel({ profile, services }: { profile: Profile; services: MySer
           <Link href="/dashboard/profile" className={btn("outline", "sm", "w-full")}>
             <PencilLine className="size-3.5" /> Edit
           </Link>
-          <Link href={`/pro/${profile.id}`} className={btn("secondary", "sm", "w-full")}>
+          <Link href={`/pro/${profile.id}`} className={btn("outline", "sm", "w-full")}>
             <ExternalLink className="size-3.5" /> View
           </Link>
         </div>
@@ -476,7 +698,7 @@ function ProfilePanel({ profile, services }: { profile: Profile; services: MySer
 function BecomeProPanel({ hasProfile }: { hasProfile: boolean }) {
   return (
     <section className="card overflow-hidden rounded-2xl p-4 sm:p-5">
-      <span className="grid size-10 place-items-center rounded-xl bg-brand-gradient text-white shadow-glow">
+      <span className="grid size-10 place-items-center rounded-xl bg-emerald-600 text-white">
         <Briefcase className="size-5" />
       </span>
       <h2 className="mt-3 text-base font-bold">{hasProfile ? "Your pro side" : "Good at something?"}</h2>

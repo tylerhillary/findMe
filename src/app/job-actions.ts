@@ -17,6 +17,8 @@ import { completeBrokerJob } from "@/lib/broker";
 import { paystackReady, refundPayment, startPayment } from "@/lib/paystack";
 import { CLAIM_REASONS, GUARANTEE_DAYS, claimOpen } from "@/lib/guarantee";
 import { parseRequirements } from "@/lib/requirements";
+import { MIN_BIO } from "@/lib/bio";
+import { readPlace } from "@/lib/lgas";
 import { APP_URL } from "@/lib/email";
 import type { JobDoc, UserDoc } from "@/lib/schema";
 import type { FormState } from "@/app/actions";
@@ -59,7 +61,9 @@ export async function createJobAction(_: FormState, fd: FormData): Promise<FormS
   const details = str(fd, "details", 3000);
   const requirements = parseRequirements(fd.get("requirements"));
   const category = str(fd, "category", 40);
-  const location = str(fd, "location", 160);
+  // State and LGA are required: they decide which nearby pros findMe considers.
+  const place = readPlace((k) => fd.get(k), true, true);
+  const location = place.location;
   const when = str(fd, "when", 80);
   const phoneRaw = str(fd, "phone", 30);
   const phone = normalizeNgPhone(phoneRaw);
@@ -72,7 +76,7 @@ export async function createJobAction(_: FormState, fd: FormData): Promise<FormS
   if (!requirements.length) fieldErrors.requirements = "List at least one thing the pro must do, so everyone agrees what done looks like.";
   if (!isCategory(category)) fieldErrors.category = "Pick the closest category.";
   if (when.length < 2) fieldErrors.when = "Tell us when you need it done, e.g. This Saturday or As soon as possible.";
-  if (location.length < 3) fieldErrors.location = "Where should the pro come to? Area and state is enough for now.";
+  if (place.errors) Object.assign(fieldErrors, place.errors);
   if (!phone) fieldErrors.phone = phoneRaw ? "Enter a valid Nigerian number, e.g. 0803 123 4567." : "Add a number so the pro we send can reach you.";
   if (Object.keys(fieldErrors).length) return { fieldErrors };
 
@@ -96,13 +100,15 @@ export async function createJobAction(_: FormState, fd: FormData): Promise<FormS
   const now = Date.now();
   const ref = jobs().doc();
   await ref.set({
-    clientId: user.id, clientName: user.name, clientPhone: phone!, title, details, requirements, category, location, when,
+    clientId: user.id, clientName: user.name, clientPhone: phone!, title, details, requirements, category, location, state: place.state!, lga: place.lga!, city: place.city, street: place.street, landmark: place.landmark, when,
     preferredProId, clientOffer: 0, status: "new", price: 0, proPayout: 0, proId: null, createdAt: now, updatedAt: now,
     ...(repeatOf ? { repeatOf } : {}),
   } satisfies JobDoc);
   // Remember their number for next time.
   const me = (await users().doc(user.id).get()).data() as UserDoc | undefined;
   if (!me?.phone) await users().doc(user.id).update({ phone: phone! });
+  // And where they are, if their profile doesn't say: it picks the pros shown on their dashboard.
+  if (!me?.state) await users().doc(user.id).update({ state: place.state!, lga: place.lga!, city: place.city, street: place.street, landmark: place.landmark, location });
 
   after(() =>
     emailAdmins({
@@ -113,7 +119,8 @@ export async function createJobAction(_: FormState, fd: FormData): Promise<FormS
       cta: "Open job",
       details: [
         ["Category", categoryName(category)],
-        ["Where", location],
+        ["Where", [place.street, location].filter(Boolean).join(", ")],
+        ...(place.landmark ? [["Landmark", place.landmark] as [string, string]] : []),
         ["When", when],
         ["Requirements", requirements.map((r, i) => `${i + 1}. ${r}`).join("  ")],
         ["Pro they picked", preferredName ? `${preferredName}${repeatOf ? " (booking again)" : ""}` : "Any"],
@@ -269,6 +276,33 @@ export async function markJobPaidAction(jobId: string): Promise<{ ok?: true; err
     cta: "View job",
   });
   return ok();
+}
+
+// ---------------- Pro ----------------
+
+/** A pro saw an open request on their dashboard and says they can do it. findMe decides who goes. */
+export async function offerToHelpAction(jobId: string): Promise<{ ok?: true; error?: string }> {
+  const user = await requireUser("/dashboard");
+  if (user.role !== "provider") return { error: "Set up your pro profile first." };
+  const { ref, job } = await loadJob(jobId);
+  if (!job || job.proId || !["new", "quoted", "paid"].includes(job.status)) return { error: "findMe has already found someone for this job." };
+  if (job.clientId === user.id) return { error: "This is your own request." };
+  if (job.interested?.includes(user.id)) return { ok: true };
+  // Clients need to know who they'd be getting, so a pro needs a bio before putting themselves forward.
+  const me = (await users().doc(user.id).get()).data() as UserDoc | undefined;
+  if ((me?.bio ?? "").trim().length < MIN_BIO) return { error: "Add a short bio first so clients know who you are. It's on your profile." };
+  // Not updatedAt: that would move the job up the client's list for something they don't see.
+  await ref.update({ interested: FieldValue.arrayUnion(user.id) });
+  after(() =>
+    emailAdmins({
+      subject: `${user.name} can do "${job.title}"`,
+      title: "A pro wants this job",
+      body: `${user.name} saw "${job.title}" (${categoryName(job.category)}, ${job.location}) on their dashboard and says they can do it. They're at the top of the pro list on the job.`,
+      href: adminHref(ref.id),
+      cta: "Open job",
+    }).catch(() => {}),
+  );
+  return { ok: true };
 }
 
 /** Admin: send a pro. They see the client's contact; the client never sees theirs. */

@@ -9,11 +9,12 @@ import type { RateUnit } from "@/lib/price";
 import { formatNgPhone } from "@/lib/phone";
 import { addSkillAction, removeSkillAction, updateProfileAction, type FormState } from "@/app/actions";
 import { CATEGORIES, SKILL_LEVELS } from "@/lib/categories";
-import { Avatar, FieldError, Input, Label, LocationInput, Select, Textarea, btn, cn } from "@/components/ui";
+import { Avatar, FieldError, Input, Label, Select, Textarea, btn, cn } from "@/components/ui";
+import { PlaceInput } from "@/components/place-input";
 import { Toast } from "@/components/toast";
 
 type Profile = {
-  name: string; business_name: string; email: string; role: string; headline: string; bio: string; location: string;
+  name: string; business_name: string; email: string; role: string; headline: string; bio: string; location: string; state: string | null; lga: string | null; city: string; street: string; landmark: string;
   category: string; hourly_rate: number; rate_unit: RateUnit; available: boolean; avatar: string | null;
   phone: string; whatsapp: boolean; show_phone: boolean; phone_verified: boolean; cover: string | null;
 };
@@ -163,6 +164,17 @@ export function ProfileForm({ profile, startListed }: { profile: Profile; startL
             <Label htmlFor="bio" hint={`${bio.length}/1500`}>About you</Label>
             <Textarea id="bio" name="bio" value={bio} onChange={(e) => setBio(e.target.value)} maxLength={1500} rows={5} placeholder="Your experience, what you love doing, and what clients can expect when they work with you." />
           </div>
+          <div className="sm:col-span-2">
+            <p className="text-sm font-semibold">Where you are</p>
+            <p className="mb-3 mt-0.5 text-xs text-muted">
+              {listed ? "Clients in your local government see you first, so pick it exactly." : "We show you pros in your local government first."}
+            </p>
+            <PlaceInput
+              defaultValue={{ state: profile.state ?? "", lga: profile.lga ?? "", city: profile.city, street: profile.street, landmark: profile.landmark }}
+              required={listed}
+              errors={{ state: state.fieldErrors?.state, lga: state.fieldErrors?.lga, city: state.fieldErrors?.city }}
+            />
+          </div>
           <div>
             <Label htmlFor="category">Main category</Label>
             <Select id="category" name="category" defaultValue={profile.category} aria-invalid={!!state.fieldErrors?.category}>
@@ -170,10 +182,6 @@ export function ProfileForm({ profile, startListed }: { profile: Profile; startL
               {CATEGORIES.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
             </Select>
             <FieldError msg={state.fieldErrors?.category} />
-          </div>
-          <div>
-            <Label htmlFor="location" hint="Area, State">Location</Label>
-            <LocationInput id="location" name="location" defaultValue={profile.location} />
           </div>
           <div>
             <Label htmlFor="rate" hint="optional">Your rate (₦)</Label>

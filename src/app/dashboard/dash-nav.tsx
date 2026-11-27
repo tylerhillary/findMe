@@ -3,21 +3,24 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
-import { Briefcase, LayoutDashboard, MessageSquareText, Search, UserRound } from "lucide-react";
+import { Briefcase, Home, LayoutDashboard, MessageSquareText, Search, UserRound } from "lucide-react";
 import { cn } from "@/components/ui";
+import { MODE_STYLE } from "./mode-switch";
 
 type Mode = "hire" | "work";
 
-const ITEMS = [
+const ITEMS: { href: string; label: string; icon: typeof Home; workOnly?: boolean; sidebarOnly?: boolean }[] = [
+  { href: "/", label: "Home", icon: Home, sidebarOnly: true },
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/jobs", label: "Jobs", icon: MessageSquareText },
   { href: "/dashboard/services", label: "My services", icon: Briefcase, workOnly: true },
   { href: "/dashboard/profile", label: "Profile & skills", icon: UserRound },
   { href: "/search", label: "Find talent", icon: Search },
 ];
-const itemsFor = (mode: Mode) => ITEMS.filter((i) => !i.workOnly || mode === "work");
+// The phone tab bar has no room for Home; the logo and a home icon in the phone header cover it.
+const itemsFor = (mode: Mode, sidebar = true) => ITEMS.filter((i) => (!i.workOnly || mode === "work") && (sidebar || !i.sidebarOnly));
 
-const isActive = (pathname: string, href: string) => (href === "/dashboard" ? pathname === href : pathname.startsWith(href));
+const isActive = (pathname: string, href: string) => (href === "/dashboard" || href === "/" ? pathname === href : pathname.startsWith(href));
 
 function Badge({ n, className }: { n: number; className?: string }) {
   if (!n) return null;
@@ -30,37 +33,46 @@ function Badge({ n, className }: { n: number; className?: string }) {
 
 export function DashNav({ badge = 0, mode = "hire" }: { badge?: number; mode?: Mode }) {
   const pathname = usePathname();
+  const s = MODE_STYLE[mode];
   return (
-    <nav className="space-y-1">
-      {itemsFor(mode).map(({ href, label, icon: Icon }) => {
-        const active = isActive(pathname, href);
-        return (
-          <Link
-            key={href}
-            href={href}
-            className={cn("relative flex items-center gap-3 rounded-xl px-3.5 py-3 text-sm font-semibold transition-colors", active ? "text-white" : "text-ink-soft hover:bg-brand-50 hover:text-brand-700")}
-          >
-            {active && <motion.span layoutId="dash-active" className="absolute inset-0 rounded-xl bg-ink shadow-lift" transition={{ type: "spring", stiffness: 380, damping: 32 }} />}
-            <Icon className="relative size-[18px]" />
-            <span className="relative flex-1">{label}</span>
-            {href === "/dashboard/jobs" && <Badge n={badge} className="relative" />}
-          </Link>
-        );
-      })}
+    <nav aria-label={`${s.label} menu`}>
+      <p className="mb-2 px-3.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">Menu</p>
+      <div className="space-y-0.5">
+        {itemsFor(mode).map(({ href, label, icon: Icon }) => {
+          const active = isActive(pathname, href);
+          return (
+            <Link
+              key={href}
+              href={href}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "relative flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-[14px] font-semibold transition-colors",
+                active ? s.navActive : "text-ink-soft hover:bg-zinc-100/80 hover:text-ink"
+              )}
+            >
+              {active && <motion.span layoutId="dash-active" className={cn("absolute inset-0 rounded-xl", s.navActive)} transition={{ type: "spring", stiffness: 380, damping: 32 }} />}
+              <Icon className={cn("relative size-[18px]", active ? s.navIcon : "text-muted")} />
+              <span className="relative flex-1">{label}</span>
+              {href === "/dashboard/jobs" && <Badge n={badge} className="relative" />}
+            </Link>
+          );
+        })}
+      </div>
     </nav>
   );
 }
 
 export function MobileTabs({ badge = 0, mode = "hire" }: { badge?: number; mode?: Mode }) {
   const pathname = usePathname();
+  const s = MODE_STYLE[mode];
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t border-line bg-white/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden">
-      {itemsFor(mode).map(({ href, label, icon: Icon }) => {
+      {itemsFor(mode, false).map(({ href, label, icon: Icon }) => {
         const active = isActive(pathname, href);
         return (
-          <Link key={href} href={href} aria-current={active ? "page" : undefined} className={cn("relative flex flex-1 flex-col items-center gap-0.5 pb-2 pt-2 text-[10.5px] font-semibold transition-colors", active ? "text-brand-700" : "text-muted")}>
+          <Link key={href} href={href} aria-current={active ? "page" : undefined} className={cn("relative flex flex-1 flex-col items-center gap-0.5 pb-2 pt-2 text-[10.5px] font-semibold transition-colors", active ? s.navIcon : "text-muted")}>
             <span className="relative grid h-7 w-12 place-items-center">
-              {active && <motion.span layoutId="tab-active" className="absolute inset-0 rounded-full bg-brand-50" transition={{ type: "spring", stiffness: 380, damping: 32 }} />}
+              {active && <motion.span layoutId="tab-active" className={cn("absolute inset-0 rounded-full", s.navActive)} transition={{ type: "spring", stiffness: 380, damping: 32 }} />}
               <Icon className="relative size-[19px]" strokeWidth={active ? 2.3 : 2} />
               {href === "/dashboard/jobs" && <Badge n={badge} className="absolute -right-0.5 -top-1 ring-2 ring-white" />}
             </span>

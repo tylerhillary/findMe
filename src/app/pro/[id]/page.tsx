@@ -15,6 +15,9 @@ import { CategoryIcon } from "@/components/category-icon";
 import { FadeIn, Reveal, Stagger, StaggerItem } from "@/components/motion";
 import { Avatar, Rating, Stars, cn, formatMoney, timeAgo } from "@/components/ui";
 import { getCurrentUser } from "@/lib/auth";
+import { FarAwayCheck } from "@/components/far-away-check";
+import { getWorkPhotos } from "@/lib/works";
+import { WorkGallery } from "./work-gallery";
 import { shownName } from "@/lib/names";
 import { categoryName } from "@/lib/categories";
 import { getNow, getProviderProfile, hasReported, type ProviderProfile } from "@/lib/queries";
@@ -45,7 +48,7 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const p = await getProviderProfile(id);
   if (!p) notFound();
-  const now = await getNow();
+  const [now, works] = await Promise.all([getNow(), getWorkPhotos(p.id)]);
 
   const levelPct = { Beginner: 33, Intermediate: 66, Expert: 100 } as Record<string, number>;
   const dist = [5, 4, 3, 2, 1].map((s) => ({ s, n: p.reviews.filter((r) => r.rating === s).length }));
@@ -180,6 +183,16 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
             {p.services.length === 0 && <p className="card mt-3 rounded-2xl p-4 text-sm text-muted sm:mt-5 sm:rounded-[1.25rem] sm:p-6">No fixed services yet. Send a custom request instead.</p>}
           </section>
 
+          {works.length > 0 && (
+            <section className="mt-7 sm:mt-10">
+              <div className="flex items-baseline justify-between gap-3">
+                <h2 className="text-lg font-extrabold tracking-tight sm:text-2xl">Work photos</h2>
+                <p className="text-sm text-muted">{works.length} photo{works.length === 1 ? "" : "s"}</p>
+              </div>
+              <WorkGallery photos={works} name={shownName(p)} />
+            </section>
+          )}
+
           <section className="mt-7 pb-4 sm:mt-10 sm:pb-16">
             <h2 className="text-lg font-extrabold tracking-tight sm:text-2xl">Reviews</h2>
             {p.reviewCount > 0 ? (
@@ -230,6 +243,9 @@ async function Profile({ params }: { params: Promise<{ id: string }> }) {
             </Suspense>
             <Suspense fallback={null}>
               <ReportLink p={p} />
+            </Suspense>
+            <Suspense fallback={null}>
+              <FarAwayCheck pro={{ id: p.id, name: shownName(p), category: p.category, state: p.state, lga: p.lga }} />
             </Suspense>
           </div>
         </aside>

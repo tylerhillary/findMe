@@ -13,6 +13,13 @@ export type UserDoc = {
   headline?: string;
   bio?: string;
   location?: string;
+  /** Picked from the list: state and local government. `location` is the public "City, LGA, State". */
+  state?: string;
+  lga?: string;
+  city?: string;
+  /** Private: never shown on the public profile or in search. */
+  street?: string;
+  landmark?: string;
   category?: string;
   hourlyRate?: number;
   /** How hourlyRate is charged: per hour (default) or one price per job, paid when it's done. */
@@ -184,12 +191,20 @@ export type JobDoc = {
   requirements?: string[];
   requirementsAgreedAt?: number;
   category: string;
-  location: string; // area / address for the pro
+  location: string; // public "City, LGA, State": what pros see before the job is theirs
+  state?: string;
+  lga?: string;
+  city?: string;
+  /** Exact address: only the assigned pro and admins see these. */
+  street?: string;
+  landmark?: string;
   when: string; // e.g. "This weekend", "ASAP"
   /** Pro the client picked on findMe, if any (findMe may still assign someone else). */
   preferredProId: string | null;
   /** Set when the client tapped "Book again" on an earlier job of theirs: that job's id. */
   repeatOf?: string;
+  /** Pros who saw this open request on their dashboard and said they can do it. findMe still picks who goes. */
+  interested?: string[];
   /** Old field from when clients could make offers. Always 0 now. */
   clientOffer: number;
   status: JobStatus;

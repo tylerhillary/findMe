@@ -10,6 +10,7 @@ import { SignOutForm } from "@/components/sign-out-form";
 import { Avatar, Logo, btn, cn } from "./ui";
 
 const LINKS = [
+  { href: "/", label: "Home" },
   { href: "/search", label: "Find talent" },
   { href: "/#categories", label: "Categories" },
   { href: "/#how", label: "How it works" },
@@ -17,7 +18,7 @@ const LINKS = [
 ];
 const OFFER = { href: OFFER_SKILLS_HREF, label: "Offer your skills" };
 
-const isActive = (pathname: string, href: string) => !!pathname && !href.includes("#") && (pathname === href || pathname.startsWith(`${href}/`));
+const isActive = (pathname: string, href: string) => !!pathname && !href.includes("#") && (pathname === href || (href !== "/" && pathname.startsWith(`${href}/`)));
 
 /*
  * The links read the current path to mark the page you're on. On pages with dynamic URLs the
@@ -25,7 +26,7 @@ const isActive = (pathname: string, href: string) => !!pathname && !href.include
  */
 function DesktopLinks({ pathname = "" }: { pathname?: string }) {
   return (
-    <ul className="hidden items-center gap-7 lg:flex">
+    <ul className="hidden items-center gap-5 lg:flex xl:gap-7">
       {LINKS.map((l) => {
         const active = isActive(pathname, l.href);
         return (
@@ -108,7 +109,7 @@ export function HeaderShell({ auth, transparent }: { auth: ReactNode; transparen
         )}
       >
         <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8" aria-label="Main">
-          <div className="flex min-w-0 items-center gap-10">
+          <div className="flex min-w-0 items-center gap-8 xl:gap-10">
             <Logo />
             <Suspense fallback={<DesktopLinks />}>
               <CurrentDesktopLinks />

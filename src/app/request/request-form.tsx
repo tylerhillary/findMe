@@ -5,7 +5,8 @@ import { Loader2, Send, ShieldCheck, Star } from "lucide-react";
 import { createJobAction } from "@/app/job-actions";
 import type { FormState } from "@/app/actions";
 import { CATEGORIES } from "@/lib/categories";
-import { Avatar, FieldError, Input, Label, LocationInput, Select, Textarea, btn, formatMoney } from "@/components/ui";
+import { Avatar, FieldError, Input, Label, Select, Textarea, btn, formatMoney } from "@/components/ui";
+import { PlaceInput, type PlaceValue } from "@/components/place-input";
 import { PhoneInput } from "@/components/phone-input";
 
 export type PickedPro = {
@@ -22,7 +23,7 @@ export type PickedPro = {
 };
 
 /** "Tell us what you need": goes to findMe, who sends a price and then a pro. */
-export function RequestForm({ pro, defaults, againOf }: { pro: PickedPro | null; defaults: { phone: string; location: string; category: string; details?: string; requirements?: string }; againOf?: string }) {
+export function RequestForm({ pro, defaults, againOf }: { pro: PickedPro | null; defaults: { phone: string; place: PlaceValue; category: string; details?: string; requirements?: string }; againOf?: string }) {
   const [state, action, pending] = useActionState<FormState, FormData>(createJobAction, {});
   const first = pro?.name.split(" ")[0];
   const e = state.fieldErrors ?? {};
@@ -105,9 +106,9 @@ export function RequestForm({ pro, defaults, againOf }: { pro: PickedPro | null;
           </div>
         </div>
         <div>
-          <Label htmlFor="location" hint="Area, State (full address later)">Where?</Label>
-          <LocationInput id="location" name="location" defaultValue={defaults.location} aria-invalid={!!e.location} />
-          <FieldError msg={e.location} />
+          <p className="text-sm font-semibold">Where should the pro come to?</p>
+          <p className="mb-3 mt-0.5 text-xs text-muted">We look for pros in your local government first.</p>
+          <PlaceInput defaultValue={defaults.place} required streetRequired errors={{ state: e.state, lga: e.lga, city: e.city, street: e.street }} />
         </div>
         <div>
           <Label htmlFor="phone" hint="Only the pro we send sees it">Your phone number</Label>

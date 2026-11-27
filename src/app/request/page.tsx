@@ -1,13 +1,17 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { SiteHeader } from "@/components/site-header";
-import { requireUser } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/firebase-admin";
 import { getProviderProfile } from "@/lib/queries";
 import { publicName } from "@/lib/names";
 import { formatNgPhone } from "@/lib/phone";
 import type { JobDoc, UserDoc } from "@/lib/schema";
 import { RequestForm, type PickedPro } from "./request-form";
+import { areaOf, placeOf } from "@/lib/lgas";
+import { FarAwayCheck } from "@/components/far-away-check";
+import { shownName } from "@/lib/names";
 
 export const metadata: Metadata = { title: "Request a service" };
 
@@ -31,7 +35,10 @@ async function Content({ searchParams }: { searchParams: PageProps<"/request">["
   const serviceId = one(sp.service).slice(0, 128);
   const againId = one(sp.again).slice(0, 128);
   const query = new URLSearchParams(Object.entries({ pro: proId, service: serviceId, again: againId }).filter(([, v]) => v)).toString();
-  const user = await requireUser(`/request${query ? `?${query}` : ""}`);
+  // Anyone can browse pros, but booking needs an account: visitors fill in the sign-up form
+  // first, then come straight back here with the same pro picked.
+  const user = await getCurrentUser();
+  if (!user) redirect(`/register?role=client&next=${encodeURIComponent(`/request${query ? `?${query}` : ""}`)}`);
 
   // "Book again": start from one of the client's own completed jobs, with the same pro.
   const again = againId && !againId.includes("/")
@@ -61,17 +68,30 @@ async function Content({ searchParams }: { searchParams: PageProps<"/request">["
       }
     : null;
 
+  // Where the job is: the earlier job's place for "Book again", otherwise the client's own.
+  const from = repeat ?? me;
+  const place = from ? placeOf(from) : { state: null, lga: null };
+
   return (
+    <>
+    {pro && !repeat && <FarAwayCheck pro={{ id: pro.id, name: shownName(pro), category: pro.category, state: pro.state, lga: pro.lga }} />}
     <RequestForm
       pro={picked}
       againOf={repeat && pro ? againId : undefined}
       defaults={{
         phone: me?.phone ? formatNgPhone(me.phone).replace(/^\+234 /, "") : "",
-        location: repeat?.location || me?.location || "",
+        place: {
+          state: place.state ?? "",
+          lga: place.lga ?? "",
+          city: from?.city ?? (from ? areaOf(from.location ?? "", place) : ""),
+          street: from?.street ?? "",
+          landmark: from?.landmark ?? "",
+        },
         category: repeat?.category ?? picked?.category ?? "",
         details: repeat?.details ?? "",
         requirements: repeat?.requirements?.join("\n") ?? "",
       }}
     />
+    </>
   );
 }

@@ -14,7 +14,8 @@ import { PhoneInput } from "@/components/phone-input";
 import { RateUnitPicker } from "@/components/rate-unit-picker";
 import type { RateUnit } from "@/lib/price";
 import { CategoryIcon } from "@/components/category-icon";
-import { FieldError, Input, Label, LocationInput, btn, cn } from "@/components/ui";
+import { Avatar, FieldError, Input, Label, btn, cn } from "@/components/ui";
+import { EMPTY_PLACE, PlaceInput, type PlaceValue } from "@/components/place-input";
 
 const SUGGESTIONS: Record<string, string[]> = {
   design: ["Logo Design", "UI Design", "Illustration", "Figma", "Branding"],
@@ -42,14 +43,19 @@ type Skill = { name: string; level: string };
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
-export function RegisterForm({ ninEnabled }: { ninEnabled: boolean }) {
+/** The pro a visitor tapped "Request" on before signing up. */
+export type BookingPro = { name: string; avatar: string | null; headline: string; location: string };
+
+export function RegisterForm({ ninEnabled, booking = null }: { ninEnabled: boolean; booking?: BookingPro | null }) {
   const params = useSearchParams();
   const next = params.get("next") ?? "";
+  // Booking a pro (or ?role=client): they're a client, so skip the "how will you use findMe" step.
+  const asClient = !!booking || params.get("role") === "client";
   const [state, setState] = useState<FormState>({});
   const [pending, startTransition] = useTransition();
 
-  const [role, setRole] = useState<Role | null>(params.get("role") === "provider" ? "provider" : null);
-  const [step, setStep] = useState(params.get("role") === "provider" ? 1 : 0);
+  const [role, setRole] = useState<Role | null>(asClient ? "client" : params.get("role") === "provider" ? "provider" : null);
+  const [step, setStep] = useState(asClient || params.get("role") === "provider" ? 1 : 0);
   const [dir, setDir] = useState(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -63,7 +69,7 @@ export function RegisterForm({ ninEnabled }: { ninEnabled: boolean }) {
   const [headline, setHeadline] = useState("");
   const [businessName, setBusinessName] = useState("");
   const [category, setCategory] = useState("");
-  const [location, setLocation] = useState("");
+  const [place, setPlace] = useState<PlaceValue>(EMPTY_PLACE);
   const [rate, setRate] = useState("");
   const [rateUnit, setRateUnit] = useState<RateUnit>("hour");
   const [skills, setSkills] = useState<Skill[]>([]);
@@ -80,7 +86,7 @@ export function RegisterForm({ ninEnabled }: { ninEnabled: boolean }) {
     setErrors(state.fieldErrors);
     const f = Object.keys(state.fieldErrors);
     if (f.some((k) => ["name", "email", "password", "phone", "nin"].includes(k))) setStep(1);
-    else if (f.some((k) => ["headline", "category"].includes(k))) setStep(2);
+    else if (f.some((k) => ["headline", "category", "state", "lga", "city"].includes(k))) setStep(2);
     else if (f.includes("skills")) setStep(3);
   }, [state]);
 
@@ -102,11 +108,15 @@ export function RegisterForm({ ninEnabled }: { ninEnabled: boolean }) {
       if (password.length < 8) e.password = "Use at least 8 characters.";
       if (phone.trim() && !normalizeNgPhone(phone)) e.phone = "Enter a valid Nigerian number, e.g. 0803 123 4567.";
       else if (role === "provider" && !phone.trim()) e.phone = "Add a number clients can reach you on.";
+      else if (booking && !phone.trim()) e.phone = `Add your number so ${booking.name.split(" ")[0]} can reach you about the job.`;
       if (nin.trim() && !/^\d{11}$/.test(nin.replace(/\D/g, ""))) e.nin = "Enter the 11 digits on your NIN slip, or leave it blank.";
     }
     if (s === 2) {
       if (headline.trim().length < 6) e.headline = "Tell people what you do in a few words.";
       if (!category) e.category = "Pick the category that fits you best.";
+      if (!place.state) e.state = "Choose your state.";
+      else if (!place.lga) e.lga = "Choose your local government.";
+      if (place.city.trim().length < 2) e.city = "Add your city or town.";
     }
     if (s === 3 && skills.length === 0) e.skills = "Add at least one skill.";
     setErrors(e);
@@ -125,7 +135,7 @@ export function RegisterForm({ ninEnabled }: { ninEnabled: boolean }) {
     if (step < last) return go(step + 1);
     if (!validate(step)) return;
     const fd = new FormData();
-    Object.entries({ name, businessName: role === "provider" ? businessName : "", email, password, phone, nin: ninEnabled ? nin : "", whatsapp: whatsapp ? "1" : "0", role: role ?? "client", headline, category, location, rate, rateUnit, next }).forEach(([k, v]) => fd.set(k, v));
+    Object.entries({ name, businessName: role === "provider" ? businessName : "", email, password, phone, nin: ninEnabled ? nin : "", whatsapp: whatsapp ? "1" : "0", role: role ?? "client", headline, category, state: place.state, lga: place.lga, city: place.city, street: place.street, landmark: place.landmark, rate, rateUnit, next }).forEach(([k, v]) => fd.set(k, v));
     fd.set("skills", JSON.stringify(skills));
     startTransition(async () => {
       // 1) Server validates and creates the Firebase account + profile.
@@ -160,6 +170,21 @@ export function RegisterForm({ ninEnabled }: { ninEnabled: boolean }) {
 
   return (
     <div>
+      {booking && (
+        <div className="mb-6 rounded-2xl border border-brand-200 bg-brand-50/60 p-4">
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-brand-700">You&apos;re booking</p>
+          <div className="mt-2 flex items-center gap-3">
+            <Avatar name={booking.name} src={booking.avatar} size={44} />
+            <div className="min-w-0">
+              <p className="truncate font-bold">{booking.name}</p>
+              <p className="truncate text-[13px] text-muted">{[booking.headline, booking.location].filter(Boolean).join(" · ")}</p>
+            </div>
+          </div>
+          <p className="mt-3 text-[13px] leading-relaxed text-ink-soft">
+            Create your free account first. It takes a minute, and then you&apos;ll go straight to the booking form for {booking.name.split(" ")[0]}.
+          </p>
+        </div>
+      )}
       <div className="mb-8">
         <div className="flex items-center justify-between text-xs font-semibold text-muted">
           <span>
@@ -340,11 +365,12 @@ export function RegisterForm({ ninEnabled }: { ninEnabled: boolean }) {
                       </div>
                       <FieldError msg={errors.category} />
                     </div>
+                    <div>
+                      <p className="text-sm font-semibold">Where you work from</p>
+                      <p className="mb-3 mt-0.5 text-xs text-muted">Clients in your local government see you first.</p>
+                      <PlaceInput defaultValue={place} onChange={setPlace} required errors={{ state: errors.state, lga: errors.lga, city: errors.city }} />
+                    </div>
                     <div className="grid gap-5 sm:grid-cols-2">
-                      <div>
-                        <Label htmlFor="location" hint="Area, State">Location</Label>
-                        <LocationInput id="location" value={location} onChange={(e) => setLocation(e.target.value)} />
-                      </div>
                       <div>
                         <Label htmlFor="rate" hint="optional">Your rate (₦)</Label>
                         <div className="relative">

@@ -11,6 +11,8 @@ import { FadeIn } from "@/components/motion";
 import { ProfileForm, SkillsManager } from "./profile-forms";
 import { VerifyNinCard } from "../verify-nin-card";
 import { getNinStatus, ninChecksEnabled } from "@/lib/nin";
+import { getWorkPhotos } from "@/lib/works";
+import { WorkPhotosManager } from "./work-photos";
 
 export const metadata: Metadata = { title: "Profile & skills" };
 
@@ -30,11 +32,12 @@ export default function ProfilePage({ searchParams }: PageProps<"/dashboard/prof
 
 async function Content({ searchParams }: { searchParams: PageProps<"/dashboard/profile">["searchParams"] }) {
   const user = await requireUser();
-  const [profile, sp, nin, payout] = await Promise.all([
+  const [profile, sp, nin, payout, works] = await Promise.all([
     getMyProfile(user.id),
     searchParams,
     getNinStatus(user.id),
     db().collection("payouts").doc(user.id).get().then((d) => (d.data() as PayoutDoc | undefined) ?? null),
+    user.role === "provider" ? getWorkPhotos(user.id) : Promise.resolve([]),
   ]);
   const banks = user.role === "provider" && paystackReady() ? await listBanks().catch(() => null) : null;
   // Arrived from the Hiring/Working switch without a pro profile yet.
@@ -59,6 +62,7 @@ async function Content({ searchParams }: { searchParams: PageProps<"/dashboard/p
         <div className="space-y-6 lg:sticky lg:top-10">
           {(nin.verified || ninChecksEnabled()) && <VerifyNinCard verified={nin.verified} last4={nin.last4} lastError={nin.lastError} isPro={user.role === "provider"} />}
           {user.role === "provider" && <PayoutForm banks={banks} current={payout ? { bankName: payout.bankName, bankCode: payout.bankCode ?? "", accountNumber: payout.accountNumber, accountName: payout.accountName, verified: !!payout.recipientCode } : null} />}
+          {user.role === "provider" && <WorkPhotosManager photos={works} />}
           <SkillsManager skills={profile.skills} />
         </div>
       </div>

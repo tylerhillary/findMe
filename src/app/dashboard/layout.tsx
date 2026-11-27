@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { ExternalLink, LogOut, Settings } from "lucide-react";
+import { ExternalLink, Home, LogOut, Settings } from "lucide-react";
 import { Avatar, Logo } from "@/components/ui";
 import { TeamBadge, VerifiedAccountBadge } from "@/components/verify-phone";
 import { getEmailStatus, requireUser } from "@/lib/auth";
@@ -15,19 +15,19 @@ import { VerifyEmailBanner } from "./verify-email-banner";
 export default function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
   return (
     <div className="flex min-h-dvh">
-      <aside className="sticky top-0 hidden h-dvh w-72 shrink-0 flex-col border-r border-line bg-white px-5 py-6 lg:flex">
-        <div className="flex items-center justify-between pl-2">
+      <aside className="sticky top-0 hidden h-dvh w-72 shrink-0 flex-col border-r border-line bg-white px-4 py-6 lg:flex">
+        <div className="flex items-center justify-between px-2">
           <Logo />
           <Suspense fallback={null}>
             <Bell align="left" />
           </Suspense>
         </div>
-        <div className="mt-8">
-          <Suspense fallback={<div className="skeleton h-11" />}>
+        <div className="mt-7">
+          <Suspense fallback={<div className="skeleton h-[86px] rounded-2xl" />}>
             <Switch />
           </Suspense>
         </div>
-        <div className="mt-6 flex-1">
+        <div className="mt-7 flex-1">
           <Suspense fallback={<div className="skeleton h-64" />}>
             <SideNav />
           </Suspense>
@@ -44,7 +44,7 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
             <MobileUser />
           </Suspense>
         </header>
-        <main className="flex-1 px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 lg:px-10 lg:pb-12 lg:pt-10">
+        <main className="flex-1 bg-canvas px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 lg:px-10 lg:pb-12 lg:pt-10">
           <div className="mx-auto max-w-6xl">
             <div className="mb-4 lg:hidden">
               <Suspense fallback={<div className="skeleton h-11" />}>
@@ -103,31 +103,32 @@ async function SidebarUser() {
   const user = await requireUser();
   const { verified } = await getEmailStatus(user.id);
   return (
-    <div className="rounded-2xl border border-line bg-canvas p-3">
-      <div className="flex items-center gap-3">
-        <Avatar name={user.name} src={user.avatar} size={40} />
+    <div className="border-t border-line pt-4">
+      <Link href="/dashboard/profile" className="flex items-center gap-3 rounded-xl p-1.5 transition hover:bg-zinc-100/80">
+        <Avatar name={user.name} src={user.avatar} size={38} />
         <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-1 text-sm font-bold">
+          <p className="flex items-center gap-1 text-[13.5px] font-bold">
             <span className="truncate">{user.name}</span>
-            {user.team && <TeamBadge compact />}
-            {verified && <VerifiedAccountBadge compact />}
+            {user.team ? <TeamBadge compact /> : verified && <VerifiedAccountBadge compact />}
           </p>
           <p className="truncate text-xs text-muted">{user.team ? "findMe team" : user.role === "provider" ? "Client & professional" : "Client"}</p>
         </div>
-        <Link href="/dashboard/settings" className="grid size-9 place-items-center rounded-lg text-muted transition hover:bg-white hover:text-ink" aria-label="Account settings" title="Account settings">
+      </Link>
+      <div className="mt-2 flex items-center gap-1">
+        {user.role === "provider" && (
+          <Link href={`/pro/${user.id}`} className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg text-[12.5px] font-semibold text-ink-soft ring-1 ring-line transition hover:bg-zinc-50 hover:text-ink">
+            <ExternalLink className="size-3.5" /> Public profile
+          </Link>
+        )}
+        <Link href="/dashboard/settings" className="grid size-9 shrink-0 place-items-center rounded-lg text-muted ring-1 ring-line transition hover:bg-zinc-50 hover:text-ink" aria-label="Account settings" title="Account settings">
           <Settings className="size-4" />
         </Link>
         <SignOutForm>
-          <button className="grid size-9 place-items-center rounded-lg text-muted transition hover:bg-red-50 hover:text-red-600" aria-label="Sign out" title="Sign out">
+          <button className="grid size-9 shrink-0 place-items-center rounded-lg text-muted ring-1 ring-line transition hover:bg-red-50 hover:text-red-600 hover:ring-red-200" aria-label="Sign out" title="Sign out">
             <LogOut className="size-4" />
           </button>
         </SignOutForm>
       </div>
-      {user.role === "provider" && (
-        <Link href={`/pro/${user.id}`} className="mt-3 flex items-center justify-center gap-1.5 rounded-xl bg-white py-2 text-xs font-semibold text-brand-700 ring-1 ring-line transition hover:ring-brand-200">
-          View public profile <ExternalLink className="size-3" />
-        </Link>
-      )}
     </div>
   );
 }
@@ -137,6 +138,9 @@ async function MobileUser() {
   const [unread, { verified }] = await Promise.all([getUnreadCount(user.id), getEmailStatus(user.id)]);
   return (
     <div className="flex items-center gap-0.5">
+      <Link href="/" className="grid size-9 place-items-center rounded-full text-muted hover:bg-brand-50 hover:text-brand-700" aria-label="findMe home" title="Home">
+        <Home className="size-[18px]" />
+      </Link>
       <NotificationBell unread={unread} />
       <Link href="/dashboard/settings" className="grid size-9 place-items-center rounded-full text-muted hover:bg-brand-50 hover:text-brand-700" aria-label="Account settings">
         <Settings className="size-[18px]" />

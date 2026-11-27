@@ -5,6 +5,7 @@ import { settleOverdueBrokerJobs } from "./broker";
 import type { JobDoc, UserDoc } from "./schema";
 import { hasTeamBadge } from "./team";
 import { photoUrl } from "./photos";
+import { nearness, placeOf, type Place } from "./lgas";
 
 export type JobWithId = JobDoc & { id: string };
 
@@ -31,6 +32,61 @@ export async function getMyJobs(uid: string) {
   if (await settleOverdueBrokerJobs([...asked, ...assigned])) [asked, assigned] = await Promise.all([load("clientId", uid), load("proId", uid)]);
   const byNew = (a: JobWithId, b: JobWithId) => b.updatedAt - a.updatedAt;
   return { asked: asked.sort(byNew), assigned: assigned.filter((j) => j.status !== "cancelled" || j.assignedAt).sort(byNew) };
+}
+
+/** What a pro sees of an open request: no client name, phone or full details. */
+export type OpenJob = {
+  id: string;
+  title: string;
+  category: string;
+  area: string;
+  when: string;
+  createdAt: number;
+  /** The pro's share, once findMe has priced the job. */
+  pay: number | null;
+  requirements: number;
+  askedForYou: boolean;
+  offered: boolean;
+};
+
+const OPEN: JobDoc["status"][] = ["new", "quoted", "paid"];
+
+/** Open requests in a pro's categories, split by how far they are from the pro. */
+export type OpenJobsByPlace = { near: OpenJob[]; sameState: OpenJob[]; far: OpenJob[]; place: Place };
+
+/**
+ * Requests no pro has been given yet in this pro's categories: in their own LGA, elsewhere in
+ * their state, and outside it. Requests where the client picked them always count as near.
+ */
+export async function getOpenJobsFor(uid: string, categories: string[], place: Place): Promise<OpenJobsByPlace> {
+  await connection();
+  const cats = new Set(categories.filter(Boolean));
+  const out: OpenJobsByPlace = { near: [], sameState: [], far: [], place };
+  if (!cats.size) return out;
+  const snap = await db().collection("jobs").where("status", "in", OPEN).get();
+  snap.docs
+    .map((d) => ({ id: d.id, ...(d.data() as JobDoc) }))
+    .filter((j) => !j.proId && j.clientId !== uid && (j.preferredProId === uid || cats.has(j.category)))
+    .sort((a, b) => Number(b.preferredProId === uid) - Number(a.preferredProId === uid) || b.createdAt - a.createdAt)
+    .forEach((j) => {
+      const n = j.preferredProId === uid ? "same_lga" : nearness(place, placeOf(j));
+      const row: OpenJob = {
+        id: j.id,
+        title: j.title,
+        category: j.category,
+        area: j.location,
+        when: j.when,
+        createdAt: j.createdAt,
+        pay: j.status !== "new" && j.proPayout > 0 ? j.proPayout : null,
+        requirements: j.requirements?.length ?? 0,
+        askedForYou: j.preferredProId === uid,
+        offered: !!j.interested?.includes(uid),
+      };
+      // Without an LGA on one side, the whole state counts as near.
+      const bucket = n === "same_lga" || n === "unknown" || (n === "same_state" && !(place.lga && placeOf(j).lga)) ? out.near : n === "same_state" ? out.sameState : out.far;
+      if (bucket.length < 50) bucket.push(row);
+    });
+  return out;
 }
 
 /** One job, for its client, its assigned pro, or an admin. */

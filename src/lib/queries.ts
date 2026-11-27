@@ -9,6 +9,7 @@ import { AggregateField } from "firebase-admin/firestore";
 import { db } from "./firebase-admin";
 import { CATEGORIES, categoryName, type RequestStatus } from "./categories";
 import { inState } from "./nigeria";
+import { areaOf, nearness, placeOf, type Place } from "./lgas";
 import { publicName } from "./names";
 import type { RequestDoc, ReviewDoc, ServiceDoc, UserDoc, VerifiedKind } from "./schema";
 import { photoUrl } from "./photos";
@@ -23,6 +24,9 @@ export type ProviderCard = {
   businessName: string;
   headline: string;
   location: string;
+  /** State and LGA, picked or read from older free-text locations. */
+  state: string | null;
+  lga: string | null;
   category: string;
   hourlyRate: number;
   rateUnit: RateUnit;
@@ -60,6 +64,7 @@ function cardFrom(id: string, u: UserDoc): ProviderCard {
     businessName: u.businessName ?? "",
     headline: u.headline ?? "",
     location: u.location ?? "",
+    ...placeOf(u),
     category: u.category ?? "",
     hourlyRate: u.hourlyRate ?? 0,
     rateUnit: asRateUnit(u.rateUnit),
@@ -82,7 +87,7 @@ const asVerifiedKind = (v: unknown): VerifiedKind | null => (v === "individual" 
 
 // Public fields only — phone numbers and emails never enter the cached catalog.
 const PUBLIC_FIELDS = [
-  "name", "businessName", "headline", "bio", "location", "category", "hourlyRate", "rateUnit", "available", "avatar",
+  "name", "businessName", "headline", "bio", "location", "state", "lga", "category", "hourlyRate", "rateUnit", "available", "avatar",
   "skills", "ratingSum", "reviewCount", "jobsDone", "startingPrice", "flagged", "banned", "teamBadge", "phoneConfirmed", "emailVerified", "ninVerified", "verifiedAs",
 ] as const;
 
@@ -183,6 +188,8 @@ export type SearchParams = {
   state?: string;
   /** Only pros rated at least this (and with at least one review). */
   minRating?: number;
+  /** Where the person searching is: pros in their LGA, then their state, rank first. */
+  near?: Place;
 };
 
 export type SearchResult = {
@@ -227,6 +234,11 @@ export async function searchProviders(params: SearchParams): Promise<SearchResul
   for (const c of matches) categoryCounts[c.category] = (categoryCounts[c.category] ?? 0) + 1;
 
   const sort = params.sort ?? "relevance";
+  // 2 = same LGA, 1 = same state, 0 = further or unknown.
+  const closeness = (c: ProviderCard) => {
+    const n = params.near ? nearness(params.near, c) : "unknown";
+    return n === "same_lga" ? 2 : n === "same_state" ? 1 : 0;
+  };
   const results = matches
     .filter((c) => !params.category || c.category === params.category)
     .sort((a, b) => {
@@ -235,10 +247,27 @@ export async function searchProviders(params: SearchParams): Promise<SearchResul
       if (sort === "price_high") return cardPrice(b) - cardPrice(a);
       // ID-verified pros get a small boost, so they rank above equally good matches.
       const boost = (c: ProviderCard) => (c.score ?? 0) + (c.ninVerified ? 2 : 0) + (c.phoneVerified ? 1 : 0);
-      return boost(b) - boost(a) || b.rating * b.reviewCount - a.rating * a.reviewCount;
+      return closeness(b) - closeness(a) || boost(b) - boost(a) || b.rating * b.reviewCount - a.rating * a.reviewCount;
     });
 
   return { results, categoryCounts, totalPros: catalog.length };
+}
+
+/** Skills pros on findMe have listed, most common first: search suggestions draw on these. */
+export async function getSkillVocabulary(limit = 400): Promise<string[]> {
+  await connection();
+  const catalog = await loadCatalog();
+  const counts = new Map<string, { name: string; n: number }>();
+  for (const p of catalog) {
+    for (const s of p.skills) {
+      const key = s.trim().toLowerCase();
+      if (key.length < 2) continue;
+      const c = counts.get(key);
+      if (c) c.n++;
+      else counts.set(key, { name: s.trim(), n: 1 });
+    }
+  }
+  return [...counts.values()].sort((a, b) => b.n - a.n).slice(0, limit).map((c) => c.name);
 }
 
 export async function getFeaturedProviders(limit = 6): Promise<ProviderCard[]> {
@@ -353,6 +382,10 @@ export async function getMyProfile(userId: string) {
     headline: u.headline ?? "",
     bio: u.bio ?? "",
     location: u.location ?? "",
+    ...placeOf(u),
+    city: u.city ?? areaOf(u.location ?? "", placeOf(u)),
+    street: u.street ?? "",
+    landmark: u.landmark ?? "",
     category: u.category ?? "",
     hourly_rate: u.hourlyRate ?? 0,
     rate_unit: asRateUnit(u.rateUnit),

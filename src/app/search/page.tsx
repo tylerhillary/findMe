@@ -3,7 +3,7 @@ import { after } from "next/server";
 import { logMissedSearch } from "@/lib/missed-searches";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, BadgeCheck, ChevronRight, Lock, ReceiptText, SearchX, ShieldCheck, Star } from "lucide-react";
+import { ArrowRight, BadgeCheck, ChevronRight, Lock, ReceiptText, SearchX, ShieldCheck, Sparkles, Star } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { ShowMore } from "./show-more";
@@ -15,6 +15,12 @@ import { CATEGORIES, categoryName, isCategory } from "@/lib/categories";
 import { CategoryIcon } from "@/components/category-icon";
 import { NIGERIAN_STATES } from "@/lib/nigeria";
 import { searchProviders, type SearchParams } from "@/lib/queries";
+import { getCurrentUser } from "@/lib/auth";
+import { db } from "@/lib/firebase-admin";
+import { placeOf } from "@/lib/lgas";
+import { closestField } from "@/lib/professions";
+import type { ProviderCard as ProCard } from "@/lib/queries";
+import type { UserDoc } from "@/lib/schema";
 import { ResultsFrame, SearchNavProvider } from "./search-nav";
 import { ActiveFilters, CategoryChips, ClearFiltersButton, FilterPanel, MobileFilters, PendingSpinner, SortSelect } from "./search-filters";
 
@@ -58,8 +64,27 @@ export default function SearchPage({ searchParams }: PageProps<"/search">) {
 
 async function SearchBody({ searchParams }: { searchParams: Promise<Raw> }) {
   const params = parse(await searchParams);
-  const { results, categoryCounts, totalPros } = await searchProviders(params);
+  // Signed in: pros closest to them (same LGA, then state) come first in "best match".
+  const viewer = await getCurrentUser();
+  const near = viewer ? placeOf(((await db().collection("users").doc(viewer.id).get()).data() as UserDoc | undefined) ?? {}) : undefined;
+  const { results, categoryCounts, totalPros } = await searchProviders({ ...params, near });
   const matchTotal = Object.values(categoryCounts).reduce((a, b) => a + b, 0);
+
+  // Few or no exact matches: also show pros in the closest field ("plumer" → Plumber → Home Services),
+  // so a typo or an unusual word still finds someone.
+  let closest: ReturnType<typeof closestField> = null;
+  let related: ProCard[] = [];
+  if (params.q && results.length < 3) {
+    closest = closestField(params.q);
+    if (closest) {
+      const seen = new Set(results.map((r) => r.id));
+      const byName = closest.profession && closest.profession.toLowerCase() !== params.q.toLowerCase()
+        ? (await searchProviders({ ...params, q: closest.profession, near })).results.filter((p) => !seen.has(p.id))
+        : [];
+      const byField = (await searchProviders({ ...params, q: undefined, category: closest.category, near })).results.filter((p) => !seen.has(p.id) && !byName.some((b) => b.id === p.id));
+      related = [...byName, ...byField].slice(0, 12);
+    }
+  }
   const terms = (params.q ?? "").toLowerCase().split(/\s+/).filter((t) => t.length > 2);
   const filtered = !!(params.category || params.state || params.maxRate || params.minRating || params.available);
   const intro = !params.q && !filtered;
@@ -129,7 +154,9 @@ async function SearchBody({ searchParams }: { searchParams: Promise<Raw> }) {
             </div>
 
             <ResultsFrame>
-              {results.length === 0 ? (
+              {results.length === 0 && closest && related.length > 0 ? (
+                <ClosestField query={params.q!} label={closest.label} pros={related} terms={terms} exact={false} />
+              ) : results.length === 0 ? (
                 <div className="mt-4 rounded-2xl border border-dashed border-line bg-white px-5 py-10 text-center sm:py-14">
                   <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-brand-50 text-brand-600">
                     <SearchX className="size-6" />
@@ -164,6 +191,7 @@ async function SearchBody({ searchParams }: { searchParams: Promise<Raw> }) {
                   ))}
                 />
               )}
+              {results.length > 0 && closest && related.length > 0 && <ClosestField query={params.q!} label={closest.label} pros={related} terms={terms} exact />}
             </ResultsFrame>
 
             {results.length > 0 && (
@@ -181,6 +209,30 @@ async function SearchBody({ searchParams }: { searchParams: Promise<Raw> }) {
         </div>
       </div>
     </SearchNavProvider>
+  );
+}
+
+/** Pros in the field closest to what was searched, when the search itself found few or none. */
+function ClosestField({ query, label, pros, terms, exact }: { query: string; label: string; pros: ProCard[]; terms: string[]; exact: boolean }) {
+  return (
+    <section className={exact ? "mt-10 border-t border-line pt-8" : "mt-4"}>
+      {exact ? (
+        <h3 className="text-base font-bold tracking-tight sm:text-lg">More pros in {label}</h3>
+      ) : (
+        <div className="flex items-start gap-3 rounded-2xl border border-brand-200 bg-brand-50/60 px-4 py-3">
+          <Sparkles className="mt-0.5 size-4 shrink-0 text-brand-600" />
+          <p className="text-sm text-ink-soft">
+            No exact matches for <span className="font-semibold text-ink">&ldquo;{query}&rdquo;</span>. Showing pros in{" "}
+            <span className="font-semibold text-ink">{label}</span>, the closest field.
+          </p>
+        </div>
+      )}
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3">
+        {pros.map((p) => (
+          <ProviderCard key={p.id} p={p} highlight={terms} />
+        ))}
+      </div>
+    </section>
   );
 }
 

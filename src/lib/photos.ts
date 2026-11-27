@@ -5,7 +5,7 @@
  * src/app/img/[kind]/[id]/route.ts. The hash changes whenever the photo does, so the browser and
  * Vercel's CDN can keep each version for a year.
  */
-export type PhotoKind = "avatar" | "cover";
+export type PhotoKind = "avatar" | "cover" | "work";
 
 /** Short, stable fingerprint of the photo (FNV-1a), so a new photo gets a new address. */
 function version(data: string): string {
@@ -17,7 +17,10 @@ function version(data: string): string {
   return `${(h >>> 0).toString(36)}${data.length.toString(36)}`;
 }
 
-/** The address to use in <img src>, or null when there's no photo. Plain http(s) URLs pass through. */
+/**
+ * The address to use in <img src>, or null when there's no photo. Plain http(s) URLs pass through.
+ * For "work" photos the id is the photo's own id (works/{id}), not the user's.
+ */
 export function photoUrl(kind: PhotoKind, userId: string, data: string | null | undefined): string | null {
   if (!data) return null;
   if (!data.startsWith("data:")) return data;

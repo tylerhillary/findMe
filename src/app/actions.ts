@@ -3,6 +3,9 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { refresh, updateTag } from "next/cache";
+import { MIN_BIO } from "@/lib/bio";
+import { MAX_WORK_PHOTOS, MAX_WORK_PHOTO_CHARS } from "@/lib/work-limits";
+import { readPlace } from "@/lib/lgas";
 import { after } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { adminAuth, db } from "@/lib/firebase-admin";
@@ -112,7 +115,8 @@ export async function registerAction(_: FormState, fd: FormData): Promise<FormSt
 
   const headline = str(fd, "headline", 120);
   const businessName = str(fd, "businessName", 80);
-  const location = str(fd, "location", 80);
+  const place = readPlace((k) => fd.get(k), role === "provider");
+  const location = place.location;
   const category = str(fd, "category", 40);
   const rate = int(fd, "rate");
   const phoneRaw = str(fd, "phone", 30);
@@ -136,6 +140,7 @@ export async function registerAction(_: FormState, fd: FormData): Promise<FormSt
     if (headline.length < 6) fieldErrors.headline = "Tell people what you do in a few words.";
     if (!isCategory(category)) fieldErrors.category = "Pick the category that fits you best.";
     if (skills.length === 0) fieldErrors.skills = "Add at least one skill.";
+    if (place.errors) Object.assign(fieldErrors, place.errors);
     if (!phone) fieldErrors.phone = phoneRaw ? PHONE_ERROR : "Add a number clients can reach you on.";
   } else if (phoneRaw && !phone) {
     fieldErrors.phone = PHONE_ERROR;
@@ -161,7 +166,7 @@ export async function registerAction(_: FormState, fd: FormData): Promise<FormSt
 
   try {
     await users().doc(uid).set({
-      name, email, role, headline, location,
+      name, email, role, headline, location, ...(place.state ? { state: place.state, lga: place.lga ?? "" } : {}), city: place.city, street: place.street, landmark: place.landmark,
       ...(role === "provider" && businessName ? { businessName } : {}),
       category: isCategory(category) ? category : "",
       hourlyRate: rate, rateUnit: asRateUnit(fd.get("rateUnit")), available: true, avatar: null,
@@ -255,6 +260,41 @@ export async function logoutAction(next?: string) {
 
 // ---------------- Profile ----------------
 
+/** Adds a photo of the pro's work (already shrunk in the browser) to their profile. */
+export async function addWorkPhotoAction(image: string, caption: string): Promise<{ ok?: true; error?: string }> {
+  const user = await requireUser();
+  if (user.role !== "provider") return { error: "Turn on your pro profile to show your work." };
+  if (!/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(image) || image.length > MAX_WORK_PHOTO_CHARS) return { error: "That photo is too large. Try another one." };
+  const works = db().collection("works");
+  const count = (await works.where("userId", "==", user.id).count().get()).data().count;
+  if (count >= MAX_WORK_PHOTOS) return { error: `You can show up to ${MAX_WORK_PHOTOS} photos. Remove one to add another.` };
+  await works.add({ userId: user.id, image, caption: String(caption ?? "").trim().slice(0, 120), createdAt: Date.now() });
+  refresh();
+  return { ok: true };
+}
+
+/** Removes one of the pro's own work photos. */
+export async function deleteWorkPhotoAction(id: string): Promise<{ ok?: true; error?: string }> {
+  const user = await requireUser();
+  const ref = db().collection("works").doc(String(id ?? "").slice(0, 128));
+  const w = (await ref.get()).data() as { userId?: string } | undefined;
+  if (!w || w.userId !== user.id) return { error: "That photo is already gone." };
+  await ref.delete();
+  refresh();
+  return { ok: true };
+}
+
+/** Saves just the "About you" text, from the dashboard's bio popup. */
+export async function saveBioAction(_: FormState, fd: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const bio = str(fd, "bio", 1500);
+  if (bio.length < MIN_BIO) return { fieldErrors: { bio: `Write at least ${MIN_BIO} characters so clients get a real picture of you.` } };
+  await users().doc(user.id).update({ bio });
+  updateTag(CATALOG_TAG);
+  refresh();
+  return { ok: true, message: "Bio saved" };
+}
+
 export async function updateProfileAction(_: FormState, fd: FormData): Promise<FormState> {
   const user = await requireUser();
   const name = str(fd, "name", 80);
@@ -272,13 +312,21 @@ export async function updateProfileAction(_: FormState, fd: FormData): Promise<F
   const phone = normalizeNgPhone(phoneRaw);
   if (phoneRaw && !phone) return { fieldErrors: { phone: PHONE_ERROR } };
   if (role === "provider" && !phone) return { fieldErrors: { phone: "Add a number clients can reach you on." } };
+  // Pros must say exactly where they are (state and LGA): it decides which clients they're shown to.
+  const place = readPlace((k) => fd.get(k), role === "provider");
+  if (place.errors) return { fieldErrors: place.errors };
 
   const update: Partial<UserDoc> = {
     name,
     businessName: str(fd, "businessName", 80),
     headline: str(fd, "headline", 120),
     bio: str(fd, "bio", 1500),
-    location: str(fd, "location", 80),
+    location: place.location,
+    state: place.state ?? "",
+    lga: place.lga ?? "",
+    city: place.city,
+    street: place.street,
+    landmark: place.landmark,
     category: isCategory(category) ? category : "",
     hourlyRate: int(fd, "rate"),
     rateUnit: asRateUnit(fd.get("rateUnit")),

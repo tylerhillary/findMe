@@ -97,7 +97,15 @@ async function Job({ params, searchParams }: { params: Promise<{ id: string }>; 
           <span className={cn("rounded-full px-2.5 py-1 text-xs font-bold", st.tone)}>{st.label}</span>
         </div>
         <dl className="mt-4 grid gap-2 text-sm text-ink-soft sm:grid-cols-2">
-          <div className="flex items-center gap-2"><MapPin className="size-4 text-brand-500" /> {job.location}</div>
+          {/* Only the client, the assigned pro and admins reach this page, so the exact address is shown. */}
+          <div className="flex items-start gap-2">
+            <MapPin className="mt-0.5 size-4 shrink-0 text-brand-500" />
+            <span>
+              {job.street && <span className="block font-semibold text-ink">{job.street}</span>}
+              {job.location}
+              {job.landmark && <span className="block text-muted">Landmark: {job.landmark}</span>}
+            </span>
+          </div>
           {job.when && <div className="flex items-center gap-2"><CalendarDays className="size-4 text-brand-500" /> {job.when}</div>}
         </dl>
         <p className="mt-4 whitespace-pre-wrap rounded-xl bg-canvas px-4 py-3 text-sm text-ink-soft">{job.details}</p>
