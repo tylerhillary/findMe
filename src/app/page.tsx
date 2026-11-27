@@ -189,7 +189,7 @@ export default function Home() {
               />
             </div>
             <p className="mx-auto mt-6 max-w-3xl text-center text-sm text-ink-soft sm:mt-10 sm:text-base">
-              If a client and pro continue privately, findMe loses nothing. We earn from optional Pro subscriptions, not a cut of each job.
+              Payment protection, reviews and job history only count for jobs booked through findMe, so it pays to keep booking here.
             </p>
           </div>
         </section>
