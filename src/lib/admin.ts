@@ -14,6 +14,9 @@ const MAIN_ADMIN = "tylerhillary03@gmail.com";
 /** Where admin emails go: the main admin plus everyone in ADMIN_EMAILS (no duplicates). */
 const adminInbox = () => [...new Set([MAIN_ADMIN, ...adminEmails().map((e) => e.toLowerCase())])];
 
+/** Also gets the sign-up emails (new clients and pros, and changed numbers) to call and verify them. Email only: not an admin login. */
+const SIGNUP_INBOX = ["dominicnyong121@gmail.com"];
+
 /**
  * Puts an admin email under the bell too, for every admin account (team emails and admin: true),
  * so nothing is only in an inbox.
@@ -79,7 +82,7 @@ export async function emailAdminsNumberToVerify(p: { uid: string; name: string; 
     footnote: "On your phone? The admin page has a Call button for each person.",
   });
   await Promise.all([
-    ...adminInbox().map((to) => sendEmail({ to, subject: `Verify number: ${p.name} (${formatNgPhone(p.phone)})`, html })),
+    ...[...new Set([...adminInbox(), ...SIGNUP_INBOX])].map((to) => sendEmail({ to, subject: `Verify number: ${p.name} (${formatNgPhone(p.phone)})`, html })),
     notifyAdminsInApp(title, `Call ${formatNgPhone(p.phone)} to verify this number. Their code: ${code}.`, "/admin/verifications").catch(() => {}),
   ]);
 }
