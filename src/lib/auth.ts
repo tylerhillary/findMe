@@ -5,6 +5,7 @@ import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { adminAuth, db } from "./firebase-admin";
 import { hasTeamBadge } from "./team";
+import { photoUrl } from "./photos";
 
 export const SESSION_COOKIE = "findme_session";
 // Firebase session cookies can last at most 14 days.
@@ -88,7 +89,7 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
     name: u.name,
     email: u.email,
     role: u.role === "provider" ? "provider" : "client",
-    avatar: u.avatar ?? null,
+    avatar: photoUrl("avatar", uid, u.avatar),
     headline: u.headline ?? "",
     team: hasTeamBadge(u),
   };

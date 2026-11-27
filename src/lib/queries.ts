@@ -11,6 +11,7 @@ import { CATEGORIES, categoryName, type RequestStatus } from "./categories";
 import { inState } from "./nigeria";
 import { publicName } from "./names";
 import type { RequestDoc, ReviewDoc, ServiceDoc, UserDoc, VerifiedKind } from "./schema";
+import { photoUrl } from "./photos";
 
 /** Cache tag for the public provider catalog (search, featured, category counts). */
 export const CATALOG_TAG = "catalog";
@@ -63,7 +64,7 @@ function cardFrom(id: string, u: UserDoc): ProviderCard {
     hourlyRate: u.hourlyRate ?? 0,
     rateUnit: asRateUnit(u.rateUnit),
     available: u.available !== false,
-    avatar: u.avatar ?? null,
+    avatar: photoUrl("avatar", id, u.avatar),
     rating: u.reviewCount ? round1((u.ratingSum ?? 0) / u.reviewCount) : 0,
     reviewCount: u.reviewCount ?? 0,
     jobsDone: u.jobsDone ?? 0,
@@ -306,7 +307,7 @@ export async function getProviderProfile(id: string): Promise<ProviderProfile | 
   return {
     ...cardFrom(id, u),
     bio: u.bio ?? "",
-    cover: (coverSnap.get("image") as string | undefined) ?? null,
+    cover: photoUrl("cover", id, coverSnap.get("image") as string | undefined),
     flagged: !!u.flagged,
     memberSince: u.createdAt,
     skillList: u.skills ?? [],
@@ -320,7 +321,7 @@ export async function getProviderProfile(id: string): Promise<ProviderProfile | 
       comment: r.comment,
       createdAt: r.createdAt,
       clientName: clients.get(r.clientId)?.name ?? "findMe user",
-      clientAvatar: clients.get(r.clientId)?.avatar ?? null,
+      clientAvatar: photoUrl("avatar", r.clientId, clients.get(r.clientId)?.avatar),
     })),
     contact: { phone: u.phone ?? "", whatsapp: u.whatsapp !== false, showPhone: !!u.showPhone },
   };
@@ -344,7 +345,7 @@ export async function getMyProfile(userId: string) {
   const u = snap.data() as UserDoc;
   return {
     id: userId,
-    cover: (coverSnap.get("image") as string | undefined) ?? null,
+    cover: photoUrl("cover", userId, coverSnap.get("image") as string | undefined),
     name: u.name,
     business_name: u.businessName ?? "",
     email: u.email,
@@ -356,7 +357,7 @@ export async function getMyProfile(userId: string) {
     hourly_rate: u.hourlyRate ?? 0,
     rate_unit: asRateUnit(u.rateUnit),
     available: u.available !== false,
-    avatar: u.avatar ?? null,
+    avatar: photoUrl("avatar", userId, u.avatar),
     phone: u.phone ?? "",
     whatsapp: u.whatsapp !== false,
     show_phone: !!u.showPhone,
@@ -421,7 +422,7 @@ export async function getMyRequests(userId: string): Promise<RequestSummary[]> {
       updatedAt: r.updatedAt,
       direction: incoming ? "incoming" : "outgoing",
       // Clients see the pro's business name in their list when they have one.
-      other: { id: otherId, name: o ? (incoming ? o.name : publicName(o)) : "findMe user", avatar: o?.avatar ?? null },
+      other: { id: otherId, name: o ? (incoming ? o.name : publicName(o)) : "findMe user", avatar: photoUrl("avatar", otherId, o?.avatar) },
       lastMessage: r.lastMessage ?? null,
       messageCount: r.messageCount ?? 0,
       needsReview: !incoming && r.status === "completed" && r.reviewed !== true,
@@ -461,11 +462,11 @@ export async function getRequestThread(requestId: string, userId: string) {
     message_count: r.messageCount ?? messagesSnap.size,
     created_at: r.createdAt,
     client_name: c?.name ?? "findMe user",
-    client_avatar: c?.avatar ?? null,
+    client_avatar: photoUrl("avatar", r.clientId, c?.avatar),
     client_email_verified: !!c?.emailVerified,
     client_team: hasTeamBadge(c),
     provider_name: p?.name ?? "findMe user",
-    provider_avatar: p?.avatar ?? null,
+    provider_avatar: photoUrl("avatar", r.providerId, p?.avatar),
     provider_email_verified: !!p?.emailVerified,
     provider_team: hasTeamBadge(p),
     provider_headline: p?.headline ?? "",

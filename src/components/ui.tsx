@@ -79,7 +79,7 @@ export function Avatar({
   const ringCls = ring && "ring-4 ring-white";
   if (src) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} alt={name} style={style} className={cn("shrink-0 rounded-full object-cover", ringCls, className)} />;
+    return <img src={src} alt={name} width={size} height={size} loading="lazy" decoding="async" style={style} className={cn("shrink-0 rounded-full object-cover", ringCls, className)} />;
   }
   return (
     <span
