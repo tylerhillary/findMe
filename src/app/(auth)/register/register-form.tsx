@@ -86,7 +86,7 @@ export function RegisterForm({ ninEnabled, booking = null }: { ninEnabled: boole
     setErrors(state.fieldErrors);
     const f = Object.keys(state.fieldErrors);
     if (f.some((k) => ["name", "email", "password", "phone", "nin"].includes(k))) setStep(1);
-    else if (f.some((k) => ["headline", "category", "state", "lga", "city"].includes(k))) setStep(2);
+    else if (f.some((k) => ["headline", "category", "state", "lga", "street"].includes(k))) setStep(2);
     else if (f.includes("skills")) setStep(3);
   }, [state]);
 
@@ -115,8 +115,8 @@ export function RegisterForm({ ninEnabled, booking = null }: { ninEnabled: boole
       if (headline.trim().length < 6) e.headline = "Tell people what you do in a few words.";
       if (!category) e.category = "Pick the category that fits you best.";
       if (!place.state) e.state = "Choose your state.";
-      else if (!place.lga) e.lga = "Choose your local government.";
-      if (place.city.trim().length < 2) e.city = "Add your city or town.";
+      else if (!place.lga) e.lga = "Choose your city or town.";
+      if (place.street.trim().length < 4) e.street = "Add your street address.";
     }
     if (s === 3 && skills.length === 0) e.skills = "Add at least one skill.";
     setErrors(e);
@@ -135,7 +135,7 @@ export function RegisterForm({ ninEnabled, booking = null }: { ninEnabled: boole
     if (step < last) return go(step + 1);
     if (!validate(step)) return;
     const fd = new FormData();
-    Object.entries({ name, businessName: role === "provider" ? businessName : "", email, password, phone, nin: ninEnabled ? nin : "", whatsapp: whatsapp ? "1" : "0", role: role ?? "client", headline, category, state: place.state, lga: place.lga, city: place.city, street: place.street, landmark: place.landmark, rate, rateUnit, next }).forEach(([k, v]) => fd.set(k, v));
+    Object.entries({ name, businessName: role === "provider" ? businessName : "", email, password, phone, nin: ninEnabled ? nin : "", whatsapp: whatsapp ? "1" : "0", role: role ?? "client", headline, category, state: place.state, lga: place.lga, street: place.street, landmark: place.landmark, rate, rateUnit, next }).forEach(([k, v]) => fd.set(k, v));
     fd.set("skills", JSON.stringify(skills));
     startTransition(async () => {
       // 1) Server validates and creates the Firebase account + profile.
@@ -367,8 +367,8 @@ export function RegisterForm({ ninEnabled, booking = null }: { ninEnabled: boole
                     </div>
                     <div>
                       <p className="text-sm font-semibold">Where you work from</p>
-                      <p className="mb-3 mt-0.5 text-xs text-muted">Clients in your local government see you first.</p>
-                      <PlaceInput defaultValue={place} onChange={setPlace} required errors={{ state: errors.state, lga: errors.lga, city: errors.city }} />
+                      <p className="mb-3 mt-0.5 text-xs text-muted">Clients in your city or town see you first.</p>
+                      <PlaceInput defaultValue={place} onChange={setPlace} required errors={{ state: errors.state, lga: errors.lga, street: errors.street }} />
                     </div>
                     <div className="grid gap-5 sm:grid-cols-2">
                       <div>

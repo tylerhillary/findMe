@@ -9,7 +9,7 @@ import { publicName } from "@/lib/names";
 import { formatNgPhone } from "@/lib/phone";
 import type { JobDoc, UserDoc } from "@/lib/schema";
 import { RequestForm, type PickedPro } from "./request-form";
-import { areaOf, placeOf } from "@/lib/lgas";
+import { placeOf } from "@/lib/lgas";
 import { FarAwayCheck } from "@/components/far-away-check";
 import { shownName } from "@/lib/names";
 
@@ -83,7 +83,6 @@ async function Content({ searchParams }: { searchParams: PageProps<"/request">["
         place: {
           state: place.state ?? "",
           lga: place.lga ?? "",
-          city: from?.city ?? (from ? areaOf(from.location ?? "", place) : ""),
           street: from?.street ?? "",
           landmark: from?.landmark ?? "",
         },

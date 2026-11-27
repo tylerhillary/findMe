@@ -6,29 +6,26 @@ import { NIGERIAN_STATES } from "@/lib/nigeria";
 import { LGAS, isState } from "@/lib/lgas";
 import { FieldError, Input, Label, Select, cn } from "./ui";
 
-export type PlaceValue = { state: string; lga: string; city: string; street: string; landmark: string };
-export const EMPTY_PLACE: PlaceValue = { state: "", lga: "", city: "", street: "", landmark: "" };
+export type PlaceValue = { state: string; lga: string; street: string; landmark: string };
+export const EMPTY_PLACE: PlaceValue = { state: "", lga: "", street: "", landmark: "" };
 
 type Errors = Partial<Record<keyof PlaceValue, string>>;
 
 /**
- * State → local government → city or town → street → landmark. Sends each as its own field.
+ * State → city or town (the list is the state's local government areas) → street → landmark (optional). Sends each as its own field.
  * Street and landmark are private: only findMe and the pro given the job see them.
  */
 export function PlaceInput({
   defaultValue,
   onChange,
   required,
-  streetRequired,
   errors,
   className,
 }: {
   defaultValue?: Partial<PlaceValue>;
   onChange?: (v: PlaceValue) => void;
-  /** State, LGA and city must be filled in. */
+  /** State and LGA must be filled in. Street always must be; landmark never. */
   required?: boolean;
-  /** Street must be filled in too (job requests: the pro has to find the place). */
-  streetRequired?: boolean;
   errors?: Errors;
   className?: string;
 }) {
@@ -54,22 +51,17 @@ export function PlaceInput({
         <FieldError msg={errors?.state} />
       </div>
       <div>
-        <Label htmlFor="place-lga" hint={hint(required)}>Local government</Label>
+        <Label htmlFor="place-lga" hint={hint(required)}>City or town</Label>
         <Select id="place-lga" name="lga" value={v.lga} onChange={(e) => set({ lga: e.target.value })} disabled={!lgas.length} aria-invalid={!!errors?.lga}>
-          <option value="">{lgas.length ? "Choose your LGA…" : "Pick a state first"}</option>
+          <option value="">{lgas.length ? "Choose your city or town…" : "Pick a state first"}</option>
           {lgas.map((l) => (
             <option key={l} value={l}>{l}</option>
           ))}
         </Select>
         <FieldError msg={errors?.lga} />
       </div>
-      <div className="sm:col-span-2">
-        <Label htmlFor="place-city" hint={hint(required)}>City or town</Label>
-        <Input id="place-city" name="city" value={v.city} onChange={(e) => set({ city: e.target.value })} maxLength={60} placeholder="e.g. Rumuokoro" aria-invalid={!!errors?.city} />
-        <FieldError msg={errors?.city} />
-      </div>
       <div>
-        <Label htmlFor="place-street" hint={hint(streetRequired)}>Street address</Label>
+        <Label htmlFor="place-street">Street address</Label>
         <Input id="place-street" name="street" value={v.street} onChange={(e) => set({ street: e.target.value })} maxLength={120} placeholder="e.g. 12 Aba Road" autoComplete="street-address" aria-invalid={!!errors?.street} />
         <FieldError msg={errors?.street} />
       </div>

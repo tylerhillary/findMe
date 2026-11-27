@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { OFFER_SKILLS_HREF, SmartLink } from "./smart-link";
 import { AnimatePresence, motion } from "motion/react";
-import { ChevronRight, LayoutDashboard, LogOut, Menu, MessageSquareText, Settings, UserRound, X } from "lucide-react";
+import { ChevronRight, Home, LayoutDashboard, LogOut, Menu, MessageSquareText, Settings, UserRound, X } from "lucide-react";
 import { SignOutForm } from "@/components/sign-out-form";
 import { Avatar, Logo, btn, cn } from "./ui";
 
@@ -153,7 +153,20 @@ export function HeaderShell({ auth, transparent }: { auth: ReactNode; transparen
   );
 }
 
-export function UserMenu({ user }: { user: { id: string; name: string; email: string; avatar: string | null; role: "client" | "provider" } }) {
+export function UserMenu({
+  user,
+  badge,
+  withHome,
+  compact,
+}: {
+  user: { id: string; name: string; email: string; avatar: string | null; role: "client" | "provider" };
+  /** Small badge on the photo (findMe team, verified). */
+  badge?: ReactNode;
+  /** Adds "findMe home" to the menu (the dashboard has no site nav). */
+  withHome?: boolean;
+  /** Photo only, no name beside it. */
+  compact?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -171,6 +184,7 @@ export function UserMenu({ user }: { user: { id: string; name: string; email: st
   }, []);
 
   const items = [
+    ...(withHome ? [{ href: "/", label: "findMe home", icon: Home }] : []),
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/dashboard/requests", label: "Requests & messages", icon: MessageSquareText },
     // Pros see their public page as others do (it has its own edit button). Editing lives in the dashboard.
@@ -182,12 +196,14 @@ export function UserMenu({ user }: { user: { id: string; name: string; email: st
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 rounded-full border border-line bg-white p-0.5 transition hover:border-brand-200 hover:shadow-soft sm:p-1 sm:pr-3"
+        className={cn("relative flex items-center gap-2 rounded-full border border-line bg-white p-0.5 transition hover:border-brand-200 hover:shadow-soft", !compact && "sm:p-1 sm:pr-3")}
         aria-expanded={open}
         aria-haspopup="menu"
+        aria-label="Your account"
       >
         <Avatar name={user.name} src={user.avatar} size={30} />
-        <span className="hidden max-w-28 truncate text-sm font-semibold sm:block">{user.name.split(" ")[0]}</span>
+        {badge && <span className="absolute -bottom-0.5 -right-0.5 grid place-items-center rounded-full bg-white">{badge}</span>}
+        {!compact && <span className="hidden max-w-28 truncate text-sm font-semibold sm:block">{user.name.split(" ")[0]}</span>}
       </button>
       <AnimatePresence>
         {open && (

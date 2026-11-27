@@ -107,8 +107,8 @@ export function RequestForm({ pro, defaults, againOf }: { pro: PickedPro | null;
         </div>
         <div>
           <p className="text-sm font-semibold">Where should the pro come to?</p>
-          <p className="mb-3 mt-0.5 text-xs text-muted">We look for pros in your local government first.</p>
-          <PlaceInput defaultValue={defaults.place} required streetRequired errors={{ state: e.state, lga: e.lga, city: e.city, street: e.street }} />
+          <p className="mb-3 mt-0.5 text-xs text-muted">We look for pros in your city or town first.</p>
+          <PlaceInput defaultValue={defaults.place} required errors={{ state: e.state, lga: e.lga, street: e.street }} />
         </div>
         <div>
           <Label htmlFor="phone" hint="Only the pro we send sees it">Your phone number</Label>

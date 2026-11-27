@@ -62,7 +62,7 @@ export async function createJobAction(_: FormState, fd: FormData): Promise<FormS
   const requirements = parseRequirements(fd.get("requirements"));
   const category = str(fd, "category", 40);
   // State and LGA are required: they decide which nearby pros findMe considers.
-  const place = readPlace((k) => fd.get(k), true, true);
+  const place = readPlace((k) => fd.get(k), true);
   const location = place.location;
   const when = str(fd, "when", 80);
   const phoneRaw = str(fd, "phone", 30);
@@ -100,7 +100,7 @@ export async function createJobAction(_: FormState, fd: FormData): Promise<FormS
   const now = Date.now();
   const ref = jobs().doc();
   await ref.set({
-    clientId: user.id, clientName: user.name, clientPhone: phone!, title, details, requirements, category, location, state: place.state!, lga: place.lga!, city: place.city, street: place.street, landmark: place.landmark, when,
+    clientId: user.id, clientName: user.name, clientPhone: phone!, title, details, requirements, category, location, state: place.state!, lga: place.lga!, street: place.street, landmark: place.landmark, when,
     preferredProId, clientOffer: 0, status: "new", price: 0, proPayout: 0, proId: null, createdAt: now, updatedAt: now,
     ...(repeatOf ? { repeatOf } : {}),
   } satisfies JobDoc);
@@ -108,7 +108,7 @@ export async function createJobAction(_: FormState, fd: FormData): Promise<FormS
   const me = (await users().doc(user.id).get()).data() as UserDoc | undefined;
   if (!me?.phone) await users().doc(user.id).update({ phone: phone! });
   // And where they are, if their profile doesn't say: it picks the pros shown on their dashboard.
-  if (!me?.state) await users().doc(user.id).update({ state: place.state!, lga: place.lga!, city: place.city, street: place.street, landmark: place.landmark, location });
+  if (!me?.state) await users().doc(user.id).update({ state: place.state!, lga: place.lga!, street: place.street, landmark: place.landmark, location });
 
   after(() =>
     emailAdmins({

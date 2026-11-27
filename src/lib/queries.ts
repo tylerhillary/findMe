@@ -9,7 +9,7 @@ import { AggregateField } from "firebase-admin/firestore";
 import { db } from "./firebase-admin";
 import { CATEGORIES, categoryName, type RequestStatus } from "./categories";
 import { inState } from "./nigeria";
-import { areaOf, nearness, placeOf, type Place } from "./lgas";
+import { nearness, placeOf, type Place } from "./lgas";
 import { publicName } from "./names";
 import type { RequestDoc, ReviewDoc, ServiceDoc, UserDoc, VerifiedKind } from "./schema";
 import { photoUrl } from "./photos";
@@ -383,7 +383,6 @@ export async function getMyProfile(userId: string) {
     bio: u.bio ?? "",
     location: u.location ?? "",
     ...placeOf(u),
-    city: u.city ?? areaOf(u.location ?? "", placeOf(u)),
     street: u.street ?? "",
     landmark: u.landmark ?? "",
     category: u.category ?? "",

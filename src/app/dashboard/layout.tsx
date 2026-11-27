@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { ExternalLink, Home, LogOut, Settings } from "lucide-react";
+import { ExternalLink, LogOut, Settings } from "lucide-react";
 import { Avatar, Logo } from "@/components/ui";
 import { TeamBadge, VerifiedAccountBadge } from "@/components/verify-phone";
 import { getEmailStatus, requireUser } from "@/lib/auth";
@@ -10,6 +10,7 @@ import { ModeSwitch } from "./mode-switch";
 import { SignOutForm } from "@/components/sign-out-form";
 import { DashNav, MobileTabs } from "./dash-nav";
 import { NotificationBell } from "@/components/notification-bell";
+import { UserMenu } from "@/components/site-header-client";
 import { VerifyEmailBanner } from "./verify-email-banner";
 
 export default function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
@@ -38,7 +39,7 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-line bg-white/85 px-4 backdrop-blur-xl lg:hidden">
+        <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-line bg-white/90 px-4 backdrop-blur-xl supports-[backdrop-filter]:bg-white/80 lg:hidden">
           <Logo />
           <Suspense fallback={<div className="skeleton size-9 rounded-full" />}>
             <MobileUser />
@@ -133,35 +134,15 @@ async function SidebarUser() {
   );
 }
 
+/** Phone header, right side: notifications and the account menu (home, dashboard, settings, sign out). */
 async function MobileUser() {
   const user = await requireUser();
   const [unread, { verified }] = await Promise.all([getUnreadCount(user.id), getEmailStatus(user.id)]);
+  const badge = user.team ? <TeamBadge compact className="size-3.5" /> : verified ? <VerifiedAccountBadge compact className="size-3.5" /> : null;
   return (
-    <div className="flex items-center gap-0.5">
-      <Link href="/" className="grid size-9 place-items-center rounded-full text-muted hover:bg-brand-50 hover:text-brand-700" aria-label="findMe home" title="Home">
-        <Home className="size-[18px]" />
-      </Link>
+    <div className="flex items-center gap-1.5">
       <NotificationBell unread={unread} />
-      <Link href="/dashboard/settings" className="grid size-9 place-items-center rounded-full text-muted hover:bg-brand-50 hover:text-brand-700" aria-label="Account settings">
-        <Settings className="size-[18px]" />
-      </Link>
-      <Link href="/dashboard/profile" aria-label={verified ? "Your profile (verified email)" : "Your profile"} className="relative ml-1">
-        <Avatar name={user.name} src={user.avatar} size={32} />
-        {user.team ? (
-          <span className="absolute -bottom-0.5 -right-0.5 grid place-items-center rounded-full bg-white">
-            <TeamBadge compact className="size-3.5" />
-          </span>
-        ) : verified && (
-          <span className="absolute -bottom-0.5 -right-0.5 grid place-items-center rounded-full bg-white">
-            <VerifiedAccountBadge compact className="size-3.5" />
-          </span>
-        )}
-      </Link>
-      <SignOutForm>
-        <button className="grid size-9 place-items-center rounded-lg text-muted hover:bg-red-50 hover:text-red-600" aria-label="Sign out">
-          <LogOut className="size-4" />
-        </button>
-      </SignOutForm>
+      <UserMenu user={{ id: user.id, name: user.name, email: user.email, avatar: user.avatar, role: user.role }} badge={badge} withHome compact />
     </div>
   );
 }

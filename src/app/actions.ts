@@ -166,7 +166,7 @@ export async function registerAction(_: FormState, fd: FormData): Promise<FormSt
 
   try {
     await users().doc(uid).set({
-      name, email, role, headline, location, ...(place.state ? { state: place.state, lga: place.lga ?? "" } : {}), city: place.city, street: place.street, landmark: place.landmark,
+      name, email, role, headline, location, ...(place.state ? { state: place.state, lga: place.lga ?? "" } : {}), street: place.street, landmark: place.landmark,
       ...(role === "provider" && businessName ? { businessName } : {}),
       category: isCategory(category) ? category : "",
       hourlyRate: rate, rateUnit: asRateUnit(fd.get("rateUnit")), available: true, avatar: null,
@@ -324,7 +324,6 @@ export async function updateProfileAction(_: FormState, fd: FormData): Promise<F
     location: place.location,
     state: place.state ?? "",
     lga: place.lga ?? "",
-    city: place.city,
     street: place.street,
     landmark: place.landmark,
     category: isCategory(category) ? category : "",

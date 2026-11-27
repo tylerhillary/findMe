@@ -14,7 +14,7 @@ import { PlaceInput } from "@/components/place-input";
 import { Toast } from "@/components/toast";
 
 type Profile = {
-  name: string; business_name: string; email: string; role: string; headline: string; bio: string; location: string; state: string | null; lga: string | null; city: string; street: string; landmark: string;
+  name: string; business_name: string; email: string; role: string; headline: string; bio: string; location: string; state: string | null; lga: string | null; street: string; landmark: string;
   category: string; hourly_rate: number; rate_unit: RateUnit; available: boolean; avatar: string | null;
   phone: string; whatsapp: boolean; show_phone: boolean; phone_verified: boolean; cover: string | null;
 };
@@ -167,12 +167,12 @@ export function ProfileForm({ profile, startListed }: { profile: Profile; startL
           <div className="sm:col-span-2">
             <p className="text-sm font-semibold">Where you are</p>
             <p className="mb-3 mt-0.5 text-xs text-muted">
-              {listed ? "Clients in your local government see you first, so pick it exactly." : "We show you pros in your local government first."}
+              {listed ? "Clients in your city or town see you first, so pick it exactly." : "We show you pros in your city or town first."}
             </p>
             <PlaceInput
-              defaultValue={{ state: profile.state ?? "", lga: profile.lga ?? "", city: profile.city, street: profile.street, landmark: profile.landmark }}
+              defaultValue={{ state: profile.state ?? "", lga: profile.lga ?? "", street: profile.street, landmark: profile.landmark }}
               required={listed}
-              errors={{ state: state.fieldErrors?.state, lga: state.fieldErrors?.lga, city: state.fieldErrors?.city }}
+              errors={{ state: state.fieldErrors?.state, lga: state.fieldErrors?.lga, street: state.fieldErrors?.street }}
             />
           </div>
           <div>

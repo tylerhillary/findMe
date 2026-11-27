@@ -107,33 +107,31 @@ export function areaOf(location: string, place: Place) {
 }
 
 /**
- * Reads the fields a PlaceInput sends. `required`: state, LGA and city; `streetRequired`: street
- * too. `location` is the public "City, LGA, State"; street and landmark are kept apart because
+ * Reads the fields a PlaceInput sends. `required`: state, LGA and street. Street is never
+ * optional: anyone who gives a place at all must give its street. Landmark always is optional.
+ * `location` is the public "LGA, State"; street and landmark are kept apart because
  * only findMe and the pro given the job may see them.
  */
-export function readPlace(get: (key: string) => unknown, required: boolean, streetRequired = false) {
+export function readPlace(get: (key: string) => unknown, required: boolean) {
   const clean = (k: string, max: number) => String(get(k) ?? "").trim().replace(/\s+/g, " ").slice(0, max);
   const state = clean("state", 40);
   const lga = clean("lga", 60);
-  const city = clean("city", 60);
   const street = clean("street", 120);
   const landmark = clean("landmark", 100);
-  const errors: Partial<Record<"state" | "lga" | "city" | "street", string>> = {};
+  const errors: Partial<Record<"state" | "lga" | "street", string>> = {};
   if (state && !isState(state)) errors.state = "Choose your state from the list.";
   else if (required && !state) errors.state = "Choose your state.";
-  if (isState(state) && lga && !isLga(state, lga)) errors.lga = "Choose your local government from the list.";
-  else if (required && !lga) errors.lga = "Choose your local government.";
-  if (required && city.length < 2) errors.city = "Add your city or town.";
-  if (streetRequired && street.length < 4) errors.street = "Add the street address so the pro can find you.";
+  if (isState(state) && lga && !isLga(state, lga)) errors.lga = "Choose your city or town from the list.";
+  else if (required && !lga) errors.lga = "Choose your city or town.";
+  if ((required || state) && street.length < 4) errors.street = "Add your street address.";
   const ok = isState(state) ? state : null;
   const okLga = ok && isLga(ok, lga) ? lga : null;
   return {
     state: ok,
     lga: okLga,
-    city,
     street,
     landmark,
-    location: [city, okLga, ok].filter(Boolean).join(", ").slice(0, 160),
+    location: [okLga, ok].filter(Boolean).join(", ").slice(0, 160),
     errors: Object.keys(errors).length ? errors : null,
   };
 }

@@ -13,10 +13,9 @@ export type UserDoc = {
   headline?: string;
   bio?: string;
   location?: string;
-  /** Picked from the list: state and local government. `location` is the public "City, LGA, State". */
+  /** Picked from the list: state and local government. `location` is the public "LGA, State". */
   state?: string;
   lga?: string;
-  city?: string;
   /** Private: never shown on the public profile or in search. */
   street?: string;
   landmark?: string;
@@ -191,10 +190,9 @@ export type JobDoc = {
   requirements?: string[];
   requirementsAgreedAt?: number;
   category: string;
-  location: string; // public "City, LGA, State": what pros see before the job is theirs
+  location: string; // public "LGA, State": what pros see before the job is theirs
   state?: string;
   lga?: string;
-  city?: string;
   /** Exact address: only the assigned pro and admins see these. */
   street?: string;
   landmark?: string;

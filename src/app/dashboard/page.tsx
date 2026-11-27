@@ -363,7 +363,7 @@ function NoLocation({ place, what }: { place: Place; what: string }) {
   return (
     <p className="flex items-center gap-2 border-b border-line bg-amber-50/70 px-4 py-2.5 text-[12.5px] text-amber-900 sm:px-5">
       <MapPin className="size-3.5 shrink-0" />
-      <span className="flex-1">{place.state ? `Add your local government to see ${what} closest to you first.` : `Add your state and local government to see ${what} near you first.`}</span>
+      <span className="flex-1">{place.state ? `Add your city or town to see ${what} closest to you first.` : `Add your state and city or town to see ${what} near you first.`}</span>
       <Link href="/dashboard/profile" className="font-semibold underline underline-offset-2">Add it</Link>
     </p>
   );
