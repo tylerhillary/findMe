@@ -40,13 +40,15 @@ export const telLink = (e164: string) => `tel:${e164}`;
 export const whatsappLink = (e164: string, text?: string) =>
   `https://wa.me/${e164.replace(/^\+/, "")}${text ? `?text=${encodeURIComponent(text)}` : ""}`;
 
+/** Dom on findMe's team handles phone verification; every "Verify on WhatsApp" chat opens with this number. */
+const VERIFY_WHATSAPP_DEFAULT = "+2348050939621";
+
 /**
- * findMe's own WhatsApp number (NEXT_PUBLIC_FINDME_WHATSAPP), as digits for wa.me links, or null
- * when it isn't set. Accepts "+234 803 …", "0803 …" or "234803…".
+ * The WhatsApp number that verifies phone numbers, as digits for wa.me links: Dom's, unless
+ * NEXT_PUBLIC_VERIFY_WHATSAPP overrides it. Accepts "+234 803 …", "0803 …" or "234803…".
  */
-export function findMeWhatsApp(): string | null {
-  const raw = process.env.NEXT_PUBLIC_FINDME_WHATSAPP?.trim();
-  if (!raw) return null;
+export function verifyWhatsApp(): string | null {
+  const raw = process.env.NEXT_PUBLIC_VERIFY_WHATSAPP?.trim() || VERIFY_WHATSAPP_DEFAULT;
   const e164 = normalizeNgPhone(raw);
   const digits = (e164 ?? raw).replace(/\D/g, "");
   return digits.length >= 10 ? digits : null;

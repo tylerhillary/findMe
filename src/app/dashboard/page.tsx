@@ -33,11 +33,11 @@ import { FadeIn } from "@/components/motion";
 import { WelcomeBanner } from "./welcome-banner";
 import { ExpectCallCard, PhoneVerifiedCard } from "./expect-call-card";
 import { getCallCode, isAdmin } from "@/lib/admin";
-import { findMeWhatsApp, whatsappLink } from "@/lib/phone";
+import { verifyWhatsApp, whatsappLink } from "@/lib/phone";
 
-/** Opens WhatsApp with a message to findMe holding their code; null when findMe's number isn't set. */
+/** Opens WhatsApp with a message to findMe holding their code; goes to Dom, who verifies numbers. */
 function verifyOnWhatsApp(code: string, name: string) {
-  const to = findMeWhatsApp();
+  const to = verifyWhatsApp();
   return to ? whatsappLink(`+${to}`, `Hi findMe, please verify my phone number. My code is ${code}. (${name})`) : null;
 }
 
