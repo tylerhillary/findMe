@@ -80,9 +80,11 @@ export default function TermsPage() {
           body: (
             <ul>
               <li>The guarantee covers jobs that are booked and paid for through findMe. It doesn&apos;t cover work arranged or paid for outside findMe.</li>
+              <li>Every job has a list of agreed requirements. The client writes them when requesting, findMe confirms the final list with the price, and paying accepts it. The professional ticks off each requirement before marking the job done.</li>
+              <li>Problems are judged against the agreed requirements. A report must say which requirement wasn&apos;t met. Work or expectations that weren&apos;t on the list aren&apos;t covered, so add anything that matters to you before you pay.</li>
               <li>When the professional marks a job done, the client has 3 days to confirm it or report a problem on the job page. We hold the professional&apos;s pay during that time.</li>
               <li>When a problem is reported, the job isn&apos;t confirmed automatically and the professional isn&apos;t paid until findMe has looked into it. We may call both sides and ask for photos.</li>
-              <li>If the problem is with the professional&apos;s work, they fix or redo it at no extra cost before they&apos;re paid. If that isn&apos;t possible, findMe refunds the client the price they paid, and the professional isn&apos;t paid for the job.</li>
+              <li>If an agreed requirement wasn&apos;t met because of the professional&apos;s work, they fix or redo it at no extra cost before they&apos;re paid. If that isn&apos;t possible, findMe refunds the client the price they paid, and the professional isn&apos;t paid for the job.</li>
               <li>If the problem was caused by the client or someone else, or the work was done as agreed, the guarantee doesn&apos;t apply: the job is confirmed and the professional is paid.</li>
               <li>Once a client confirms a job is done, or the 3 days pass without a report, the guarantee ends for that job.</li>
               <li>findMe&apos;s decision is final. Card refunds go back to the card or account used and can take a few working days to arrive.</li>

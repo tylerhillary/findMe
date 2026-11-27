@@ -176,6 +176,13 @@ export type JobDoc = {
   clientPhone: string; // E.164; shown only to the assigned pro and admins
   title: string;
   details: string;
+  /**
+   * What "done" means for this job, one item each. The client writes them when requesting;
+   * findMe agrees the final list when it sends the price (requirementsAgreedAt), and paying
+   * accepts it. The pro ticks each one off, and guarantee claims are judged against this list.
+   */
+  requirements?: string[];
+  requirementsAgreedAt?: number;
   category: string;
   location: string; // area / address for the pro
   when: string; // e.g. "This weekend", "ASAP"
@@ -215,6 +222,8 @@ export type JobDoc = {
   claim?: {
     reason: string;
     details: string;
+    /** Which agreed requirements the client says weren't met. */
+    unmet?: string[];
     openedAt: number;
     outcome?: "not_covered" | "redo" | "refund" | "withdrawn";
     note?: string;

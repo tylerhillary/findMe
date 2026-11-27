@@ -70,6 +70,7 @@ async function Content({ searchParams }: { searchParams: PageProps<"/request">["
         location: repeat?.location || me?.location || "",
         category: repeat?.category ?? picked?.category ?? "",
         details: repeat?.details ?? "",
+        requirements: repeat?.requirements?.join("\n") ?? "",
       }}
     />
   );

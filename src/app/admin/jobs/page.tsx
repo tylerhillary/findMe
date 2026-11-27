@@ -174,6 +174,16 @@ async function Content() {
                       )}
                     </div>
                     <p className="mt-3 whitespace-pre-wrap rounded-xl bg-canvas px-3 py-2 text-sm text-ink-soft">{j.details}</p>
+                    {(j.requirements?.length ?? 0) > 0 && (
+                      <div className="mt-2 rounded-xl border border-line px-3 py-2 text-sm">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-muted">{j.requirementsAgreedAt ? "Agreed requirements" : "Client's requirements · agree them with the price"}</p>
+                        <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-ink-soft">
+                          {j.requirements!.map((r, i) => (
+                            <li key={i} className={cn(j.claim?.unmet?.includes(r) && "font-semibold text-red-700")}>{r}{j.claim?.unmet?.includes(r) ? " (client says not met)" : ""}</li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
                     {j.claim && (
                       <div className={cn("mt-3 rounded-xl border px-3 py-2.5 text-sm", claimOpen(j) ? "border-red-200 bg-red-50 text-red-950" : "border-line bg-canvas text-ink-soft")}>
                         <p className="font-semibold">
@@ -206,6 +216,7 @@ async function Content() {
                           canPaystack={paystack && !!j.paidAt && !!(j.proId && payouts.get(j.proId)?.recipientCode)}
                           payoutBusy={j.payoutStatus === "sending" || j.payoutStatus === "pending"}
                           claimOpen={claimOpen(j)}
+                          requirements={j.requirements ?? []}
                           refundDue={j.refundDue && !j.refundedAt ? j.refundDue : 0}
                           canPaystackRefund={paystack && j.paidVia === "paystack" && !!j.paystackRef}
                         />

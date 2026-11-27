@@ -11,6 +11,7 @@ import { jobStatusLabel } from "@/lib/job-status";
 import { AUTO_CONFIRM_MS } from "@/lib/jobs";
 import { feeOnJob } from "@/lib/fees";
 import { GUARANTEE_DAYS, claimOpen } from "@/lib/guarantee";
+import { RequirementsList } from "@/components/requirements-list";
 import { categoryName } from "@/lib/categories";
 import { Avatar, btn, cn, formatMoney } from "@/components/ui";
 import { FadeIn } from "@/components/motion";
@@ -100,6 +101,23 @@ async function Job({ params, searchParams }: { params: Promise<{ id: string }>; 
           {job.when && <div className="flex items-center gap-2"><CalendarDays className="size-4 text-brand-500" /> {job.when}</div>}
         </dl>
         <p className="mt-4 whitespace-pre-wrap rounded-xl bg-canvas px-4 py-3 text-sm text-ink-soft">{job.details}</p>
+        {(job.requirements?.length ?? 0) > 0 && (
+          <RequirementsList
+            className="mt-4"
+            items={job.requirements!}
+            title={job.requirementsAgreedAt ? "Agreed requirements" : side === "pro" ? "Requirements" : "Your requirements"}
+            done={job.status === "completed"}
+            note={
+              !job.requirementsAgreedAt
+                ? "findMe will confirm these with you when we send your price."
+                : side === "pro"
+                  ? "Agreed with the client before they paid. Do each of these: you'll tick them off before marking the job done, and any complaint is checked against this list."
+                  : job.status === "quoted"
+                    ? "This is the job findMe agreed with you. Paying confirms it. If the work doesn't meet these, the findMe Guarantee covers you."
+                    : "Agreed before you paid. The pro ticks these off, and the findMe Guarantee covers you if they aren't met."
+            }
+          />
+        )}
       </FadeIn>
 
       <div className="mt-4 space-y-4">{side === "pro" ? <ProView job={job} clientTeam={clientTeam} hasPayout={(await db().collection("payouts").doc(user.id).get()).exists} /> : <ClientView job={job} pro={pro} review={review} />}</div>
@@ -196,7 +214,7 @@ function ClientView({ job, pro, review }: { job: Data["job"]; pro: Data["pro"]; 
         <FadeIn className="card border-amber-200 p-5 sm:p-6">
           <p className="flex items-center gap-2 font-semibold"><ShieldCheck className="size-5 text-emerald-600" /> We&apos;re looking into your report</p>
           <p className="mt-1 text-sm text-ink-soft">
-            You reported: <span className="font-semibold">{job.claim!.reason}</span>. {first}&apos;s pay is on hold while findMe checks what happened. We may call you or ask for photos.
+            You reported: <span className="font-semibold">{job.claim!.reason}</span>{job.claim!.unmet?.length ? <> (not met: {job.claim!.unmet.join("; ")})</> : null}. {first}&apos;s pay is on hold while findMe checks what happened. We may call you or ask for photos.
           </p>
           <p className="mt-2 text-xs text-muted">Sorted it out with {first}? You can still confirm the job is done.</p>
           <div className="mt-3"><ConfirmDoneButtons jobId={job.id} proName={first} autoDate="" claimed /></div>
@@ -211,7 +229,7 @@ function ClientView({ job, pro, review }: { job: Data["job"]; pro: Data["pro"]; 
 
       {job.status === "assigned" && !claimOpen(job) && (
         job.doneRequestedAt ? (
-          <ConfirmDoneButtons jobId={job.id} proName={first} autoDate={day(job.doneRequestedAt + AUTO_CONFIRM_MS)} />
+          <ConfirmDoneButtons jobId={job.id} proName={first} autoDate={day(job.doneRequestedAt + AUTO_CONFIRM_MS)} requirements={job.requirementsAgreedAt ? job.requirements ?? [] : []} />
         ) : (
           <FadeIn className="card p-5 sm:p-6">
             <p className="font-semibold">{first} will contact you to arrange the job.</p>
@@ -297,7 +315,7 @@ function ProView({ job, clientTeam, hasPayout }: { job: Data["job"]; clientTeam:
               Waiting for the client to confirm. If they don&apos;t answer, it&apos;s confirmed automatically on {day(job.doneRequestedAt + AUTO_CONFIRM_MS)}.
             </FadeIn>
           ) : (
-            <ProDoneButton jobId={job.id} />
+            <ProDoneButton jobId={job.id} requirements={job.requirementsAgreedAt ? job.requirements ?? [] : []} />
           )}
         </>
       )}

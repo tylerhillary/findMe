@@ -10,8 +10,9 @@ import { MIN_JOB_PRICE, findMeFeeFor, proPayoutFor } from "@/lib/fees";
 export type ProOption = { id: string; label: string; preferred: boolean };
 
 export function AdminJobControls({
-  jobId, status, price, proPayout, proId, proPaid, paymentClaimed, pros, proPrice, canPaystack, payoutBusy, claimOpen, refundDue, canPaystackRefund,
+  jobId, status, price, proPayout, proId, proPaid, paymentClaimed, pros, proPrice, canPaystack, payoutBusy, claimOpen, refundDue, canPaystackRefund, requirements,
 }: {
+  requirements: string[];
   jobId: string; status: JobStatus; price: number; proPayout: number; canPaystack: boolean; payoutBusy: boolean; claimOpen: boolean; refundDue: number; canPaystackRefund: boolean; proId: string | null; proPaid: boolean; paymentClaimed: boolean; pros: ProOption[]; proPrice: number;
 }) {
   const [pending, start] = useTransition();
@@ -20,6 +21,7 @@ export function AdminJobControls({
   const [amount, setAmount] = useState(String(price || proPrice || ""));
   const [note, setNote] = useState("");
   const [finding, setFinding] = useState("");
+  const [reqs, setReqs] = useState(requirements.join("\n"));
   const [pick, setPick] = useState(proId ?? pros.find((p) => p.preferred)?.id ?? "");
 
   const run = (key: string, fn: () => Promise<{ error?: string }>, ask?: string) => {
@@ -46,13 +48,16 @@ export function AdminJobControls({
               <Input type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} className="h-10 pl-7 sm:pl-8" />
             </div>
             <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note to client (optional)" className="h-10 min-w-0 flex-1" />
-            <button disabled={pending || n < MIN_JOB_PRICE} onClick={() => run("quote", () => quoteJobAction(jobId, n, note))} className={btn("primary", "sm", "h-10")}>
+            <button disabled={pending || n < MIN_JOB_PRICE || !reqs.trim()} onClick={() => run("quote", () => quoteJobAction(jobId, n, note, reqs))} className={btn("primary", "sm", "h-10")}>
               {spin("quote", Send)} Send price
             </button>
           </div>
           {n > 0 && (n < MIN_JOB_PRICE
             ? <p className="mt-1.5 text-xs font-medium text-red-600">The lowest price findMe can quote is {formatMoney(MIN_JOB_PRICE)}.</p>
             : <p className="mt-1.5 text-xs text-muted">Pro gets {formatMoney(proPayoutFor(n))} · findMe keeps {formatMoney(findMeFeeFor(n))}</p>)}
+          <p className="mt-3 text-sm font-semibold">Agreed requirements <span className="font-normal text-muted">· one per line</span></p>
+          <p className="text-xs text-muted">Make each one specific and checkable (call the client if it&apos;s vague). The pro must tick every one, and any problem report is judged against this list.</p>
+          <Textarea value={reqs} onChange={(e) => setReqs(e.target.value)} rows={4} className="mt-1.5" placeholder={"Replace the kitchen tap\nNo leaks under the sink"} />
         </div>
       )}
 
@@ -79,7 +84,7 @@ export function AdminJobControls({
       {claimOpen && (
         <div className="rounded-xl border border-red-200 bg-white p-3 sm:p-4">
           <p className="text-sm font-semibold">Decide the guarantee claim</p>
-          <p className="mt-0.5 text-xs text-muted">Call both sides first. Was it the pro&apos;s work, or something the client did? Your note is shown to both.</p>
+          <p className="mt-0.5 text-xs text-muted">Judge it against the agreed requirements: was an agreed item not done, or done badly? Anything outside the list, or caused by the client, isn&apos;t covered. Call both sides first. Your note is shown to both.</p>
           <Textarea value={finding} onChange={(e) => setFinding(e.target.value)} rows={2} maxLength={1000} placeholder="What you found, e.g. The tap was fitted loosely; the pro will refit it." className="mt-2" />
           <div className="mt-2 flex flex-wrap gap-2">
             <button disabled={pending || finding.trim().length < 5} onClick={() => run("redo", () => resolveClaimAction(jobId, "redo", finding), "Ask the pro to fix it before they're paid?")} className={btn("primary", "sm")}>

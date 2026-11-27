@@ -22,7 +22,7 @@ export type PickedPro = {
 };
 
 /** "Tell us what you need": goes to findMe, who sends a price and then a pro. */
-export function RequestForm({ pro, defaults, againOf }: { pro: PickedPro | null; defaults: { phone: string; location: string; category: string; details?: string }; againOf?: string }) {
+export function RequestForm({ pro, defaults, againOf }: { pro: PickedPro | null; defaults: { phone: string; location: string; category: string; details?: string; requirements?: string }; againOf?: string }) {
   const [state, action, pending] = useActionState<FormState, FormData>(createJobAction, {});
   const first = pro?.name.split(" ")[0];
   const e = state.fieldErrors ?? {};
@@ -68,6 +68,21 @@ export function RequestForm({ pro, defaults, againOf }: { pro: PickedPro | null;
           <Label htmlFor="details">Describe the job</Label>
           <Textarea id="details" name="details" rows={4} defaultValue={defaults.details ?? ""} placeholder="What's the problem, how big is the job, anything the pro should bring?" aria-invalid={!!e.details} />
           <FieldError msg={e.details} />
+        </div>
+        <div>
+          <Label htmlFor="requirements" hint="One per line">What must be done for the job to count as finished?</Label>
+          <Textarea
+            id="requirements"
+            name="requirements"
+            rows={4}
+            defaultValue={defaults.requirements ?? ""}
+            placeholder={"e.g.\nReplace the kitchen tap with one I provide\nNo leaks under the sink\nClean up and take away the old tap"}
+            aria-invalid={!!e.requirements}
+          />
+          <p className="mt-1 text-xs text-muted">
+            findMe agrees this list with you before you pay. The pro ticks each item off, and if anything goes wrong, this is what we check the work against.
+          </p>
+          <FieldError msg={e.requirements} />
         </div>
         <div className="grid gap-4 sm:grid-cols-2 sm:gap-5">
           <div>
