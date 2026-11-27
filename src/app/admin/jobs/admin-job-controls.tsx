@@ -11,14 +11,14 @@ export type ProOption = { id: string; label: string; preferred: boolean };
 const FEE = 0.03;
 
 export function AdminJobControls({
-  jobId, status, price, offer, proId, proPaid, paymentClaimed, pros, proPrice,
+  jobId, status, price, proId, proPaid, paymentClaimed, pros, proPrice,
 }: {
-  jobId: string; status: JobStatus; price: number; offer: number; proId: string | null; proPaid: boolean; paymentClaimed: boolean; pros: ProOption[]; proPrice: number;
+  jobId: string; status: JobStatus; price: number; proId: string | null; proPaid: boolean; paymentClaimed: boolean; pros: ProOption[]; proPrice: number;
 }) {
   const [pending, start] = useTransition();
   const [which, setWhich] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [amount, setAmount] = useState(String(price || offer || proPrice || ""));
+  const [amount, setAmount] = useState(String(price || proPrice || ""));
   const [note, setNote] = useState("");
   const [pick, setPick] = useState(proId ?? pros.find((p) => p.preferred)?.id ?? "");
 

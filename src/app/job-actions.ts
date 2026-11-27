@@ -12,7 +12,7 @@ import { isCategory, categoryName } from "@/lib/categories";
 import { formatNgPhone, normalizeNgPhone } from "@/lib/phone";
 import { FINDME_FEE_LABEL, proPayoutFor } from "@/lib/fees";
 import { CATALOG_TAG } from "@/lib/queries";
-import { askProAboutOffer, completeBrokerJob } from "@/lib/broker";
+import { completeBrokerJob } from "@/lib/broker";
 import { paystackReady, startPayment } from "@/lib/paystack";
 import { APP_URL } from "@/lib/email";
 import type { JobDoc, UserDoc } from "@/lib/schema";
@@ -49,7 +49,7 @@ const ok = () => {
 
 // ---------------- Client ----------------
 
-/** Client asks findMe for help. findMe replies with a price (they can make an offer). */
+/** Client asks findMe for help. findMe replies with a price. */
 export async function createJobAction(_: FormState, fd: FormData): Promise<FormState> {
   const user = await requireUser("/request");
   const title = str(fd, "title", 120);
@@ -59,7 +59,6 @@ export async function createJobAction(_: FormState, fd: FormData): Promise<FormS
   const when = str(fd, "when", 80);
   const phoneRaw = str(fd, "phone", 30);
   const phone = normalizeNgPhone(phoneRaw);
-  const clientOffer = money(fd.get("offer"));
   const preferred = safeId(fd.get("proId"));
 
   const fieldErrors: Record<string, string> = {};
@@ -85,7 +84,7 @@ export async function createJobAction(_: FormState, fd: FormData): Promise<FormS
   const ref = jobs().doc();
   await ref.set({
     clientId: user.id, clientName: user.name, clientPhone: phone!, title, details, category, location, when,
-    preferredProId, clientOffer, status: "new", price: 0, proPayout: 0, proId: null, createdAt: now, updatedAt: now,
+    preferredProId, clientOffer: 0, status: "new", price: 0, proPayout: 0, proId: null, createdAt: now, updatedAt: now,
   } satisfies JobDoc);
   // Remember their number for next time.
   const me = (await users().doc(user.id).get()).data() as UserDoc | undefined;
@@ -102,40 +101,13 @@ export async function createJobAction(_: FormState, fd: FormData): Promise<FormS
         ["Category", categoryName(category)],
         ["Where", location],
         ["When", when],
-        ["Their offer", clientOffer ? naira(clientOffer) : "No offer"],
         ["Pro they picked", preferredName || "Any"],
         ["Phone", formatNgPhone(phone!)],
       ],
       quote: { from: user.name, text: details },
     }).catch((e) => console.error("[findMe] job email failed:", e)),
   );
-  // They made an offer to a pro they picked: ask that pro straight away.
-  if (preferredProId && clientOffer) await askProAboutOffer(ref.id, preferredProId).catch((e) => console.error("[findMe] ask pro failed:", e));
   redirect(`${jobHref(ref.id)}?new=1`);
-}
-
-/** Client: "can you do it for less?" Sends the job back to findMe with their new offer. */
-export async function counterOfferAction(jobId: string, offer: number): Promise<{ ok?: true; error?: string }> {
-  const user = await requireUser();
-  const { ref, job } = await loadJob(jobId);
-  if (!job || job.clientId !== user.id || job.status !== "quoted") return { error: "You can't change the offer on this job now." };
-  const amount = money(offer);
-  if (!amount) return { error: "Enter the amount you'd like to pay." };
-  if (amount >= job.price) return { error: "Your offer should be lower than the quote." };
-  await ref.update({ status: "new", clientOffer: amount, updatedAt: Date.now() });
-  // Ask the pro straight away: the one already lined up, the one asked before, or the one they picked.
-  const proToAsk = job.proId || job.askProId || job.preferredProId;
-  const asked = proToAsk ? await askProAboutOffer(ref.id, proToAsk).catch(() => false) : false;
-  after(() =>
-    emailAdmins({
-      subject: `Offer: ${naira(amount)} for "${job.title}"`,
-      title: `${user.name} made an offer`,
-      body: `You quoted ${naira(job.price)}. ${user.name.split(" ")[0]} would like to pay ${naira(amount)}. ${asked ? "We've asked the pro to accept it or give their final price; you'll hear when they answer." : "Check with a pro and send a new price."}`,
-      href: adminHref(ref.id),
-      cta: "Open job",
-    }).catch(() => {}),
-  );
-  return ok();
 }
 
 /** Client: "I've sent the money". findMe checks the account and confirms. */
@@ -233,33 +205,9 @@ export async function proMarkDoneAction(jobId: string): Promise<{ ok?: true; err
   return ok();
 }
 
-/** Pro asked about a client's offer: accept it, or name their final price (what the client would pay). */
-export async function answerOfferAction(jobId: string, accept: boolean, finalPrice: number): Promise<{ ok?: true; error?: string }> {
-  const user = await requireUser();
-  const { ref, job } = await loadJob(jobId);
-  if (!job || job.askProId !== user.id || (job.status !== "new" && job.status !== "quoted")) return { error: "This offer is no longer waiting for your answer." };
-  const amount = accept ? job.clientOffer : money(finalPrice);
-  if (!amount) return { error: "Enter your final price." };
-  if (!accept && amount <= job.clientOffer) return { error: "That's no more than the client's offer. Tap Accept instead." };
-  await ref.update({ proAnswer: { accepted: accept, amount, at: Date.now() }, updatedAt: Date.now() });
-  const name = user.name.split(" ")[0];
-  after(() =>
-    emailAdmins({
-      subject: accept ? `${name} accepts ${naira(amount)} for "${job.title}"` : `${name}'s final price: ${naira(amount)} for "${job.title}"`,
-      title: accept ? `${user.name} accepted the client's offer` : `${user.name} gave their final price`,
-      body: accept
-        ? `The client offered ${naira(job.clientOffer)} and ${name} accepts it. Send the client this price.`
-        : `The client offered ${naira(job.clientOffer)}. ${name}'s final price is ${naira(amount)}. Send the client a price.`,
-      href: adminHref(ref.id),
-      cta: "Send the price",
-    }).catch(() => {}),
-  );
-  return ok();
-}
-
 // ---------------- Admin ----------------
 
-/** Admin: send the client a price (after any bargaining with the pro). */
+/** Admin: send the client a price. */
 export async function quoteJobAction(jobId: string, price: number, note: string): Promise<{ ok?: true; error?: string }> {
   try {
     await requireAdmin();
@@ -275,7 +223,7 @@ export async function quoteJobAction(jobId: string, price: number, note: string)
     userId: job.clientId,
     kind: "status",
     title: `Your price from findMe: ${naira(amount)}`,
-    body: `For "${job.title}". Pay findMe to book it, or ask for a better price.${job.clientOffer && amount <= job.clientOffer ? " We matched your offer!" : ""}`,
+    body: `For "${job.title}". Pay findMe to book it.`,
     href: jobHref(ref.id),
     cta: "See price & pay",
   });

@@ -165,7 +165,7 @@ export type IdentityDoc = {
 export type CoverDoc = { image: string; updatedAt: number };
 
 /**
- * jobs/{id}: a client's request to findMe. findMe quotes a price (the client can bargain), takes
+ * jobs/{id}: a client's request to findMe. findMe quotes a price, takes
  * payment, assigns a pro, and pays the pro once the client confirms the work. Client and pro never
  * get each other's contact through the site; only the assigned pro sees the client's number.
  */
@@ -181,7 +181,7 @@ export type JobDoc = {
   when: string; // e.g. "This weekend", "ASAP"
   /** Pro the client picked on findMe, if any (findMe may still assign someone else). */
   preferredProId: string | null;
-  /** What the client would like to pay (their bargain), if they made an offer. */
+  /** Old field from when clients could make offers. Always 0 now. */
   clientOffer: number;
   status: JobStatus;
   /** The price findMe quoted / agreed with the client. */
@@ -198,11 +198,6 @@ export type JobDoc = {
   doneRequestedAt?: number; // pro said it's done; client confirms or it auto-confirms
   completedAt?: number;
   proPaidAt?: number; // admin paid the pro
-  /** Bargaining: the pro findMe asked about the client's offer (usually the one the client picked). */
-  askProId?: string | null;
-  askedAt?: number;
-  /** That pro's reply: they accept the client's offer, or name their final price (what the client pays). */
-  proAnswer?: { accepted: boolean; amount: number; at: number } | null;
   cancelledAt?: number;
   reviewed?: boolean;
   adminNote?: string;

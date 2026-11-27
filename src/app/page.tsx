@@ -105,7 +105,7 @@ export default function Home() {
             <Stagger className="relative mt-8 grid gap-3 sm:mt-16 sm:gap-6 md:grid-cols-3">
               {[
                 { icon: Search, title: "Tell us what you need", body: "Browse pros and their prices, or just describe the job, like “fix my sink”." },
-                { icon: UserRoundCheck, title: "Get a findMe price", body: "We send you a price. Want it cheaper? Make an offer and we ask the pro." },
+                { icon: UserRoundCheck, title: "Get a findMe price", body: "We send you one clear price for the job, with no haggling." },
                 { icon: MessageSquareText, title: "We send the pro", body: "Pay findMe and we send a trusted pro. We only pay them once you confirm the job is done." },
               ].map(({ icon: Icon, title, body }, i) => (
                 <StaggerItem key={title} className="group relative flex gap-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4 transition-colors hover:bg-white/[0.07] sm:block sm:rounded-3xl sm:p-7">
@@ -206,7 +206,7 @@ export default function Home() {
               name="For clients"
               price="₦0"
               note="to request a service"
-              points={["Tell us what you need, free", "See pros' prices and make an offer", "Pay findMe, never the pro", "We hold your money until you confirm the job is done", "Rate the pro when it's finished"]}
+              points={["Tell us what you need, free", "See pros' prices", "Pay findMe, never the pro", "We hold your money until you confirm the job is done", "Rate the pro when it's finished"]}
               cta={<Link href="/request" className={btn("outline", "md", "w-full")}>Request a service</Link>}
             />
             <PlanCard

@@ -46,7 +46,7 @@ async function Content({ searchParams }: { searchParams: PageProps<"/request">["
         category: pro.category,
         rating: pro.rating,
         reviewCount: pro.reviewCount,
-        // The price the client sees and can bargain against.
+        // The pro's listed price, shown on the request form.
         price: service ? service.price : pro.hourlyRate || pro.startingPrice || 0,
         unit: service ? (service.priceUnit === "hour" ? "hour" : "job") : pro.rateUnit,
         serviceTitle: service?.title ?? "",

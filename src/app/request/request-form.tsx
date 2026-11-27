@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { HandCoins, Loader2, Send, ShieldCheck, Star } from "lucide-react";
+import { useActionState } from "react";
+import { Loader2, Send, ShieldCheck, Star } from "lucide-react";
 import { createJobAction } from "@/app/job-actions";
 import type { FormState } from "@/app/actions";
 import { CATEGORIES } from "@/lib/categories";
@@ -24,7 +24,6 @@ export type PickedPro = {
 /** "Tell us what you need": goes to findMe, who sends a price and then a pro. */
 export function RequestForm({ pro, defaults }: { pro: PickedPro | null; defaults: { phone: string; location: string; category: string } }) {
   const [state, action, pending] = useActionState<FormState, FormData>(createJobAction, {});
-  const [bargain, setBargain] = useState(false);
   const first = pro?.name.split(" ")[0];
   const e = state.fieldErrors ?? {};
 
@@ -96,24 +95,6 @@ export function RequestForm({ pro, defaults }: { pro: PickedPro | null; defaults
           <Label htmlFor="phone" hint="Only the pro we send sees it">Your phone number</Label>
           <PhoneInput id="phone" name="phone" defaultValue={defaults.phone} aria-invalid={!!e.phone} />
           <FieldError msg={e.phone} />
-        </div>
-
-        <div className="rounded-2xl border border-line bg-canvas/60 p-4">
-          <button type="button" onClick={() => setBargain((b) => !b)} className="flex w-full items-center gap-2 text-left font-semibold">
-            <HandCoins className="size-5 text-brand-600" />
-            <span className="flex-1">{pro?.price ? `Want to pay less than ${formatMoney(pro.price)}?` : "Have a budget in mind?"}</span>
-            <span className="text-sm text-brand-700">{bargain ? "Hide" : "Make an offer"}</span>
-          </button>
-          {bargain && (
-            <div className="mt-3">
-              <Label htmlFor="offer">Your offer (₦)</Label>
-              <div className="relative">
-                <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 font-semibold text-muted sm:left-4">₦</span>
-                <Input id="offer" name="offer" type="number" min={0} placeholder={pro?.price ? String(Math.round(pro.price * 0.85)) : "25000"} className="pl-9 sm:pl-10" />
-              </div>
-              <p className="mt-1.5 text-xs text-muted">We&apos;ll ask {first ?? "the pro"} if they can do it for this, then send you our best price.</p>
-            </div>
-          )}
         </div>
 
         {state.error && <p className="text-sm font-medium text-red-600">{state.error}</p>}

@@ -49,7 +49,6 @@ export default function TermsPage() {
               <li>Describe your skills, experience, prices and availability honestly.</li>
               <li>Hold any licences or permits your work requires, and follow the law, including tax obligations.</li>
               <li>When findMe gives you a job, contact the client promptly and do the work to a professional standard.</li>
-              <li>findMe may ask whether you&apos;ll do a job for less when a client makes an offer. You can say no.</li>
             </ul>
           ),
         },

@@ -165,7 +165,7 @@ async function Overview({ searchParams }: { searchParams: Promise<Record<string,
           : toConfirm[0]
             ? { href: `/dashboard/jobs/${toConfirm[0].id}`, title: `Is "${toConfirm[0].title}" finished?`, sub: "The pro says it's done. Confirm it so we can pay them.", tone: "amber" as const }
             : toPay[0]
-              ? { href: `/dashboard/jobs/${toPay[0].id}`, title: `Your price is ready: ${formatMoney(toPay[0].price)}`, sub: `For "${toPay[0].title}". Pay findMe to book it, or ask for a better price.`, tone: "amber" as const }
+              ? { href: `/dashboard/jobs/${toPay[0].id}`, title: `Your price is ready: ${formatMoney(toPay[0].price)}`, sub: `For "${toPay[0].title}". Pay findMe to book it.`, tone: "amber" as const }
               : toRate[0] && { href: `/dashboard/jobs/${toRate[0].id}#review`, title: `How did "${toRate[0].title}" go?`, sub: "Rate the pro. Your review helps us send the best people.", tone: "violet" as const };
         if (!item) return null;
         const c = item.tone === "amber" ? "border-amber-200 bg-amber-50/70 text-amber-950 hover:border-amber-300" : "border-violet-200 bg-violet-50/70 text-violet-950 hover:border-violet-300";

@@ -18,7 +18,7 @@ export function bankDetails() {
 /** "Ben" or "Ben's Plumbing": what clients see of a pro (no surname, no contact). */
 export const proShownName = (u: Pick<UserDoc, "name" | "businessName">) => u.businessName?.trim() || u.name.split(" ")[0];
 
-async function load(field: "clientId" | "proId" | "askProId", uid: string) {
+async function load(field: "clientId" | "proId", uid: string) {
   const snap = await db().collection("jobs").where(field, "==", uid).get();
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as JobDoc) }));
 }
@@ -29,9 +29,7 @@ export async function getMyJobs(uid: string) {
   let [asked, assigned] = await Promise.all([load("clientId", uid), load("proId", uid)]);
   if (await settleOverdueBrokerJobs([...asked, ...assigned])) [asked, assigned] = await Promise.all([load("clientId", uid), load("proId", uid)]);
   const byNew = (a: JobWithId, b: JobWithId) => b.updatedAt - a.updatedAt;
-  // Client offers findMe asked me about (and hasn't given to someone else).
-  const offers = (await load("askProId", uid)).filter((j) => (j.status === "new" || j.status === "quoted") && (!j.proId || j.proId === uid)).sort(byNew);
-  return { asked: asked.sort(byNew), assigned: assigned.filter((j) => j.status !== "cancelled" || j.assignedAt).sort(byNew), offers };
+  return { asked: asked.sort(byNew), assigned: assigned.filter((j) => j.status !== "cancelled" || j.assignedAt).sort(byNew) };
 }
 
 /** One job, for its client, its assigned pro, or an admin. */
@@ -41,9 +39,7 @@ export async function getJob(id: string, uid: string, admin = false) {
   let job = (await ref.get()).data() as JobDoc | undefined;
   if (!job) return null;
   if (await settleOverdueBrokerJobs([{ id: ref.id, ...job }])) job = (await ref.get()).data() as JobDoc;
-  // "offer": a pro findMe asked about the client's offer. They see the job, never the client's contact.
-  const bargaining = job.askProId === uid && job.clientOffer > 0 && (job.status === "new" || job.status === "quoted");
-  const role = job.clientId === uid ? "client" : bargaining ? "offer" : job.proId === uid ? "pro" : admin ? "admin" : null;
+  const role = job.clientId === uid ? "client" : job.proId === uid ? "pro" : admin ? "admin" : null;
   if (!role) return null;
   const [proSnap, reviewSnap] = await Promise.all([
     job.proId ? db().collection("users").doc(job.proId).get() : Promise.resolve(null),

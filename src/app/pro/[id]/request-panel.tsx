@@ -52,7 +52,6 @@ export function RequestPanel({ provider, services, isSelf }: { provider: Provide
               Request {first} through findMe <ArrowRight className="size-4.5 transition-transform group-hover:translate-x-0.5" />
             </Link>
           )}
-          <p className="mt-3 text-center text-xs text-muted">Want a better price? You can make an offer.</p>
         </div>
       </div>
 
