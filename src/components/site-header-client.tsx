@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { OFFER_SKILLS_HREF, SmartLink } from "./smart-link";
@@ -17,8 +17,69 @@ const LINKS = [
 ];
 const OFFER = { href: OFFER_SKILLS_HREF, label: "Offer your skills" };
 
+const isActive = (pathname: string, href: string) => !!pathname && !href.includes("#") && (pathname === href || pathname.startsWith(`${href}/`));
+
+/*
+ * The links read the current path to mark the page you're on. On pages with dynamic URLs the
+ * path isn't known while prerendering, so they sit in Suspense and prerender unmarked.
+ */
+function DesktopLinks({ pathname = "" }: { pathname?: string }) {
+  return (
+    <ul className="hidden items-center gap-7 lg:flex">
+      {LINKS.map((l) => {
+        const active = isActive(pathname, l.href);
+        return (
+          <li key={l.href}>
+            <SmartLink
+              href={l.href}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "relative py-2 text-[14px] font-medium transition-colors",
+                "after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:origin-left after:rounded-full after:bg-ink after:transition-transform after:duration-200",
+                active ? "text-ink after:scale-x-100" : "text-ink-soft after:scale-x-0 hover:text-ink"
+              )}
+            >
+              {l.label}
+            </SmartLink>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function MobileLinks({ pathname = "", onPick }: { pathname?: string; onPick: () => void }) {
+  return (
+    <ul className="divide-y divide-line">
+      {[...LINKS, OFFER].map((l) => {
+        const active = isActive(pathname, l.href);
+        return (
+          <li key={l.href}>
+            <SmartLink
+              href={l.href}
+              onClick={onPick}
+              aria-current={active ? "page" : undefined}
+              className={cn("flex items-center justify-between py-3.5 text-[15px] font-semibold", active ? "text-brand-700" : "text-ink")}
+            >
+              {l.label}
+              <ChevronRight className="size-4 text-muted" />
+            </SmartLink>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function CurrentDesktopLinks() {
+  return <DesktopLinks pathname={usePathname()} />;
+}
+
+function CurrentMobileLinks({ onPick }: { onPick: () => void }) {
+  return <MobileLinks pathname={usePathname()} onPick={onPick} />;
+}
+
 export function HeaderShell({ auth, transparent }: { auth: ReactNode; transparent?: boolean }) {
-  const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -37,7 +98,6 @@ export function HeaderShell({ auth, transparent }: { auth: ReactNode; transparen
   }, [open]);
 
   const solid = scrolled || !transparent || open;
-  const isActive = (href: string) => !href.includes("#") && (pathname === href || pathname.startsWith(`${href}/`));
 
   return (
     <header className="sticky top-0 z-50">
@@ -50,26 +110,9 @@ export function HeaderShell({ auth, transparent }: { auth: ReactNode; transparen
         <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8" aria-label="Main">
           <div className="flex min-w-0 items-center gap-10">
             <Logo />
-            <ul className="hidden items-center gap-7 lg:flex">
-              {LINKS.map((l) => {
-                const active = isActive(l.href);
-                return (
-                  <li key={l.href}>
-                    <SmartLink
-                      href={l.href}
-                      aria-current={active ? "page" : undefined}
-                      className={cn(
-                        "relative py-2 text-[14px] font-medium transition-colors",
-                        "after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:origin-left after:rounded-full after:bg-ink after:transition-transform after:duration-200",
-                        active ? "text-ink after:scale-x-100" : "text-ink-soft after:scale-x-0 hover:text-ink"
-                      )}
-                    >
-                      {l.label}
-                    </SmartLink>
-                  </li>
-                );
-              })}
-            </ul>
+            <Suspense fallback={<DesktopLinks />}>
+              <CurrentDesktopLinks />
+            </Suspense>
           </div>
           <div className="flex items-center gap-1 sm:gap-2">
             <SmartLink href={OFFER.href} className="hidden text-[14px] font-medium text-ink-soft transition-colors hover:text-ink lg:block">
@@ -99,24 +142,9 @@ export function HeaderShell({ auth, transparent }: { auth: ReactNode; transparen
             transition={{ duration: 0.18, ease: "easeOut" }}
             className="absolute inset-x-0 top-16 border-b border-line bg-white px-4 pb-5 pt-2 shadow-lift sm:px-6 lg:hidden"
           >
-            <ul className="divide-y divide-line">
-              {[...LINKS, OFFER].map((l) => {
-                const active = isActive(l.href);
-                return (
-                  <li key={l.href}>
-                    <SmartLink
-                      href={l.href}
-                      onClick={() => setOpen(false)}
-                      aria-current={active ? "page" : undefined}
-                      className={cn("flex items-center justify-between py-3.5 text-[15px] font-semibold", active ? "text-brand-700" : "text-ink")}
-                    >
-                      {l.label}
-                      <ChevronRight className="size-4 text-muted" />
-                    </SmartLink>
-                  </li>
-                );
-              })}
-            </ul>
+            <Suspense fallback={<MobileLinks onPick={() => setOpen(false)} />}>
+              <CurrentMobileLinks onPick={() => setOpen(false)} />
+            </Suspense>
           </motion.div>
         )}
       </AnimatePresence>
