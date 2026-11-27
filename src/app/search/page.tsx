@@ -1,4 +1,6 @@
 import { Suspense } from "react";
+import { after } from "next/server";
+import { logMissedSearch } from "@/lib/missed-searches";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, BadgeCheck, ChevronRight, Lock, ReceiptText, SearchX, ShieldCheck, Star } from "lucide-react";
@@ -61,6 +63,11 @@ async function SearchBody({ searchParams }: { searchParams: Promise<Raw> }) {
   const terms = (params.q ?? "").toLowerCase().split(/\s+/).filter((t) => t.length > 2);
   const filtered = !!(params.category || params.state || params.maxRate || params.minRating || params.available);
   const intro = !params.q && !filtered;
+  // Note searches that found nobody, so we know which pros to recruit. Price, rating and
+  // availability filters are the client narrowing down, not missing supply, so they're skipped.
+  if (results.length === 0 && (params.q || params.category || params.state) && !params.maxRate && !params.minRating && !params.available) {
+    after(() => logMissedSearch(params).catch((e) => console.error("[findMe] missed search log failed:", e)));
+  }
 
   const heading = params.q ? `Results for “${params.q}”` : params.category ? categoryName(params.category) : "All professionals";
   const where = params.state ? ` in ${params.state}` : "";
