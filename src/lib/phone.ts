@@ -40,6 +40,10 @@ export const telLink = (e164: string) => `tel:${e164}`;
 export const whatsappLink = (e164: string, text?: string) =>
   `https://wa.me/${e164.replace(/^\+/, "")}${text ? `?text=${encodeURIComponent(text)}` : ""}`;
 
+/** findMe's support / concierge line: calls and WhatsApp. */
+export const SUPPORT_PHONE = "+2349060484528";
+export const SUPPORT_PHONE_SHOWN = "+234 906 048 4528";
+
 /** Dom on findMe's team handles phone verification; every "Verify on WhatsApp" chat opens with this number. */
 const VERIFY_WHATSAPP_DEFAULT = "+2348050939621";
 

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { OFFER_SKILLS_HREF, SmartLink } from "./smart-link";
 import { CATEGORIES } from "@/lib/categories";
 import { Logo } from "./ui";
+import { SUPPORT_PHONE, SUPPORT_PHONE_SHOWN, telLink, whatsappLink } from "@/lib/phone";
 
 export function SiteFooter() {
   return (
@@ -11,6 +12,12 @@ export function SiteFooter() {
           <Logo />
           <p className="mt-3 max-w-xs text-[13px] leading-relaxed text-muted sm:mt-4 sm:text-sm">
             findMe connects people with skilled professionals across Nigeria. Your contact details stay private until you accept a request.
+          </p>
+          <p className="mt-3 text-[13px] sm:text-sm">
+            <span className="font-semibold text-ink-soft">Concierge:</span>{" "}
+            <a href={telLink(SUPPORT_PHONE)} className="font-semibold tabular-nums text-brand-700 hover:underline">{SUPPORT_PHONE_SHOWN}</a>
+            <span className="text-muted"> · </span>
+            <a href={whatsappLink(SUPPORT_PHONE)} target="_blank" rel="noreferrer" className="font-semibold text-emerald-700 hover:underline">WhatsApp</a>
           </p>
         </div>
         <FooterCol title="Popular categories" links={CATEGORIES.slice(0, 5).map((c) => ({ href: `/search?category=${c.slug}`, label: c.name }))} />

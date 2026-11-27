@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Banknote, CalendarDays, CheckCircle2, Clock, Landmark, MapPin, PhoneOff, ShieldCheck, Star, UserRound } from "lucide-react";
+import { ArrowLeft, Banknote, CalendarDays, CheckCircle2, Clock, Headset, Landmark, MapPin, PhoneOff, ShieldCheck, Star, UserRound } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
 import { db } from "@/lib/firebase-admin";
@@ -19,6 +19,7 @@ import { ReviewForm } from "../../requests/[id]/thread-client";
 import { CancelJobButton, ConfirmDoneButtons, PayButtons, PaystackButton, ProDoneButton } from "../job-buttons";
 import { checkPayment, jobIdOf, paystackReady, paystackTestMode } from "@/lib/paystack";
 import { recordPaystackPayment } from "@/lib/broker";
+import { SUPPORT_PHONE, SUPPORT_PHONE_SHOWN, telLink, whatsappLink } from "@/lib/phone";
 
 export const metadata: Metadata = { title: "Job" };
 
@@ -101,6 +102,13 @@ async function Job({ params, searchParams }: { params: Promise<{ id: string }>; 
       </FadeIn>
 
       <div className="mt-4 space-y-4">{side === "pro" ? <ProView job={job} clientTeam={clientTeam} hasPayout={(await db().collection("payouts").doc(user.id).get()).exists} /> : <ClientView job={job} pro={pro} review={review} />}</div>
+
+      <p className="mt-6 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-sm text-muted">
+        <Headset className="size-4 text-brand-500" /> Questions about this job? findMe concierge:
+        <a href={telLink(SUPPORT_PHONE)} className="font-semibold tabular-nums text-brand-700 hover:underline">{SUPPORT_PHONE_SHOWN}</a>
+        <span>·</span>
+        <a href={whatsappLink(SUPPORT_PHONE, `Hi findMe, I have a question about my job "${job.title}".`)} target="_blank" rel="noreferrer" className="font-semibold text-emerald-700 hover:underline">WhatsApp</a>
+      </p>
     </div>
   );
 }
